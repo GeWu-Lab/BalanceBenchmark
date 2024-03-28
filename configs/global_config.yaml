@@ -1,0 +1,57 @@
+name: "Baseline"
+mode: "train_and_test"
+seed: 42
+
+dataset:
+  dataloader:
+    eff_batch_size: 1024 # effective batch_size = num_node*num_process_per_node*batch_size_per_process = world_size*batch_size_per_process
+    batch_size: -1 # batch size per process, set to -1 to use eff_batch_size
+    num_workers: 4 # number of workers for dataloader
+    fast_run: false # if true, only use part of the dataset
+    shuffle: true # if true, shuffle the dataset
+    drop_last: true # if true, drop the last batch if the size is not equal to batch_size
+    pin_memory: true # if true, use pin_memory for dataloader
+
+device:
+  accelerator: "auto" # "cpu", "gpu", "cuda", "mps", "tpu"
+  devices: "auto" # number of devices or list of index
+  precision: "32-true" # "32-true", "16-mixed", "bf16-mixed", etc.
+  strategy: "dp" # "dp", "ddp", "ddp2", "ddp_spawn"
+
+log:
+  logger_name: [] # list of logger name
+  wandb_name: ''
+  log_interval: 100 # how many batches to wait before logging training status
+  log_per_epoch: -1 # number of log for each epoch. If set will override log_interval
+  comment: '' # comment for the logger
+
+model:
+  type: AVClassifier
+  n_classes: 6
+  fusion: concat
+
+train:
+  parameter:
+    total_epoch: 200 # number of epochs to train
+    warmup: 10 # warmup beta and lr
+    base_lr: 0.001 # base learning rate. Using linear law, lr = eff_batch_size/base_bs*base_lr
+    lr: -1 # learning rate. If set, override base_lr, set to -1 to use base_lr
+    base_batch_size: 64 # base batch_size
+    lr_scaling_rule: "linear" # "sqrt", "linear" learning rate should scale with batch size
+  checkpoint:
+    resume: '' # path to the checkpoint
+    checkpoint_frequency: 1 # number of epoch interval to save the checkpoint
+    num_checkpoint_keep: 3 # set to -1 to save all checkpoints
+  optimizer:
+    type: "SGD" # type of optimizer
+    momentum: 0.9
+    weight_decay: 1e-4
+  scheduler:
+    type: "StepLR" # type of scheduler
+    step_size: 30 # step size for StepLR
+    gamma: 0.1 # gamma for StepLR
+  validation:
+    frequency: 1 # number of epoch interval to do validation
+    select_best: 'last' # 'last', 'best' select the best model based on validation loss
+  loss:
+    type: "CrossEntropyLoss" # type of loss

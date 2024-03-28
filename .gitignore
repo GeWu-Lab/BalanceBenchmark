@@ -1,0 +1,4 @@
+# ignore experiments
+experiments/
+# ignore python cache
+__pycache__/

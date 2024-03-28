@@ -1,0 +1,36 @@
+import importlib
+import os
+from os import path as osp
+from types import SimpleNamespace
+
+__all__ = ['create_trainer']
+
+# automatically scan and import trainer modules
+# scan all the files under the data folder with '_trainer' in file names
+trainer_folder = osp.dirname(osp.abspath(__file__))
+trainer_filenames = [
+    osp.splitext(v)[0] for v in os.listdir(trainer_folder)
+    if v.endswith('_trainer.py')
+]
+
+# import all the trainer modules
+_trainer_modules = [
+    importlib.import_module(f'.{file_name}', package="balancemm.trainer")
+    for file_name in trainer_filenames
+]
+
+def create_trainer(trainer_opt):
+    # dynamic instantiation
+    for module in _trainer_modules:
+        trainer_cls = getattr(module, trainer_opt["trainer"], None)
+        if trainer_cls is not None:
+            break
+    if trainer_cls is None:
+        raise ValueError(f'trainer {trainer} is not found.')
+
+    trainer = trainer_cls(trainer_opt)
+
+    print(
+        f'Trainer {trainer.__class__.__name__} - {trainer_opt["name"]} '
+        'is created.')
+    return trainer
