@@ -7,9 +7,8 @@ import lightning as L
 def create_train_val_dataloader(fabric: L.Fabric, config: dict):
     config = SimpleNamespace(**config)
     
-    with fabric.rank_zero_first():  # set `local=True` if your filesystem is not shared between machines
-        train_dataset = create_dataset(config.train)
-        val_dataset = create_dataset(config.val)
+    train_dataset = create_dataset(config.train)
+    val_dataset = create_dataset(config.val)
     
     config_dataloader = SimpleNamespace(**config.dataloader)
     if config_dataloader.fast_run == True:
@@ -20,7 +19,7 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
     fabric.print(f"Train dataset: {train_dataset.__class__.__name__} - {config.train['name']}, {len(train_dataset)} samples")
     fabric.print(f"Val dataset: {val_dataset.__class__.__name__} - {config.val['name']}, {len(val_dataset)} samples")
 
-    if (not hasattr(config_dataloader, 'batch_size')) or config_dataloader.batch_size == -1:
+    if (not hasattr(config_dataloader, 'batch_size')):
         config_dataloader.batch_size = round(config_dataloader.eff_batch_size/fabric.world_size) # using the effective batch_size to calculate the batch_size per gpu
     
     train_dataloader = torch.utils.data.DataLoader(train_dataset,  batch_size=config_dataloader.batch_size, shuffle=config_dataloader.shuffle, drop_last = config_dataloader.drop_last, num_workers = config_dataloader.num_workers, multiprocessing_context='spawn', pin_memory = config_dataloader.pin_memory)

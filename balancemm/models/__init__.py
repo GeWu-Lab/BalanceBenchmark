@@ -2,7 +2,7 @@ import importlib
 import os
 from os import path as osp
 from types import SimpleNamespace
-from balancemm.utils.parser_utils import find_module
+from ..utils.parser_utils import find_module
 __all__ = ['find_model', 'create_model']
 
 # ----------------------
@@ -26,13 +26,12 @@ def find_model(model_name: str) -> object:
     return model_cls
 
 # create model from model_opt
-def create_model(model_opt: SimpleNamespace):
+def create_model(model_opt: dict):
     if 'type' not in model_opt:
         raise ValueError('Model type is required.')
-    model_cls = find_model(model_opt.type)
+    model_cls = find_model(model_opt['type'])
     model = model_cls(model_opt)
 
     print(
-        f'Model {model.__class__.__name__} - {model_opt.type} '
-        'is created.')
+        f'Model {model.__class__.__name__} - {model_opt["type"]} is created.')
     return model

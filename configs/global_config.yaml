@@ -12,7 +12,7 @@ dataset:
     drop_last: true # if true, drop the last batch if the size is not equal to batch_size
     pin_memory: true # if true, use pin_memory for dataloader
 
-device:
+fabric:
   accelerator: "auto" # "cpu", "gpu", "cuda", "mps", "tpu"
   devices: "auto" # number of devices or list of index
   precision: "32-true" # "32-true", "16-mixed", "bf16-mixed", etc.
@@ -45,7 +45,7 @@ train:
   optimizer:
     type: "SGD" # type of optimizer
     momentum: 0.9
-    weight_decay: 1e-4
+    weight_decay: 0.0001
   scheduler:
     type: "StepLR" # type of scheduler
     step_size: 30 # step size for StepLR

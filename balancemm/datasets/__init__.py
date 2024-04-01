@@ -1,7 +1,7 @@
 import importlib
 import os
 from os import path as osp
-from balancemm.utils.parser_utils import find_module
+from ..utils.parser_utils import find_module
 __all__ = ['find_dataset', 'create_dataset']
 
 # ----------------------

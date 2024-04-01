@@ -41,22 +41,6 @@ class BaseTrainer:
                 The value applies per node.
             precision: Double precision (``"64"``), full precision (``"32"``), half precision AMP (``"16-mixed"``),
                 or bfloat16 precision AMP (``"bf16-mixed"``).
-            plugins: One or several custom plugins
-            callbacks: A single callback or a list of callbacks. The following hooks are supported:
-                - on_train_epoch_start
-                - on train_epoch_end
-                - on_train_batch_start
-                - on_train_batch_end
-                - on_before_backward
-                - on_after_backward
-                - on_before_zero_grad
-                - on_before_optimizer_step
-                - on_validation_model_eval
-                - on_validation_model_train
-                - on_validation_epoch_start
-                - on_validation_epoch_end
-                - on_validation_batch_start
-                - on_validation_batch_end
 
             loggers: A single logger or a list of loggers. See :meth:`~lightning.fabric.fabric.Fabric.log` for more
                 information.
@@ -106,7 +90,7 @@ class BaseTrainer:
 
     def fit(
         self,
-        model: L.LightningModule,
+        model,
         train_loader: torch.utils.data.DataLoader,
         val_loader: torch.utils.data.DataLoader,
         ckpt_path: Optional[str] = None,
@@ -129,11 +113,6 @@ class BaseTrainer:
         train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
         if val_loader is not None:
             val_loader = self.fabric.setup_dataloaders(val_loader, use_distributed_sampler=self.use_distributed_sampler)
-
-        # setup model and optimizer
-        if isinstance(self.fabric.strategy, L.fabric.strategies.fsdp.FSDPStrategy):
-            # currently, there is no way to support fsdp with model.configure_optimizers in fabric, as it would require fabric to hold a reference to the model, which we don't want to.
-            raise NotImplementedError("BYOT currently does not support FSDP")
 
         optimizer, scheduler_cfg = self._parse_optimizers_schedulers(model.configure_optimizers())
         assert optimizer is not None
@@ -434,61 +413,6 @@ class BaseTrainer:
             return None
 
         return os.path.join(checkpoint_dir, items[-1])
-
-    def _parse_optimizers_schedulers(
-        self, configure_optim_output
-    ) -> Tuple[
-        Optional[L.fabric.utilities.types.Optimizable],
-        Optional[Mapping[str, Union[L.fabric.utilities.types.LRScheduler, bool, str, int]]],
-    ]:
-        """Recursively parses the output of :meth:`lightning.pytorch.LightningModule.configure_optimizers`.
-
-        Args:
-            configure_optim_output: The output of ``configure_optimizers``.
-                For supported values, please refer to :meth:`lightning.pytorch.LightningModule.configure_optimizers`.
-
-        """
-        _lr_sched_defaults = {"interval": "epoch", "frequency": 1, "monitor": "val_loss"}
-
-        # single optimizer
-        if isinstance(configure_optim_output, L.fabric.utilities.types.Optimizable):
-            return configure_optim_output, None
-
-        # single lr scheduler
-        if isinstance(configure_optim_output, L.fabric.utilities.types.LRScheduler):
-            return None, _lr_sched_defaults.update(scheduler=configure_optim_output)
-
-        # single lr scheduler config
-        if isinstance(configure_optim_output, Mapping):
-            _lr_sched_defaults.update(configure_optim_output)
-            return None, _lr_sched_defaults
-
-        # list or tuple
-        if isinstance(configure_optim_output, (list, tuple)):
-            if all(isinstance(_opt_cand, L.fabric.utilities.types.Optimizable) for _opt_cand in configure_optim_output):
-                # single optimizer in list
-                if len(configure_optim_output) == 1:
-                    return configure_optim_output[0][0], None
-
-                raise NotImplementedError("BYOT only supports a single optimizer")
-
-            if all(
-                isinstance(_lr_cand, (L.fabric.utilities.types.LRScheduler, Mapping))
-                for _lr_cand in configure_optim_output
-            ):
-                # single scheduler in list
-                if len(configure_optim_output) == 1:
-                    return None, self._parse_optimizers_schedulers(configure_optim_output[0])[1]
-
-            # optimizer and lr scheduler
-            elif len(configure_optim_output) == 2:
-                opt_cands, lr_cands = (
-                    self._parse_optimizers_schedulers(configure_optim_output[0])[0],
-                    self._parse_optimizers_schedulers(configure_optim_output[1])[1],
-                )
-                return opt_cands, lr_cands
-
-        return None, None
 
     @staticmethod
     def _format_iterable(
