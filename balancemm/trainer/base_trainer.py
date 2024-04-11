@@ -14,7 +14,7 @@ from lightning_utilities import apply_to_collection
 from tqdm import tqdm
 
 
-class BaseTrainer:
+class BaseTrainer():
     def __init__(
         self,
         fabric: L.Fabric,
@@ -62,7 +62,6 @@ class BaseTrainer:
             callbacks written for the lightning trainer (especially making assumptions on the trainer), won't work!
 
         """
-
         self.fabric = fabric
         self.global_step = 0
         self.grad_accum_steps: int = grad_accum_steps
@@ -93,6 +92,8 @@ class BaseTrainer:
         model,
         train_loader: torch.utils.data.DataLoader,
         val_loader: torch.utils.data.DataLoader,
+        optimizer: torch.optim.Optimizer,
+        scheduler_cfg: torch.optim.lr_scheduler,
         ckpt_path: Optional[str] = None,
     ):
         """The main entrypoint of the trainer, triggering the actual training.
@@ -107,16 +108,16 @@ class BaseTrainer:
                 If specified, will always look for the latest checkpoint within the given directory.
 
         """
+        print(type(self.fabric))
         self.fabric.launch()
 
         # setup dataloaders
         train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
         if val_loader is not None:
             val_loader = self.fabric.setup_dataloaders(val_loader, use_distributed_sampler=self.use_distributed_sampler)
-
-        optimizer, scheduler_cfg = self._parse_optimizers_schedulers(model.configure_optimizers())
-        assert optimizer is not None
-        model, optimizer = self.fabric.setup(model, optimizer)
+        # optimizer, scheduler_cfg = self._parse_optimizers_schedulers(model.configure_optimizers())
+        # assert optimizer is not None
+        # model, optimizer = self.fabric.setup(model, optimizer)
 
         # assemble state (current epoch and global step will be added in save)
         state = {"model": model, "optim": optimizer, "scheduler": scheduler_cfg}
@@ -139,7 +140,8 @@ class BaseTrainer:
             if self.should_validate:
                 self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
 
-            self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
+            # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
+            scheduler_cfg.step()
 
             self.current_epoch += 1
 
@@ -182,7 +184,9 @@ class BaseTrainer:
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
                 break
-
+            for i in range(len(batch)):
+                print(len(batch))
+                print(batch[i].shape)
             self.fabric.call("on_train_batch_start", batch, batch_idx)
 
             # check if optimizer should step in gradient accumulation
@@ -204,12 +208,13 @@ class BaseTrainer:
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
-            if should_optim_step:
-                self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
+            # if should_optim_step:
+            #     self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
 
             # add output values to progress bar
+            
             self._format_iterable(iterable, self._current_train_return, "train")
-
+            
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
 
