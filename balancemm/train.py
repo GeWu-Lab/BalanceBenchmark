@@ -42,8 +42,11 @@ def train_and_test(args: dict):
     train_dataloader, val_dataloader = create_train_val_dataloader(fabric, args.dataset)
     
     model = create_model(args.model)
-
-    optimizer = create_optimizer(model, args.train['optimizer'])
+    optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
+    trainer = create_trainer(fabric, args.trainer, args.trainer_para)
+    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler)
 
     
