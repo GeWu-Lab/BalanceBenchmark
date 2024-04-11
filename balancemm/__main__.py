@@ -1,6 +1,23 @@
 import sys, yaml
-
 from os import path as osp
+import os
+
+def add_to_pythonpath(path):
+    """
+    Add a directory to PYTHONPATH environment variable.
+    
+    Args:
+        path (str): The directory path to be added to PYTHONPATH.
+    """
+    # Get the current value of PYTHONPATH or an empty string if not set
+    pythonpath = os.environ.get('PYTHONPATH', '')
+
+    # Add the new directory to PYTHONPATH
+    pythonpath += os.pathsep + path
+    print(pythonpath)
+    # Update the PYTHONPATH environment variable
+    os.environ['PYTHONPATH'] = pythonpath
+add_to_pythonpath(os.getcwd())
 from balancemm.utils.parser_utils import parse_cli_args_to_dict, load_config_dict, ensure_and_get_config_path
 from balancemm.train import train_and_test
 from balancemm.test import only_test
