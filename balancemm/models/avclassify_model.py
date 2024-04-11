@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from .resnet_arch import ResNet18
+import lightning as L
+from .resnet_arch import ResNet18, ResNet
 from .fusion_arch import SumFusion, ConcatFusion, FiLM, GatedFusion
-
-class AVClassifierModel(nn.Module):
+from typing import Mapping
+class AVClassifierModel(L.LightningModule):
     def __init__(self, args):
         super(AVClassifierModel, self).__init__()
         n_classes = args['n_classes']
@@ -28,7 +28,9 @@ class AVClassifierModel(nn.Module):
 
 
     def forward(self, audio, visual):
-
+        visual = visual.permute(0, 2, 1, 3, 4).contiguous().float()
+        audio = audio.unsqueeze(1).float()
+        # print(a.shape)
         a = self.audio_net(audio)
         v = self.visual_net(visual)
 
@@ -46,3 +48,9 @@ class AVClassifierModel(nn.Module):
         a, v, out = self.fusion_module(a, v)
 
         return a, v, out
+    
+    def training_step(self, batch: torch.Any, batch_idx: torch.Any) -> torch.Tensor | Mapping[str, any] | None:
+        modality_1, modality_2 = batch[1], batch[0]
+        a, v, out = self(modality_1, modality_2)
+        loss = F.cross_entropy(out, batch[2])
+        return loss
