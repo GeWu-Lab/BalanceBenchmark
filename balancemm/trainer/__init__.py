@@ -2,6 +2,7 @@ import importlib
 import os
 from os import path as osp
 from types import SimpleNamespace
+import lightning as L
 
 __all__ = ['create_trainer']
 
@@ -19,7 +20,7 @@ _trainer_modules = [
     for file_name in trainer_filenames
 ]
 
-def create_trainer(trainer_opt):
+def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt):
     # dynamic instantiation
     for module in _trainer_modules:
         trainer_cls = getattr(module, trainer_opt["trainer"], None)
@@ -28,7 +29,7 @@ def create_trainer(trainer_opt):
     if trainer_cls is None:
         raise ValueError(f'trainer {trainer} is not found.')
 
-    trainer = trainer_cls(trainer_opt)
+    trainer = trainer_cls(fabric, para_opt[trainer_opt['name']], para_opt['base'])
 
     print(
         f'Trainer {trainer.__class__.__name__} - {trainer_opt["name"]} '
