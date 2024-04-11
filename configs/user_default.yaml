@@ -11,16 +11,16 @@ dataset:
     drop_last: true # if true, drop the last batch if the size is not equal to batch_size
     pin_memory: true # if true, use pin_memory for dataloader
   train:
-    name: Cremad
+    name: KS
     mode: train
     fps: 3
-    audio_path: D:\Data\cremad\audio
-    visual_path: D:\Data\cremad\visual
-    csv_file: D:\Data\cremad\train.csv
+    csv_file : '/data/users/yake_wei/KS_2023/ks_train_overlap.txt'
+    audio_path : '/data/users/yake_wei/KS_2023/train_spec'
+    visual_path : '/data/users/yake_wei/KS_2023/train-frames-1fps/train'
   test:
-    name: Cremad
+    name: KS
     mode: test
     fps: 3
-    audio_path: D:\Data\cremad\audio
-    visual_path: D:\Data\cremad\visual
-    csv_file: D:\Data\cremad\test.csv
+    csv_file : '/data/users/yake_wei/KS_2023/ks_test_overlap.txt'
+    audio_path : '/data/users/yake_wei/KS_2023/test_spec'
+    visual_path : '/data/users/yake_wei/KS_2023/val-frames-1fps/test'

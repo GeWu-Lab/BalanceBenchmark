@@ -13,8 +13,8 @@ dataset:
     pin_memory: true # if true, use pin_memory for dataloader
 
 fabric:
-  accelerator: "auto" # "cpu", "gpu", "cuda", "mps", "tpu"
-  devices: "auto" # number of devices or list of index
+  accelerator: "gpu" # "cpu", "gpu", "cuda", "mps", "tpu"
+  devices: [2] # number of devices or list of index
   precision: "32-true" # "32-true", "16-mixed", "bf16-mixed", etc.
   strategy: "dp" # "dp", "ddp", "ddp2", "ddp_spawn"
 
@@ -27,12 +27,12 @@ log:
 
 model:
   type: AVClassifier
-  n_classes: 6
+  n_classes: 31
   fusion: concat
 
 train:
   parameter:
-    total_epoch: 200 # number of epochs to train
+    total_epoch: 1 # number of epochs to train
     warmup: 10 # warmup beta and lr
     base_lr: 0.001 # base learning rate. Using linear law, lr = eff_batch_size/base_bs*base_lr
     lr: -1 # learning rate. If set, override base_lr, set to -1 to use base_lr
@@ -55,3 +55,17 @@ train:
     select_best: 'last' # 'last', 'best' select the best model based on validation loss
   loss:
     type: "CrossEntropyLoss" # type of loss
+trainer:  
+  trainer: "OGMTrainer"
+  name: 'OGM'
+  gpus: "2"
+trainer_para:
+  base:
+    grad_accum_steps: 1
+  OGM:
+    alpha: 0.1
+    method: 'OGM_GE'
+    modulation_starts: 10
+    modulation_ends: 80
+
+
