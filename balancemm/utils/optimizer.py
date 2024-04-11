@@ -8,12 +8,13 @@ def find_module(optimizer_type):
     else:
         raise ValueError(f'Optimizer {optimizer_type} not found in torch.optim or current module.')
 
-def create_optimizer(model, args: dict):
+def create_optimizer(model, args: dict, parameter: dict):
     if 'type' not in args:
         raise ValueError('Optimizer type is required.')
     optimizer_type = args['type']
     optimizer_cls = find_module(optimizer_type)
     optimizer_args = {k: v for k, v in args.items() if k != 'type'}
+    optimizer_args['lr'] = parameter['base_lr'] if parameter['lr'] == -1 else parameter['lr']
     optimizer = optimizer_cls(model.parameters(), **optimizer_args)
     print (f'Optimizer {optimizer.__class__.__name__} - {optimizer_type} is created.')
     return optimizer
