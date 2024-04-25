@@ -14,16 +14,20 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 
 import lightning as L
 import torch
+import numpy as np
 
 
-class OGMTrainer(BaseTrainer):
+class AMCoTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
-        super(OGMTrainer,self).__init__(fabric,**para_dict)
+        super(AMCoTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
-
+        
+        self.sigma = method_dict['sigma']
+        self.U = method_dict['U']
+        self.eps = method_dict['eps']
     def train_loop(
         self,
         model: L.LightningModule,
@@ -50,6 +54,9 @@ class OGMTrainer(BaseTrainer):
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
+        
+        dependent_modality = {"audio": False, "visual": False, "text": False}
+        l_t = 0
 
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
@@ -58,6 +65,16 @@ class OGMTrainer(BaseTrainer):
 
             self.fabric.call("on_train_batch_start", batch, batch_idx)
 
+            # prepare the mask
+            pt = np.sin(np.pi/2*(min(self.eps,l_t)/self.eps))
+            N = int(pt * self.U)
+            mask_t = np.ones(self.U-N)
+            mask_t = np.pad(mask_t,(0,N))
+            np.random.shuffle(mask_t)
+            mask_t = torch.from_numpy(mask_t)
+            mask_t = mask_t.to(next(model.parameters()).device)
+            l_t += self.current_epoch/10
+
             # check if optimizer should step in gradient accumulation
             should_optim_step = self.global_step % self.grad_accum_steps == 0
             if should_optim_step:
@@ -65,7 +82,11 @@ class OGMTrainer(BaseTrainer):
                 self.fabric.call("on_before_optimizer_step", optimizer, 0)
 
                 # optimizer step runs train step internally through closure
-                optimizer.step(partial(self.training_step, model=model, batch=batch, batch_idx=batch_idx))
+                loss, dependent_modality = self.training_step( model=model, batch=batch, 
+                                                              batch_idx=batch_idx, mask= mask_t, 
+                                                              dependent_modality= dependent_modality,
+                                                              pt = pt)
+                optimizer.step()
                 self.fabric.call("on_before_zero_grad", optimizer)
 
                 optimizer.zero_grad()
@@ -89,63 +110,48 @@ class OGMTrainer(BaseTrainer):
 
         self.fabric.call("on_train_epoch_end")
     
-    def training_step(self, model, batch, batch_idx):
+    def training_step(self, model, batch, batch_idx, dependent_modality, mask ,pt):
 
         # TODO: make it simpler and easier to extend
-        softmax = nn.Softmax(dim=1)
         criterion = nn.CrossEntropyLoss()
-        relu = nn.ReLU(inplace=True)
-        tanh = nn.Tanh()
+        softmax = nn.Softmax(dim=1)
+        if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
+            a, v, t, out = model(batch,dependent_modality = dependent_modality, mask = mask,\
+                                         pt = pt)
+        else:
+            a, v, t, out = model(batch)
+        out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
         label = batch['label']
-        a, v, out = model(batch)
-        out_a, out_v = model.AVCalculate(a, v, out)
-        loss = criterion(out, label)
-        loss.backward()
+        # print(a.shape, v.shape, model.head.weight.shape)
 
-
-        # Modulation starts here !
-
-        score_v = sum([softmax(out_v)[i][label[i]] for i in range(out_v.size(0))])
-        score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
-
-        ratio_v = score_v / score_a
-        ratio_a = 1 / ratio_v
-
-        """
-        Below is the Eq.(10) in our CVPR paper:
-                1 - tanh(alpha * rho_t_u), if rho_t_u > 1
-        k_t_u =
-                1,                         else
-        coeff_u is k_t_u, where t means iteration steps and u is modality indicator, either a or v.
-        """
-
-        if ratio_v > 1:
-            coeff_v = 1 - tanh(self.alpha * relu(ratio_v))
-            coeff_a = 1
-        else:
-            coeff_a = 1 - tanh(self.alpha * relu(ratio_a))
-            coeff_v = 1
-
-        if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
-            for name, parms in model.named_parameters():
-                layer = str(name).split('.')[1]
-                if 'v1' in layer and len(parms.grad.size()) == 4:
-                    if self.method == 'OGM_GE':  # bug fixed
-                        parms.grad = parms.grad * coeff_a + \
-                                    torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
-                    elif self.method == 'OGM':
-                        parms.grad *= coeff_a
-
-                if 'visual' in layer and len(parms.grad.size()) == 4:
-                    if self.method == 'OGM_GE':  # bug fixed
-                        parms.grad = parms.grad * coeff_v + \
-                                    torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
-                    elif self.method == 'OGM':
-                        parms.grad *= coeff_v
-        else:
-            pass
-
-
+        ## our modality-wise normalization on weight and feature
     
+        loss = criterion(out, label) 
+        if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
+            loss_v = criterion(out_v, label)
+            loss_a = criterion(out_a, label)
+            loss_t = criterion(out_t, label)
+            loss.backward(retain_graph=True)
+            loss_v.backward()
+            loss_a.backward()
+            loss_t.backward()
 
-        return loss
+            out_combine = torch.cat((out_a, out_v, out_t),1)
+            sft_out = softmax(out_combine)
+            sft_oa = torch.sum(sft_out[:, 0: model.n_classes])/(len(label))
+            sft_ov = torch.sum(sft_out[:, model.n_classes:2* model.n_classes])/(len(label))
+            sft_ot = torch.sum(sft_out[:, 2*model.n_classes: ])/(len(label))
+            # print(sft_oa,sft_ov,sft_out.size())
+            if(sft_oa>=self.sigma):
+                dependent_modality['audio'] = True
+            elif(sft_ov>=self.sigma):
+                dependent_modality['visual'] = True
+            elif(sft_ot>=self.sigma):
+                dependent_modality['text'] = True
+        else: 
+            loss.backward()
+        
+        
+
+
+        return loss, dependent_modality

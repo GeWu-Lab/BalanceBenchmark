@@ -69,7 +69,9 @@ class BaseTrainer():
 
         self.max_epochs = max_epochs
         self.should_stop = False
-
+        
+        self.should_save = False
+        self.best_acc = 0.0
         # ensures limit_X_batches is either int or inf
         if not isinstance(limit_train_batches, int):
             assert limit_train_batches == float("inf")
@@ -148,8 +150,10 @@ class BaseTrainer():
             # stopping condition on epoch level
             if self.max_epochs is not None and self.current_epoch >= self.max_epochs:
                 self.should_stop = True
-
-            self.save(state)
+            
+            if self.should_save:
+                self.save(state)
+                self.should_save = False
 
         # reset for next fit call
         self.should_stop = False
@@ -239,13 +243,13 @@ class BaseTrainer():
         if val_loader is None:
             return
 
-        # no validation but warning if val_loader was passed, but validation_step not implemented
-        if val_loader is not None and not is_overridden("validation_step", _unwrap_objects(model)):
-            L.fabric.utilities.rank_zero_warn(
-                "Your LightningModule does not have a validation_step implemented, "
-                "but you passed a validation dataloder. Skipping Validation."
-            )
-            return
+        # # no validation but warning if val_loader was passed, but validation_step not implemented
+        # if val_loader is not None and not is_overridden("validation_step", _unwrap_objects(model)):
+        #     L.fabric.utilities.rank_zero_warn(
+        #         "Your LightningModule does not have a validation_step implemented, "
+        #         "but you passed a validation dataloder. Skipping Validation."
+        #     )
+        #     return
 
         self.fabric.call("on_validation_model_eval")  # calls `model.eval()`
 
@@ -255,6 +259,8 @@ class BaseTrainer():
 
         iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
 
+        count = 0
+        _acc = 0
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -262,7 +268,7 @@ class BaseTrainer():
 
             self.fabric.call("on_validation_batch_start", batch, batch_idx)
 
-            out = model.validation_step(batch, batch_idx)
+            out, acc = model.validation_step(batch, batch_idx)
             # avoid gradients in stored/accumulated values -> prevents potential OOM
             out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
 
@@ -270,6 +276,14 @@ class BaseTrainer():
             self._current_val_return = out
 
             self._format_iterable(iterable, self._current_val_return, "val")
+
+            count += 1
+            _acc += acc
+        _acc = _acc/count
+        if _acc > self.best_acc:
+            self.should_save = True
+            self.best_acc = _acc
+        print("valid_acc : {}".format(_acc))
 
         self.fabric.call("on_validation_epoch_end")
 

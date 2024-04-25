@@ -16,9 +16,9 @@ import lightning as L
 import torch
 
 
-class OGMTrainer(BaseTrainer):
+class MSBDTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
-        super(OGMTrainer,self).__init__(fabric,**para_dict)
+        super(MSBDTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
@@ -50,6 +50,7 @@ class OGMTrainer(BaseTrainer):
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
+        
 
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
@@ -89,63 +90,50 @@ class OGMTrainer(BaseTrainer):
 
         self.fabric.call("on_train_epoch_end")
     
-    def training_step(self, model, batch, batch_idx):
+    def training_step(self, model, batch, batch_idx , dependent_modality : str = 'none'):
 
         # TODO: make it simpler and easier to extend
-        softmax = nn.Softmax(dim=1)
         criterion = nn.CrossEntropyLoss()
-        relu = nn.ReLU(inplace=True)
-        tanh = nn.Tanh()
-        label = batch['label']
+        softmax = nn.Softmax(dim=1)
         a, v, out = model(batch)
         out_a, out_v = model.AVCalculate(a, v, out)
-        loss = criterion(out, label)
-        loss.backward()
+        label = batch['label']
+        device = model.device
+        # print(a.shape, v.shape, model.head.weight.shape)
 
-
-        # Modulation starts here !
-
-        score_v = sum([softmax(out_v)[i][label[i]] for i in range(out_v.size(0))])
-        score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
-
-        ratio_v = score_v / score_a
-        ratio_a = 1 / ratio_v
-
-        """
-        Below is the Eq.(10) in our CVPR paper:
-                1 - tanh(alpha * rho_t_u), if rho_t_u > 1
-        k_t_u =
-                1,                         else
-        coeff_u is k_t_u, where t means iteration steps and u is modality indicator, either a or v.
-        """
-
-        if ratio_v > 1:
-            coeff_v = 1 - tanh(self.alpha * relu(ratio_v))
-            coeff_a = 1
-        else:
-            coeff_a = 1 - tanh(self.alpha * relu(ratio_a))
-            coeff_v = 1
-
-        if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
-            for name, parms in model.named_parameters():
-                layer = str(name).split('.')[1]
-                if 'v1' in layer and len(parms.grad.size()) == 4:
-                    if self.method == 'OGM_GE':  # bug fixed
-                        parms.grad = parms.grad * coeff_a + \
-                                    torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
-                    elif self.method == 'OGM':
-                        parms.grad *= coeff_a
-
-                if 'visual' in layer and len(parms.grad.size()) == 4:
-                    if self.method == 'OGM_GE':  # bug fixed
-                        parms.grad = parms.grad * coeff_v + \
-                                    torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
-                    elif self.method == 'OGM':
-                        parms.grad *= coeff_v
-        else:
-            pass
-
-
+        ## our modality-wise normalization on weight and feature
     
+        loss = criterion(out, label) 
+        loss_v = criterion(out_v, label)
+        loss_a = criterion(out_a, label)
+
+        prediction_a = softmax(out_a)
+        prediction_v = softmax(out_v)
+        if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
+            loss_RS = 1/out_a.shape[1] * torch.sum((out_a - out_v)**2, dim = 1)
+
+            w = torch.tensor([0.0 for _ in range(len(out))])
+            w = w.to(device)
+            y_pred_a = prediction_a
+            y_pred_a = y_pred_a.argmax(dim = -1)
+            y_pred_v = prediction_v
+            y_pred_v = y_pred_v.argmax(dim = -1)
+            ps = torch.tensor([0.0 for _ in range(len(out))])
+            ps = ps.to(device)
+            pw = torch.tensor([0.0 for _ in range(len(out))])
+            pw = pw.to(device)
+            for i in range(len(out)):
+                if y_pred_a[i] == label[i] or y_pred_v[i] == label[i]:
+                    w[i] = max(prediction_a[i][label[i]], prediction_v[i][label[i]]) -  min(prediction_a[i][label[i]], prediction_v[i][label[i]])
+                ps[i] = max(prediction_a[i][label[i]], prediction_v[i][label[i]])
+                pw[i] = min(prediction_a[i][label[i]], prediction_v[i][label[i]])
+
+            loss_KL = F.kl_div(ps, pw, reduction = 'none')
+            w = w.reshape(1,-1)
+            loss_KL = loss_KL.reshape(-1,1)
+            loss_KL = torch.mm(w, loss_KL) / len(out)
+            loss_RS = loss_RS.reshape(-1,1)
+            loss_RS = torch.mm(w, loss_RS) / len(out)
+            loss = loss + loss_v + loss_a + loss_RS.squeeze() + loss_KL.squeeze() ## erase the dim of 1
 
         return loss
