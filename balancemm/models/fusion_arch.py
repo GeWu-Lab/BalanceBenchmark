@@ -17,13 +17,29 @@ class ConcatFusion(nn.Module):
     def __init__(self, input_dim=1024, output_dim=100):
         super(ConcatFusion, self).__init__()
         self.fc_out = nn.Linear(input_dim, output_dim)
-
     def forward(self, x, y):
         output = torch.cat((x, y), dim=1)
         output = self.fc_out(output)
         return x, y, output
 
+class ConcatFusion_3(nn.Module):
+    def __init__(self, input_dim=3072, output_dim=100):
+        super(ConcatFusion_3, self).__init__()
+        self.fc_out = nn.Linear(input_dim, output_dim)
+        self.input_dim = input_dim
 
+    def forward(self, x, y, z):
+        output = torch.cat((x, y), dim=1)
+        output = torch.cat((output, z),dim = 1)
+        output = self.fc_out(output)
+        # x = (torch.mm(x, torch.transpose(self.fc_out.weight[:, self.input_dim // 3: 2 * self.input_dim // 3], 0, 1))
+        #              + self.fc_out.bias / 2)
+
+        # y = (torch.mm(y, torch.transpose(self.fc_out.weight[:, 2* self.input_dim // 3: self.input_dim ], 0, 1))
+        #             + self.fc_out.bias / 2)
+        
+        return x, y, z, output
+    
 class FiLM(nn.Module):
     """
     FiLM: Visual Reasoning with a General Conditioning Layer,
