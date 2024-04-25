@@ -1,4 +1,4 @@
-name: "Baseline"
+name: "OGM_GE"
 mode: "train_and_test"
 seed: 42
 
@@ -14,20 +14,20 @@ dataset:
 
 fabric:
   accelerator: "gpu" # "cpu", "gpu", "cuda", "mps", "tpu"
-  devices: [2] # number of devices or list of index
+  devices: [0] # number of devices or list of index
   precision: "32-true" # "32-true", "16-mixed", "bf16-mixed", etc.
   strategy: "dp" # "dp", "ddp", "ddp2", "ddp_spawn"
 
 log:
-  logger_name: [] # list of logger name
+  logger_name: ['tensorboard'] # list of logger name
   wandb_name: ''
   log_interval: 100 # how many batches to wait before logging training status
   log_per_epoch: -1 # number of log for each epoch. If set will override log_interval
   comment: '' # comment for the logger
 
 model:
-  type: AVClassifier
-  n_classes: 31
+  type: AVTClassifier
+  n_classes: 7
   fusion: concat
 
 train:
@@ -36,7 +36,7 @@ train:
     warmup: 10 # warmup beta and lr
     base_lr: 0.001 # base learning rate. Using linear law, lr = eff_batch_size/base_bs*base_lr
     lr: -1 # learning rate. If set, override base_lr, set to -1 to use base_lr
-    base_batch_size: 64 # base batch_size
+    base_batch_size: 2 # base batch_size
     lr_scaling_rule: "linear" # "sqrt", "linear" learning rate should scale with batch size
   checkpoint:
     resume: '' # path to the checkpoint
@@ -56,8 +56,8 @@ train:
   loss:
     type: "CrossEntropyLoss" # type of loss
 trainer:  
-  trainer: "OGMTrainer"
-  name: 'OGM'
+  trainer: "CMLTrainer"
+  name: 'CML'
   gpus: "2"
 trainer_para:
   base:
@@ -67,5 +67,24 @@ trainer_para:
     method: 'OGM_GE'
     modulation_starts: 10
     modulation_ends: 80
+  AGM:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 10
+    modulation_ends: 80
+  AMCo:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 10
+    modulation_ends: 80
+    sigma: 0.5
+    U: 512
+    eps: 0.3
+  CML:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 10
+    modulation_ends: 80
+    lam: 0
 
 
