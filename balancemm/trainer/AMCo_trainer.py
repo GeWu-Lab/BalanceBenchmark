@@ -122,6 +122,7 @@ class AMCoTrainer(BaseTrainer):
             a, v, t, out = model(batch)
         out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
         label = batch['label']
+        label = label.to(model.device)
         # print(a.shape, v.shape, model.head.weight.shape)
 
         ## our modality-wise normalization on weight and feature

@@ -12,17 +12,25 @@ from os import path as osp
 import os
 import torch
 import yaml
+import logging
 
 def train_and_test(args: dict):
     args = SimpleNamespace(**args)
-    sys_log = setup_logger(osp.join(args.out_dir, "train.log"))
 
     log_dir = osp.join(args.out_dir, "logs")
-    loggers = [choose_logger(logger_name, log_dir = log_dir, project = args.name, comment = args.log['comment']) for logger_name in args.log['logger_name']]
-
+    print("logg:{}".format(log_dir))
+    # loggers = [choose_logger(logger_name, log_dir = log_dir, project = args.name, comment = args.log['comment']) for logger_name in args.log['logger_name']]
+    logger = logging.getLogger(__name__)
     args.checkpoint_dir = osp.join(args.out_dir, 'checkpoints')
     os.makedirs(args.out_dir, exist_ok=True)
     os.makedirs(args.checkpoint_dir, exist_ok=True)
+    file_handler = logging.FileHandler(args.out_dir + '/training.log') 
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    loggers = [logger]
+    logger.setLevel(logging.DEBUG)
     for logger in loggers:
         if isinstance(logger, L.fabric.loggers.CSVLogger):
             os.makedirs(os.path.join(log_dir, 'csv'), exist_ok=True)
@@ -40,13 +48,24 @@ def train_and_test(args: dict):
         torch.set_float32_matmul_precision('high')
 
     train_dataloader, val_dataloader = create_train_val_dataloader(fabric, args.dataset)
-    
+    args.trainer_para['base']['checkpoint_dir'] = args.checkpoint_dir
     model = create_model(args.model)
+    if args.trainer['name'] == 'GBlending':
+        print("GBlending!!!")
+        args.model['type'] = 'AVTClassifier_gb'
+        model = create_model(args.model)
+        temp_model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
-    trainer = create_trainer(fabric, args.trainer, args.trainer_para)
+    trainer = create_trainer(fabric, args.trainer, args.trainer_para, args)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
-    trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler)
+    model.device = device
+    if args.trainer['name'] == 'GBlending':
+        temp_model.to(device)
+        temp_model.device = device
+        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger)
+        return
+    trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger)
 
     

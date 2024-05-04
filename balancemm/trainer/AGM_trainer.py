@@ -120,31 +120,36 @@ class GradMod(nn.Module):
         n_classes = self.net.n_classes
         softmax  = nn.Softmax(dim = 1)
         label = batch['label']
+        label = label.to(self.net.device)
         loss = F.cross_entropy(out, label)
         prediction = softmax(out)
-        # pred_v = softmax(out_v)
-        # pred_a = softmax(out_a)
+        pred_v = softmax(out_v)
+        pred_a = softmax(out_a)
+        pred_t = softmax(out_t)
         num = [0.0 for _ in range(n_classes)]
         acc = [0.0 for _ in range(n_classes)]
-        # acc_a = [0.0 for _ in range(n_classes)]
-        # acc_v = [0.0 for _ in range(n_classes)]
+        acc_a = [0.0 for _ in range(n_classes)]
+        acc_v = [0.0 for _ in range(n_classes)]
+        acc_t = [0.0 for _ in range(n_classes)]
 
-        for i in range(out.shape[0]):
+        for i in range(a.shape[0]):
 
             ma = np.argmax(prediction[i].cpu().data.numpy())
-            # v = np.argmax(pred_v[i].cpu().data.numpy())
-            # a = np.argmax(pred_a[i].cpu().data.numpy())
+            v = np.argmax(pred_v[i].cpu().data.numpy())
+            a = np.argmax(pred_a[i].cpu().data.numpy())
+            t = np.argmax(pred_t[i].cpu().data.numpy())
             num[label[i]] += 1.0
 
             #pdb.set_trace()
             if np.asarray(label[i].cpu()) == ma:
                 acc[label[i]] += 1.0
-            # if np.asarray(label[i].cpu()) == v:
-            #     acc_v[label[i]] += 1.0
-            # if np.asarray(label[i].cpu()) == a:
-            #     acc_a[label[i]] += 1.0
-        # print(sum(acc)/sum(num))            
-        return loss, sum(acc)/sum(num)
+            if np.asarray(label[i].cpu()) == v:
+                acc_v[label[i]] += 1.0
+            if np.asarray(label[i].cpu()) == a:
+                acc_a[label[i]] += 1.0
+            if np.asarray(label[i].cpu()) == t:
+                acc_t[label[i]] += 1.0
+        return loss, sum(acc), sum(acc_a), sum(acc_v), sum(acc_t)
 
 class AGMTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
@@ -233,7 +238,7 @@ class AGMTrainer(BaseTrainer):
         Mod = GradMod(model)
         out_a, out_v, out_t, out = Mod(batch)
         label = batch['label']
-
+        label = label.to(model.device)
         # print(a.shape, v.shape, model.head.weight.shape)
 
         ## our modality-wise normalization on weight and feature
@@ -374,6 +379,12 @@ class AGMTrainer(BaseTrainer):
         count = 0
         _acc = 0
         model = GradMod(model)
+        count = 0
+        _acc = 0
+        _acc_a = 0
+        _acc_v = 0
+        _acc_t = 0
+        valid_loss = 0
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -381,7 +392,7 @@ class AGMTrainer(BaseTrainer):
 
             self.fabric.call("on_validation_batch_start", batch, batch_idx)
 
-            out, acc = model.validation_step(batch, batch_idx)
+            out, acc, acc_a, acc_v, acc_t = model.validation_step(batch, batch_idx)
             # avoid gradients in stored/accumulated values -> prevents potential OOM
             out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
 
@@ -390,9 +401,17 @@ class AGMTrainer(BaseTrainer):
 
             self._format_iterable(iterable, self._current_val_return, "val")
 
-            count += 1
+            count += len(batch)
             _acc += acc
-        _acc = _acc/count
+            _acc_a += acc_a
+            _acc_v += acc_v
+            _acc_t += acc_t
+            valid_loss += out
+        valid_loss /= count
+        _acc /= count
+        _acc_a /= count
+        _acc_v /= count
+        _acc_t /= count
         #print("valid_acc : {}".format(_acc))
         if _acc > self.best_acc:
             self.should_save = True
@@ -403,3 +422,4 @@ class AGMTrainer(BaseTrainer):
 
         self.fabric.call("on_validation_model_train")
         torch.set_grad_enabled(True)
+        return valid_loss, _acc, _acc_a, _acc_v, _acc_t

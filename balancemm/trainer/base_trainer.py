@@ -24,7 +24,7 @@ class BaseTrainer():
         limit_val_batches: Union[int, float] = float("inf"),
         validation_frequency: int = 1,
         use_distributed_sampler: bool = True,
-        checkpoint_dir: str = "./checkpoints",
+        checkpoint_dir: str = "./experiments/checkpoints",
         checkpoint_frequency: int = 1,
     ) -> None:
         """Exemplary Trainer with Fabric. This is a very simple trainer focused on readablity but with reduced
@@ -96,6 +96,7 @@ class BaseTrainer():
         val_loader: torch.utils.data.DataLoader,
         optimizer: torch.optim.Optimizer,
         scheduler_cfg: torch.optim.lr_scheduler,
+        logger: Logger,
         ckpt_path: Optional[str] = None,
     ):
         """The main entrypoint of the trainer, triggering the actual training.
@@ -110,7 +111,7 @@ class BaseTrainer():
                 If specified, will always look for the latest checkpoint within the given directory.
 
         """
-        print(type(self.fabric))
+        print(self.max_epochs)
         self.fabric.launch()
 
         # setup dataloaders
@@ -138,10 +139,15 @@ class BaseTrainer():
             self.train_loop(
                 model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg
             )
+            logger.info("epoch: {:0}  ".format(self.current_epoch))
 
             if self.should_validate:
-                self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
-
+                valid_loss, valid_acc, valid_acc_a,valid_acc_v, valid_acc_t=self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
+                
+                logger.info(" valid_loss: {:0}, valid_acc: {:1}, acc_a: {:2}, acc_v: {:3}, acc_t: {:4}"
+                        .format( valid_loss, valid_acc, valid_acc_a, valid_acc_v, valid_acc_t))
+                for handler in logger.handlers:
+                    handler.flush()
             # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
             scheduler_cfg.step()
 
@@ -261,6 +267,10 @@ class BaseTrainer():
 
         count = 0
         _acc = 0
+        _acc_a = 0
+        _acc_v = 0
+        _acc_t = 0
+        valid_loss = 0
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -268,7 +278,7 @@ class BaseTrainer():
 
             self.fabric.call("on_validation_batch_start", batch, batch_idx)
 
-            out, acc = model.validation_step(batch, batch_idx)
+            out, acc, acc_a, acc_v, acc_t = model.validation_step(batch, batch_idx)
             # avoid gradients in stored/accumulated values -> prevents potential OOM
             out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
 
@@ -277,18 +287,27 @@ class BaseTrainer():
 
             self._format_iterable(iterable, self._current_val_return, "val")
 
-            count += 1
+            
             _acc += acc
-        _acc = _acc/count
+            _acc_a += acc_a
+            _acc_v += acc_v
+            _acc_t += acc_t
+            valid_loss += out
+        count = len(val_loader)
+        valid_loss /= count
+        _acc /= count
+        _acc_a /= count
+        _acc_v /= count
+        _acc_t /= count
         if _acc > self.best_acc:
             self.should_save = True
             self.best_acc = _acc
-        print("valid_acc : {}".format(_acc))
 
         self.fabric.call("on_validation_epoch_end")
 
         self.fabric.call("on_validation_model_train")
         torch.set_grad_enabled(True)
+        return valid_loss, _acc, _acc_a, _acc_v, _acc_t
 
     def training_step(self, model: L.LightningModule, batch: Any, batch_idx: int) -> torch.Tensor:
         """A single training step, running forward and backward. The optimizer step is called separately, as this is
@@ -412,8 +431,7 @@ class BaseTrainer():
             state = {}
 
         state.update(global_step=self.global_step, current_epoch=self.current_epoch)
-
-        self.fabric.save(os.path.join(self.checkpoint_dir, f"epoch-{self.current_epoch:04d}.ckpt"), state)
+        self.fabric.save(os.path.join(self.checkpoint_dir, "epoch_normal.ckpt"), state)
 
     @staticmethod
     def get_latest_checkpoint(checkpoint_dir: str) -> Optional[str]:

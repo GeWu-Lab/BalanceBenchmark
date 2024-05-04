@@ -32,7 +32,7 @@ model:
 
 train:
   parameter:
-    total_epoch: 1 # number of epochs to train
+    total_epoch: 70 # number of epochs to train
     warmup: 10 # warmup beta and lr
     base_lr: 0.001 # base learning rate. Using linear law, lr = eff_batch_size/base_bs*base_lr
     lr: -1 # learning rate. If set, override base_lr, set to -1 to use base_lr
@@ -56,12 +56,13 @@ train:
   loss:
     type: "CrossEntropyLoss" # type of loss
 trainer:  
-  trainer: "CMLTrainer"
-  name: 'CML'
-  gpus: "2"
+  trainer: "GBlendingTrainer"
+  name: 'GBlending'
+  gpus: "1"
 trainer_para:
   base:
     grad_accum_steps: 1
+    max_epochs: 70
   OGM:
     alpha: 0.1
     method: 'OGM_GE'
@@ -78,7 +79,7 @@ trainer_para:
     modulation_starts: 10
     modulation_ends: 80
     sigma: 0.5
-    U: 512
+    U: 1024
     eps: 0.3
   CML:
     alpha: 0.1
@@ -86,5 +87,11 @@ trainer_para:
     modulation_starts: 10
     modulation_ends: 80
     lam: 0
+  GBlending:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 10
+    modulation_ends: 80
+    super_epoch: 10
 
 
