@@ -525,3 +525,38 @@ class VTClassifierModel(AVTClassifierModel):
 
         a, v, out = self.fusion_module(a, v)
         return a, v, out
+    
+    def validation_step(self, batch, batch_idx) -> torch.Tensor | Mapping[str, any] | None:
+        
+        a, v,  out = self(batch)
+        out_a, out_v = self.AVCalculate(a,v,out)
+        n_classes = self.n_classes
+        softmax  = nn.Softmax(dim = 1)
+        label = batch['label']
+        label = label.to(self.device)
+        loss = F.cross_entropy(out, label)
+        prediction = softmax(out)
+        pred_v = softmax(out_v)
+        pred_a = softmax(out_a)
+
+        num = [0.0 for _ in range(n_classes)]
+        acc = [0.0 for _ in range(n_classes)]
+        acc_a = [0.0 for _ in range(n_classes)]
+        acc_v = [0.0 for _ in range(n_classes)]
+        acc_t = [0.0 for _ in range(n_classes)]
+
+        for i in range(label.shape[0]):
+
+            ma = np.argmax(prediction[i].cpu().data.numpy())
+            v = np.argmax(pred_v[i].cpu().data.numpy())
+            a = np.argmax(pred_a[i].cpu().data.numpy())
+            num[label[i]] += 1.0
+
+            #pdb.set_trace()
+            if np.asarray(label[i].cpu()) == ma:
+                acc[label[i]] += 1.0
+            if np.asarray(label[i].cpu()) == v:
+                acc_v[label[i]] += 1.0
+            if np.asarray(label[i].cpu()) == a:
+                acc_a[label[i]] += 1.0
+        return loss, sum(acc), sum(acc_a), sum(acc_v), sum(acc_t)
