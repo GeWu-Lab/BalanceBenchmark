@@ -26,8 +26,8 @@ log:
   comment: '' # comment for the logger
 
 model:
-  type: AVTClassifier
-  n_classes: 7
+  type: AVClassifier
+  n_classes: 10
   fusion: concat
 
 train:
@@ -58,7 +58,7 @@ train:
 trainer:  
   trainer: "GBlendingTrainer"
   name: 'GBlending'
-  gpus: "1"
+  gpus: "2"
 trainer_para:
   base:
     grad_accum_steps: 1
@@ -73,25 +73,37 @@ trainer_para:
     method: "None"
     modulation_starts: 10
     modulation_ends: 80
+    modality: 2
   AMCo:
     alpha: 0.1
     method: "None"
     modulation_starts: 10
     modulation_ends: 80
     sigma: 0.5
-    U: 1024
+    U: 512
     eps: 0.3
+    modality: 2
   CML:
     alpha: 0.1
     method: "None"
     modulation_starts: 10
     modulation_ends: 80
     lam: 0
+    modality: 2
   GBlending:
     alpha: 0.1
     method: "None"
-    modulation_starts: 10
+    modulation_starts: 0
     modulation_ends: 80
     super_epoch: 10
+    modality: 2
+  PMR:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+    modality: 2
+    embed_dim: 512
+    momentum_coef: 0.5
 
 

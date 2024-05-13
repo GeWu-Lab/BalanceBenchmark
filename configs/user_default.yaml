@@ -1,4 +1,4 @@
-name: "GBlending-Mosei"
+name: "GBlending-Balance"
 mode: "train_and_test"
 seed: 42
 
@@ -11,7 +11,7 @@ dataset:
     drop_last: true # if true, drop the last batch if the size is not equal to batch_size
     pin_memory: true # if true, use pin_memory for dataloader
   train:
-    name: Mosei
+    name: balance
     mode: train
     fps: 3
     csv_file : '/data/users/yake_wei/KS_2023/ks_train_overlap.txt'
@@ -22,7 +22,7 @@ dataset:
     dataset_path: '/home/zequn_yang/MMT/data/'
     data: 'mosei_senti'
   test:
-    name: Mosei
+    name: balance
     mode: test
     fps: 3
     csv_file : '/data/users/yake_wei/KS_2023/ks_test_overlap.txt'

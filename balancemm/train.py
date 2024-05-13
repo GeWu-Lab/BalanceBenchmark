@@ -51,14 +51,15 @@ def train_and_test(args: dict):
     args.trainer_para['base']['checkpoint_dir'] = args.checkpoint_dir
     model = create_model(args.model)
     if args.trainer['name'] == 'GBlending':
-        print("GBlending!!!")
-        args.model['type'] = 'AVTClassifier_gb'
+        args.model['type'] = args.model['type'] + '_gb'
         model = create_model(args.model)
         temp_model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
     trainer = create_trainer(fabric, args.trainer, args.trainer_para, args)
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    gpu_ids = args.trainer['gpus']
+
+    device = torch.device("cuda:" + gpu_ids if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.device = device
     if args.trainer['name'] == 'GBlending':
