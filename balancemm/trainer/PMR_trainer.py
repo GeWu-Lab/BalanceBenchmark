@@ -39,6 +39,9 @@ class PMRTrainer(BaseTrainer):
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
 
+        self.embed_dim = method_dict['embed_dim']
+        self.momentum_coef = method_dict['momentum_coef']
+
     def train_loop(
         self,
         model: L.LightningModule,
@@ -113,8 +116,9 @@ class PMRTrainer(BaseTrainer):
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
         a, v, out = model(batch)
-        out_a, out_v = model.AVCaulate(a, v, out)
+        out_a, out_v = model.AVCalculate(a, v, out)
         label = batch['label']
+        label = label.to(model.device)
 
         audio_sim = -EU_dist(a, audio_proto)  # B x n_class
         visual_sim = -EU_dist(v, visual_proto)  # B x n_class
@@ -165,12 +169,12 @@ class PMRTrainer(BaseTrainer):
         # # todo more acc to print
         # pred_v_p = softmax(visual_sim)
         # pred_a_p = softmax(audio_sim)
-
+        loss.backward()
         return loss
     
     def calculate_prototype(self, model, dataloader, a_proto=None, v_proto=None):
     # todo customed output of prototype
-        n_classes = model.n_class
+        n_classes = model.n_classes
         device = next(model.parameters()).device
         audio_prototypes = torch.zeros(n_classes, self.embed_dim).to(device)
         visual_prototypes = torch.zeros(n_classes, self.embed_dim).to(device)

@@ -188,22 +188,36 @@ class GBlendingTrainer(BaseTrainer):
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
-        out_a, out_v, out_t, out = model(batch)
-        label = batch['label']
-        label = label.to(model.device)
-        model.train()
-        loss_a = criterion(out_a, label)
-        loss_v = criterion(out_v, label)
-        loss_t = criterion(out_t, label)
-        loss_avt = criterion(out, label)
+        if self.modality == 3:
+            out_a, out_v, out_t, out = model(batch)
+            label = batch['label']
+            label = label.to(model.device)
+            model.train()
+            loss_a = criterion(out_a, label)
+            loss_v = criterion(out_v, label)
+            loss_t = criterion(out_t, label)
+            loss_avt = criterion(out, label)
 
-        if self.modulation_starts <= self.current_epoch < self.modulation_ends:
-            loss = weight_a * loss_a + weight_v * loss_v + weight_avt * loss_avt +weight_t * loss_t    
-        else:
-            loss = loss_avt
+            if self.modulation_starts <= self.current_epoch < self.modulation_ends:
+                loss = weight_a * loss_a + weight_v * loss_v + weight_avt * loss_avt +weight_t * loss_t    
+            else:
+                loss = loss_avt
+            
+        elif self.modality == 2:
+            out_a, out_v, out = model(batch)
+            label = batch['label']
+            label = label.to(model.device)
+            model.train()
+            loss_a = criterion(out_a, label)
+            loss_v = criterion(out_v, label)
+            loss_avt = criterion(out, label)
+
+            if self.modulation_starts <= self.current_epoch < self.modulation_ends:
+                loss = weight_a * loss_a + weight_v * loss_v + weight_avt * loss_avt  
+            else:
+                loss = loss_avt
         loss.backward()
         return loss
-    
     def super_training_step(self, model, batch, batch_idx, types = 0):
         out = model(batch, batch_idx,types = types)
         criterion = nn.CrossEntropyLoss()
@@ -310,36 +324,37 @@ class GBlendingTrainer(BaseTrainer):
                         now_v_loss_test = _loss_v_test
 
         # text
-        temp_model.load_state_dict(model.state_dict(),strict=True)
-        for epoch in range(self.super_epoch):
-            _loss_t = 0.0
-            _loss_t_test = 0.0
-            temp_model.train()
-            for batch_idx, batch in enumerate(train_dataloader):
-                optimizer.zero_grad()
-                # image = image.to(device)
-                loss_t = self.super_training_step(temp_model,batch, batch_idx, types = 3)
-                _loss_t += loss_t.item()
-                optimizer.step()
+        if self.modality == 3:
+            temp_model.load_state_dict(model.state_dict(),strict=True)
+            for epoch in range(self.super_epoch):
+                _loss_t = 0.0
+                _loss_t_test = 0.0
+                temp_model.train()
+                for batch_idx, batch in enumerate(train_dataloader):
+                    optimizer.zero_grad()
+                    # image = image.to(device)
+                    loss_t = self.super_training_step(temp_model,batch, batch_idx, types = 3)
+                    _loss_t += loss_t.item()
+                    optimizer.step()
 
-            _loss_t /= len(train_dataloader)
+                _loss_t /= len(train_dataloader)
 
-            if epoch == 0 or epoch == self.super_epoch - 1:
-                with torch.no_grad():
-                    temp_model.eval()
-                    for batch_idx, batch in enumerate(test_dataloader):
+                if epoch == 0 or epoch == self.super_epoch - 1:
+                    with torch.no_grad():
+                        temp_model.eval()
+                        for batch_idx, batch in enumerate(test_dataloader):
 
-                        loss_t = self.super_training_step(model, batch, batch_idx, types = 3)
-                        _loss_t_test += loss_t.item()
+                            loss_t = self.super_training_step(model, batch, batch_idx, types = 3)
+                            _loss_t_test += loss_t.item()
 
-                    _loss_t_test /= len(test_dataloader)
+                        _loss_t_test /= len(test_dataloader)
 
-                    if epoch == 0:
-                        pre_t_loss_train = _loss_t
-                        pre_t_loss_test = _loss_t_test
-                    else:
-                        now_t_loss_train = _loss_t
-                        now_t_loss_test = _loss_t_test
+                        if epoch == 0:
+                            pre_t_loss_train = _loss_t
+                            pre_t_loss_test = _loss_t_test
+                        else:
+                            now_t_loss_train = _loss_t
+                            now_t_loss_test = _loss_t_test
 
         # all
         temp_model.load_state_dict(model.state_dict(),strict=True)
@@ -351,7 +366,10 @@ class GBlendingTrainer(BaseTrainer):
                 optimizer.zero_grad()
                 label = batch['label'].to(model.device)
                 # image = image.to(device)
-                _, _, _, out_avt = temp_model(batch, batch_idx)
+                if self.modality == 3:
+                    _, _, _, out_avt = temp_model(batch, batch_idx)
+                else:
+                    _, _, out_avt = temp_model(batch, batch_idx)
                 loss_avt = criterion(out_avt, label)
                 loss_avt.backward()
                 _loss_avt += loss_avt.item()
@@ -364,7 +382,10 @@ class GBlendingTrainer(BaseTrainer):
                     temp_model.eval()
                     for batch_idx,batch in enumerate(test_dataloader):
                         label = batch['label'].to(model.device)
-                        _, _, _, out_avt = temp_model(batch, batch_idx)
+                        if self.modality == 3:
+                            _, _, _, out_avt = temp_model(batch, batch_idx)
+                        else:
+                            _, _, out_avt = temp_model(batch, batch_idx)
                         loss_avt = criterion(out_avt, label)
                         _loss_avt_test += loss_avt.item()
 

@@ -46,6 +46,20 @@ class Modality_Text(nn.Module):
     def forward(self, AVT, AT, VT, AV, A, V, T):
         return 1/3*(AVT -AV) + 1/6*(VT - V + AT - A) + 1/3*(T)
     
+class Modality_Visual_2(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, total_out, pad_visual_out, pad_audio_out):
+        return 0.5 * (total_out - pad_visual_out + pad_audio_out)
+
+
+class Modality_Audio_2(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, total_out, pad_visual_out, pad_audio_out):
+        return 0.5 * (total_out - pad_audio_out + pad_visual_out)
 
 class GradMod(nn.Module):
     def __init__(self, model):
@@ -114,6 +128,56 @@ class GradMod(nn.Module):
         #     # return m_a+m_v, m_a, m_v, zero_padding_out, m_a + m_v, encoded_feature
         
         return m_a, m_v, m_t, m_a + m_v + m_t
+
+class GradMod_2(nn.Module):
+    def __init__(self, model):
+        super().__init__()
+        # self.mode = cfgs.mode
+        self.mode = 'train'
+        self.extract_mm_feature = False
+        self.net = model
+        self.m_v = Modality_Visual_2()
+        self.m_a = Modality_Audio_2()
+        self.m_v_o = Modality_out()
+        self.m_a_o = Modality_out()
+
+        self.scale_a = 1.0
+        self.scale_v = 1.0
+
+        self.m_a_o.register_full_backward_hook(self.hooka)
+        self.m_v_o.register_full_backward_hook(self.hookv)
+
+    def hooka(self, m, ginp, gout):
+        gnew = ginp[0].clone()
+        return gnew * self.scale_a,
+
+    def hookv(self, m, ginp, gout):
+        gnew = ginp[0].clone()
+        return gnew * self.scale_v,
+
+    def update_scale(self, coeff_a, coeff_v):
+        self.scale_a = coeff_a
+        self.scale_v = coeff_v
+
+    def forward(self, batch):
+        _,_,total_out = self.net(batch, pad_audio=False, pad_visual=False)
+        # print(f'2.1 cuda allocated: {torch.cuda.memory_allocated() // (1024 ** 3)} GB')
+        self.net.eval()
+        with torch.no_grad():
+            _, _, pad_visual_out = self.net(batch, pad_audio=False, pad_visual=True)
+            _, _, pad_audio_out = self.net(batch, pad_audio=True, pad_visual=False)
+            _, _, zero_padding_out = self.net(batch, pad_audio=True, pad_visual=True)
+        # print(f'2.2 cuda allocated: {torch.cuda.memory_allocated() // (1024 ** 3)} GB')
+
+        if self.mode == "train":
+            self.net.train()
+        m_a = self.m_a_o(self.m_a(total_out, pad_visual_out, pad_audio_out))
+        m_v = self.m_v_o(self.m_v(total_out, pad_visual_out, pad_audio_out))
+        # print(f'2.3 cuda allocated: {torch.cuda.memory_allocated() // (1024 ** 3)} GB')
+
+        if self.extract_mm_feature is True:
+            return total_out, pad_visual_out, pad_audio_out, zero_padding_out, m_a + m_v, encoded_feature
+        return m_a, m_v, _ ,m_a + m_v
     
     def validation_step(self, batch, batch_idx) -> torch.Tensor | Mapping[str, any] | None:
         out_a, out_v, out_t , out = self(batch)
@@ -125,19 +189,17 @@ class GradMod(nn.Module):
         prediction = softmax(out)
         pred_v = softmax(out_v)
         pred_a = softmax(out_a)
-        pred_t = softmax(out_t)
         num = [0.0 for _ in range(n_classes)]
         acc = [0.0 for _ in range(n_classes)]
         acc_a = [0.0 for _ in range(n_classes)]
         acc_v = [0.0 for _ in range(n_classes)]
         acc_t = [0.0 for _ in range(n_classes)]
 
-        for i in range(a.shape[0]):
+        for i in range(label.shape[0]):
 
             ma = np.argmax(prediction[i].cpu().data.numpy())
             v = np.argmax(pred_v[i].cpu().data.numpy())
             a = np.argmax(pred_a[i].cpu().data.numpy())
-            t = np.argmax(pred_t[i].cpu().data.numpy())
             num[label[i]] += 1.0
 
             #pdb.set_trace()
@@ -147,8 +209,7 @@ class GradMod(nn.Module):
                 acc_v[label[i]] += 1.0
             if np.asarray(label[i].cpu()) == a:
                 acc_a[label[i]] += 1.0
-            if np.asarray(label[i].cpu()) == t:
-                acc_t[label[i]] += 1.0
+
         return loss, sum(acc), sum(acc_a), sum(acc_v), sum(acc_t)
 
 class AGMTrainer(BaseTrainer):
@@ -157,6 +218,7 @@ class AGMTrainer(BaseTrainer):
         self.alpha = method_dict['alpha']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
+        self.modality = method_dict['modality']
 
     def train_loop(
         self,
@@ -235,7 +297,10 @@ class AGMTrainer(BaseTrainer):
 
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
-        Mod = GradMod(model)
+        if self.modality == 2:
+            Mod = GradMod_2(model)
+        else:
+            Mod = GradMod(model)
         out_a, out_v, out_t, out = Mod(batch)
         label = batch['label']
         label = label.to(model.device)
@@ -291,45 +356,64 @@ class AGMTrainer(BaseTrainer):
             else:
                 score_visual += -torch.log(softmax(out_v)[k][label[k]])
 
+            if self.modality ==2:
+                pass
             if torch.isinf(torch.log(softmax(out_t)[k][label[k]])) or softmax(out_t)[k][label[k]] < 1e-8:
                 score_text += -torch.log(torch.tensor(1e-8, dtype=out_v.dtype, device=out_v.device))
             else:
                 score_text += -torch.log(softmax(out_v)[k][label[k]])
         score_audio = score_audio / out_a.size(0)
         score_visual = score_visual / out_v.size(0)
-        score_text = score_text / out_v.size(0)
+        if self.modality == 3:
+            score_text = score_text / out_t.size(0)
 
-        score_mean = (score_audio + score_visual + score_text)/3
-        ratio_a = math.exp(3/2*(score_audio.item() - score_mean.item())) ##r
-        ratio_v = math.exp(3/2*(score_visual.item() - score_mean.item()))
-        ratio_t = math.exp(3/2*(score_text.item() - score_mean.item()))
-
-        train_score_mean = (train_score_a + train_score_v +train_score_v)/3
-        optimal_ratio_a = math.exp(3/2*(train_score_a - train_score_mean)) ##eta
-        optimal_ratio_v = math.exp(3/2*(train_score_v - train_score_mean))
-        optimal_ratio_t = math.exp(3/2*(train_score_t - train_score_mean))
-
-
-        # coeff_a = math.exp(cfgs.alpha * (optimal_ratio_a - ratio_a))
-        # coeff_v = math.exp(cfgs.alpha * (optimal_ratio_v - ratio_v))
-
-        # if optimal_ratio_a - ratio_a> 10 or optimal_ratio_v - ratio_v >10 or optimal_ratio_t - ratio_t >10:
-        #     print('difference:',optimal_ratio_a - ratio_a,optimal_ratio_v - ratio_v)
-        coeff_a = math.exp(self.alpha * min(optimal_ratio_a - ratio_a,10))
-        coeff_v = math.exp(self.alpha * min(optimal_ratio_v - ratio_v,10))
-        coeff_t = math.exp(self.alpha * min(optimal_ratio_t - ratio_t,10))
-
-        train_score_a = train_score_a * (iteration - 1) / iteration + score_audio.item() / iteration ##s^
-        train_score_v = train_score_v * (iteration - 1) / iteration + score_visual.item() / iteration
-        train_score_t = train_score_t * (iteration - 1) / iteration + score_text.item() / iteration
-        # ra_score_a = ra_score_a * step / (step + 1) + score_audio.item() / (step + 1)
-        # ra_score_v = ra_score_v * step / (step + 1) + score_visual.item() / (step + 1)
-
-        # if cfgs.method == "AGM" and cfgs.modulation_starts <= epoch <= cfgs.modulation_ends:
-        if self.modulation_starts <= self.current_epoch <= self.modulation_ends:  
         
-            Mod.update_scale(coeff_a, coeff_v, coeff_t)
+            score_mean = (score_audio + score_visual + score_text)/3
+            ratio_a = math.exp(3/2*(score_audio.item() - score_mean.item())) ##r
+            ratio_v = math.exp(3/2*(score_visual.item() - score_mean.item()))
+            ratio_t = math.exp(3/2*(score_text.item() - score_mean.item()))
+
+            train_score_mean = (train_score_a + train_score_v +train_score_v)/3
+            optimal_ratio_a = math.exp(3/2*(train_score_a - train_score_mean)) ##eta
+            optimal_ratio_v = math.exp(3/2*(train_score_v - train_score_mean))
+            optimal_ratio_t = math.exp(3/2*(train_score_t - train_score_mean))
+
+
+            # coeff_a = math.exp(cfgs.alpha * (optimal_ratio_a - ratio_a))
+            # coeff_v = math.exp(cfgs.alpha * (optimal_ratio_v - ratio_v))
+
+            # if optimal_ratio_a - ratio_a> 10 or optimal_ratio_v - ratio_v >10 or optimal_ratio_t - ratio_t >10:
+            #     print('difference:',optimal_ratio_a - ratio_a,optimal_ratio_v - ratio_v)
+            coeff_a = math.exp(self.alpha * min(optimal_ratio_a - ratio_a,10))
+            coeff_v = math.exp(self.alpha * min(optimal_ratio_v - ratio_v,10))
+            coeff_t = math.exp(self.alpha * min(optimal_ratio_t - ratio_t,10))
+
+            train_score_a = train_score_a * (iteration - 1) / iteration + score_audio.item() / iteration ##s^
+            train_score_v = train_score_v * (iteration - 1) / iteration + score_visual.item() / iteration
+            train_score_t = train_score_t * (iteration - 1) / iteration + score_text.item() / iteration
+            # ra_score_a = ra_score_a * step / (step + 1) + score_audio.item() / (step + 1)
+            # ra_score_v = ra_score_v * step / (step + 1) + score_visual.item() / (step + 1)
+
+            # if cfgs.method == "AGM" and cfgs.modulation_starts <= epoch <= cfgs.modulation_ends:
+            if self.modulation_starts <= self.current_epoch <= self.modulation_ends:  
+            
+                Mod.update_scale(coeff_a, coeff_v, coeff_t)
             # print(f'3 cuda allocated: {torch.cuda.memory_allocated() // (1024 ** 3)} GB')
+        else:
+            ratio_a = math.exp(score_visual.item() - score_audio.item()) ##r
+            ratio_v = math.exp(score_audio.item() - score_visual.item())
+
+            optimal_ratio_a = math.exp(train_score_v - train_score_a) ##eta
+            optimal_ratio_v = math.exp(train_score_a - train_score_v)
+            coeff_a = math.exp(self.alpha * min(optimal_ratio_a - ratio_a,10))
+            coeff_v = math.exp(self.alpha * min(optimal_ratio_v - ratio_v,10))
+            train_score_a = train_score_a * (iteration - 1) / iteration + score_audio.item() / iteration ##s^
+            train_score_v = train_score_v * (iteration - 1) / iteration + score_visual.item() / iteration
+            train_score_t = 0
+
+            if self.modulation_starts <= self.current_epoch <= self.modulation_ends:  
+            
+                Mod.update_scale(coeff_a, coeff_v)
 
         self.fabric.call("on_before_backward", loss)
         self.fabric.backward(loss)
@@ -378,7 +462,10 @@ class AGMTrainer(BaseTrainer):
 
         count = 0
         _acc = 0
-        model = GradMod(model)
+        if self.modality == 2:
+            model = GradMod_2(model)
+        else:
+            model = GradMod(model)
         count = 0
         _acc = 0
         _acc_a = 0

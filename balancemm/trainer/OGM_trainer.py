@@ -97,6 +97,7 @@ class OGMTrainer(BaseTrainer):
         relu = nn.ReLU(inplace=True)
         tanh = nn.Tanh()
         label = batch['label']
+        label = label.to(model.device)
         a, v, out = model(batch)
         out_a, out_v = model.AVCalculate(a, v, out)
         loss = criterion(out, label)
