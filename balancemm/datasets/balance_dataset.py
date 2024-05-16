@@ -44,13 +44,13 @@ class balanceDataset(Dataset):
                     self.label.append(self.class_to_idx[all_data[key]['label']])
 
 
-        print('data load finish')
+        # print('data load finish')
 
         self.transforms = transforms
 
         self._init_atransform()
 
-        print('# of files = %d ' % len(self.data))
+        # print('# of files = %d ' % len(self.data))
 
     def _init_atransform(self):
         self.aid_transform = transforms.Compose([transforms.ToTensor()])

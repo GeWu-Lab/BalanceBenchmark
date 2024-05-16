@@ -197,3 +197,9 @@ class AVDataset_CD(Dataset):
     images = torch.cat(image_arr)
 
     return fbank, images, self.classes.index(self.data2class[datum])
+
+# a = KSDataset(args = {'csv_file':'/data/users/yake_wei/KS_2023/ks_train_overlap.txt',\
+#                       'audio_path' : '/data/users/yake_wei/KS_2023/train_spec',\
+#                         'visual_path' : '/data/users/yake_wei/KS_2023/train-frames-1fps/train',\
+#                              'mode':'train' })
+# a.__getitem__(0)
