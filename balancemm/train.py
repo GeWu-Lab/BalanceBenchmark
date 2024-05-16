@@ -56,7 +56,7 @@ def train_and_test(args: dict):
         temp_model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
-    trainer = create_trainer(fabric, args.trainer, args.trainer_para, args)
+    trainer = create_trainer(fabric, args.trainer, args.trainer_para, args, logger)
     gpu_ids = args.trainer['gpus']
 
     device = torch.device("cuda:" + gpu_ids if torch.cuda.is_available() else "cpu")
