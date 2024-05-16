@@ -26,8 +26,8 @@ log:
   comment: '' # comment for the logger
 
 model:
-  type: AVClassifier
-  n_classes: 10
+  type: VTClassifier
+  n_classes: 101
   fusion: concat
 
 train:
@@ -56,15 +56,21 @@ train:
   loss:
     type: "CrossEntropyLoss" # type of loss
 trainer:  
-  trainer: "GBlendingTrainer"
-  name: 'GBlending'
-  gpus: "2"
+  trainer: "baselineTrainer"
+  name: 'baseline'
+  gpus: "0"
 trainer_para:
   base:
     grad_accum_steps: 1
     max_epochs: 70
+  baseline:
+    alpha: 0.3
+    method: 'None'
+    modulation_starts: 10
+    modulation_ends: 80
+    modality: 2
   OGM:
-    alpha: 0.1
+    alpha: 0.3
     method: 'OGM_GE'
     modulation_starts: 10
     modulation_ends: 80
