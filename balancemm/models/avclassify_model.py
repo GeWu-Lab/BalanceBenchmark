@@ -6,6 +6,7 @@ from .resnet_arch import ResNet18, ResNet
 from .fusion_arch import SumFusion, ConcatFusion, FiLM, GatedFusion, ConcatFusion_3
 from typing import Mapping
 import numpy as np
+from .encoders import image_encoder, text_encoder
 class AVClassifierModel(nn.Module):
     def __init__(self, args):
         super(AVClassifierModel, self).__init__()
@@ -131,7 +132,6 @@ class AVClassifierModel(nn.Module):
                 acc_v[label[i]] += 1.0
             if np.asarray(label[i].cpu()) == a:
                 acc_a[label[i]] += 1.0
-
         return loss, sum(acc), sum(acc_a), sum(acc_v), sum(acc_t)
 
     def AVCalculate(self, a, v, out):
@@ -643,9 +643,15 @@ class VTClassifierModel(AVTClassifierModel):
 
         self.n_classes = n_classes
         # self.audio_net = ResNet18(modality='audio')
-        self.visual_net = ResNet18(modality='visual')
+        # self.visual_net = ResNet18(modality='visual')
+        self.visual_net = image_encoder('resnet18', n_classes)
         # self.visual_net = Transformer(input_dim = 35)
-        self.audio_net = Transformer(input_dim=40, dim=512)
+        # self.audio_net = Transformer(input_dim=40, dim=512)
+        self.audio_net = text_encoder()
+        self.fc_a = nn.Linear(768, 512)
+        self.fc_v = nn.Linear(1000, 512)
+        self.a_out = nn.Linear(512, n_classes)
+        self.v_out = nn.Linear(512, n_classes)
         self.fusion = fusion
         self.device = None
         if fusion == 'sum':
@@ -671,26 +677,29 @@ class VTClassifierModel(AVTClassifierModel):
         visual = batch['visual']
         audio = batch['audio']
         visual = visual.to(self.device)
-        audio = audio.to(self.device)
+        audio = {key: value.to(self.device) for key, value in audio.items()}
+        # audio = audio.to(self.device)
         if pad_audio:
             audio = torch.zeros_like(audio, device=audio.device)
         if pad_visual:
             visual = torch.zeros_like(visual, device=visual.device)
-        visual = visual.permute(0, 2, 1, 3, 4).contiguous().float()
-        audio = audio.unsqueeze(1).float()
+        # visual = visual.permute(0, 2, 1, 3, 4).contiguous().float()
+        # audio = audio.unsqueeze(1).float()
 
         a = self.audio_net(audio)
         v = self.visual_net(visual)
-        (_, C, H, W) = v.size()
-        B = a.size()[0]
-        v = v.view(B, -1, C, H, W)
-        v = v.permute(0, 2, 1, 3, 4)
+        # (_, C, H, W) = v.size()
+        # B = a.size()[0]
+        # v = v.view(B, -1, C, H, W)
+        # v = v.permute(0, 2, 1, 3, 4)
 
         # a = F.adaptive_avg_pool2d(a, 1)
-        v = F.adaptive_avg_pool3d(v, 1)
+        # v = F.adaptive_avg_pool3d(v, 1)
 
-        a = torch.flatten(a, 1)
-        v = torch.flatten(v, 1)
+        # a = torch.flatten(a, 1)
+        # v = torch.flatten(v, 1)
+        a = self.fc_a(a)
+        v = self.fc_v(v)
 
         if dependent_modality['audio']:
             a = torch.mul(a,mask)
@@ -742,3 +751,21 @@ class VTClassifierModel(AVTClassifierModel):
             if np.asarray(label[i].cpu()) == a:
                 acc_a[label[i]] += 1.0
         return loss, sum(acc), sum(acc_a), sum(acc_v), sum(acc_t)
+
+    # def AVCalculate(self, a, v, out):
+    #     if self.fusion == 'sum':
+    #         out_v = (torch.mm(v, torch.transpose(self.fusion_module.fc_y.weight, 0, 1)) +
+    #                     self.fusion_module.fc_y.bias)
+    #         out_a = (torch.mm(a, torch.transpose(self.fusion_module.fc_x.weight, 0, 1)) +
+    #                     self.fusion_module.fc_x.bias)
+    #     elif self.fusion == 'concat':
+    #         weight_size = self.fusion_module.fc_out.weight.size(1)
+    #         out_v = self.v_out(v.detach().copy())
+    #         out_a = self.a_out(a.detach().copy())
+    #     elif self.fusion == 'film':
+    #         out_v = out
+    #         out_a = out
+    #     elif self.fusion == 'gated':
+    #         out_v = out
+    #         out_a = out
+    #     return out_a, out_v
