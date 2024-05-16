@@ -20,7 +20,7 @@ _trainer_modules = [
     for file_name in trainer_filenames
 ]
 
-def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args):
+def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args, logger):
     # dynamic instantiation
     for module in _trainer_modules:
         trainer_cls = getattr(module, trainer_opt["trainer"], None)
@@ -35,4 +35,6 @@ def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args):
     print(
         f'Trainer {trainer.__class__.__name__} - {trainer_opt["name"]} '
         'is created.')
+    logger.info("normal Settings: %s", para_opt['base'])
+    logger.info("trainer Settings: %s", para_opt[trainer_opt['name']])
     return trainer

@@ -16,13 +16,15 @@ import lightning as L
 import torch
 
 
-class OGMTrainer(BaseTrainer):
+class baselineTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
-        super(OGMTrainer,self).__init__(fabric,**para_dict)
+        super(baselineTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
+
+        self.modality = method_dict['modality']
 
     def train_loop(
         self,
@@ -92,67 +94,13 @@ class OGMTrainer(BaseTrainer):
     def training_step(self, model, batch, batch_idx):
 
         # TODO: make it simpler and easier to extend
-        softmax = nn.Softmax(dim=1)
         criterion = nn.CrossEntropyLoss()
-        relu = nn.ReLU(inplace=True)
-        tanh = nn.Tanh()
         label = batch['label']
         label = label.to(model.device)
-        a, v, out = model(batch)
-        out_a, out_v = model.AVCalculate(a, v, out)
+        if self.modality == 2:
+            a, v, out = model(batch)
+        else:
+            a, v, t, out = model(batch)
         loss = criterion(out, label)
         loss.backward()
-
-
-        # Modulation starts here !
-
-        score_v = sum([softmax(out_v)[i][label[i]] for i in range(out_v.size(0))])
-        score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
-
-        ratio_v = score_v / score_a
-        ratio_a = 1 / ratio_v
-
-        """
-        Below is the Eq.(10) in our CVPR paper:
-                1 - tanh(alpha * rho_t_u), if rho_t_u > 1
-        k_t_u =
-                1,                         else
-        coeff_u is k_t_u, where t means iteration steps and u is modality indicator, either a or v.
-        """
-
-        if ratio_v > 1:
-            coeff_v = 1 - tanh(self.alpha * relu(ratio_v))
-            coeff_a = 1
-        else:
-            coeff_a = 1 - tanh(self.alpha * relu(ratio_a))
-            coeff_v = 1
-        # for name, parms in model.named_parameters():
-        #     layer = str(name).split('.')[0]
-        #     if 'audio' in layer:
-        #         print('{:1}  {:0}'.format(len(parms.grad.size()),name) )
-            # if 'visual' in layer :
-            #     print('visual  {:0}'.format(len(parms.grad.size()))) 
-
-        if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
-            for name, parms in model.named_parameters():
-                layer = str(name).split('.')[0]
-                if 'audio' in layer and len(parms.grad.size()) != 1: ## not layernorm or bias
-                    if self.method == 'OGM_GE':  # bug fixed
-                        parms.grad = parms.grad * coeff_a + \
-                                    torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
-                    elif self.method == 'OGM':
-                        parms.grad *= coeff_a
-
-                if 'visual' in layer and len(parms.grad.size()) != 1:
-                    if self.method == 'OGM_GE':  # bug fixed
-                        parms.grad = parms.grad * coeff_v + \
-                                    torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
-                    elif self.method == 'OGM':
-                        parms.grad *= coeff_v
-        else:
-            pass
-
-
-    
-
         return loss

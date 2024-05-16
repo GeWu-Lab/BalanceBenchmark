@@ -127,7 +127,7 @@ class GradMod(nn.Module):
         #     return total_out, pad_visual_out, pad_audio_out, zero_padding_out, m_a + m_v, encoded_feature
         #     # return m_a+m_v, m_a, m_v, zero_padding_out, m_a + m_v, encoded_feature
         
-        return m_a, m_v, m_t, m_a + m_v + m_t
+        return m_a, m_v, m_t, AVT
 
 class GradMod_2(nn.Module):
     def __init__(self, model):
@@ -176,8 +176,8 @@ class GradMod_2(nn.Module):
         # print(f'2.3 cuda allocated: {torch.cuda.memory_allocated() // (1024 ** 3)} GB')
 
         if self.extract_mm_feature is True:
-            return total_out, pad_visual_out, pad_audio_out, zero_padding_out, m_a + m_v, encoded_feature
-        return m_a, m_v, _ ,m_a + m_v
+            return total_out, pad_visual_out, pad_audio_out, zero_padding_out, m_a + m_v
+        return m_a, m_v, _ ,total_out 
     
     def validation_step(self, batch, batch_idx) -> torch.Tensor | Mapping[str, any] | None:
         out_a, out_v, out_t , out = self(batch)

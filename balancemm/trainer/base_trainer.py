@@ -194,13 +194,10 @@ class BaseTrainer():
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
                 break
-            for i in range(len(batch)):
-                print(len(batch))
-                print(batch[i].shape)
             self.fabric.call("on_train_batch_start", batch, batch_idx)
 
             # check if optimizer should step in gradient accumulation
-            should_optim_step = self.global_step % self.grad_accum_steps == 0
+            should_optim_step = True
             if should_optim_step:
                 # currently only supports a single optimizer
                 self.fabric.call("on_before_optimizer_step", optimizer, 0)
@@ -293,7 +290,7 @@ class BaseTrainer():
             _acc_v += acc_v
             _acc_t += acc_t
             valid_loss += out
-        count = len(val_loader)
+            count += len(batch['label'])
         valid_loss /= count
         _acc /= count
         _acc_a /= count
@@ -319,7 +316,7 @@ class BaseTrainer():
             batch_idx: index of the current batch w.r.t the current epoch
 
         """
-        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.training_step(batch, batch_idx=batch_idx)
+        outputs: Union[torch.Tensor, Mapping[str, Any]] = model(batch)
 
         loss = outputs if isinstance(outputs, torch.Tensor) else outputs["loss"]
 
