@@ -28,29 +28,30 @@ class balanceDataset(Dataset):
         with open(csv_path) as f:
             annotation_data = json.load(f)
             all_data = annotation_data['database']
-            choose = ['playing piano', 'playing cello', 'lawn mowing', 'singing', 'cleaning floor', 'bowling', 'whistling', 'motorcycling', 'playing flute', 'writing on blackboard']
-            # class_labels = annotation_data['labels']
-        self.class_to_idx = {label : i for i,label in enumerate(choose)}
-        print(len(choose))
+            # choose = ['playing piano', 'playing cello', 'lawn mowing', 'singing', 'cleaning floor', 'bowling', 'swimming', 'whistling', 'motorcycling', 'playing flute', 'writing on blackboard', 'beat boxing']
+            class_labels = annotation_data['labels']
+
+        self.class_to_idx = {label : i for i,label in enumerate(class_labels)}
+        print(len(class_labels))
         # exit(0)
 
         for key in all_data.keys():
         #     print(all_data[key])
         #   exit(0)
         
-            if all_data[key]['subset'] == (self.mode + 'ing') and all_data[key]['label'] in choose:
+            if all_data[key]['subset'] == (self.mode + 'ing'):
                 if os.path.exists(self.visual_path + key + '.hdf5') and os.path.exists(self.audio_path + key + '.pkl'):
                     self.data.append(key)
                     self.label.append(self.class_to_idx[all_data[key]['label']])
 
 
-        # print('data load finish')
+        print('data load finish')
 
         self.transforms = transforms
 
         self._init_atransform()
 
-        # print('# of files = %d ' % len(self.data))
+        print('# of files = %d ' % len(self.data))
 
     def _init_atransform(self):
         self.aid_transform = transforms.Compose([transforms.ToTensor()])
