@@ -25,6 +25,7 @@ class GBlendingTrainer(BaseTrainer):
         self.modulation_ends = method_dict['modulation_ends']
         
         self.super_epoch = method_dict['super_epoch']
+        self.modality = method_dict['modality']
 
     def fit(
         self,
@@ -228,25 +229,33 @@ class GBlendingTrainer(BaseTrainer):
     def super_epoch_origin(self, model, temp_model, limit_batches, train_loader, test_loader, optimizer, logger):
         pre_a_loss_train = 0.0
         pre_v_loss_train = 0.0
+        pre_t_loss_train = 0.0
         pre_av_loss_train = 0.0
         pre_avt_loss_train = 0.0
+
         now_a_loss_train = 0.0
         now_v_loss_train = 0.0
+        now_t_loss_train = 0.0
         now_av_loss_train = 0.0
         now_avt_loss_train = 0.0
         pre_a_loss_test = 0.0
         pre_v_loss_test = 0.0
+        pre_t_loss_test = 0.0
         pre_avt_loss_test = 0.0
+
         now_a_loss_test = 0.0
         now_v_loss_test = 0.0
+        now_t_loss_test = 0.0
         now_av_loss_test = 0.0
         _loss_avt = 0.0
         _loss_av = 0.0
         _loss_a = 0.0
         _loss_v = 0.0
+        _loss_t = 0.0
         _loss_av_test = 0.0
         _loss_a_test = 0.0
         _loss_v_test = 0.0
+        _loss_t_test = 0.0
         _loss_avt_test = 0.0
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)

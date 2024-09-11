@@ -305,9 +305,9 @@ class AVTClassifierModel(nn.Module):
         self.n_classes = n_classes
         # self.audio_net = ResNet18(modality='audio')
         # self.visual_net = ResNet18(modality='visual')
-        self.audio_net = Transformer(input_dim = 74)
-        self.visual_net = Transformer(input_dim = 35)
-        self.text_net = Transformer()
+        self.audio_net = Transformer(input_dim = 74, dim= 512)
+        self.visual_net = Transformer(input_dim = 35, dim = 512)
+        self.text_net = Transformer(dim = 512)
         self.fc_a = nn.Linear(1024,1)
         self.fc_v = nn.Linear(1024,1)
         self.fc_t = nn.Linear(1024,1)
@@ -316,7 +316,7 @@ class AVTClassifierModel(nn.Module):
         if fusion == 'sum':
             self.fusion_module = SumFusion(output_dim=n_classes)
         elif fusion == 'concat':
-            self.fusion_module = ConcatFusion_3(output_dim=n_classes)
+            self.fusion_module = ConcatFusion_3(output_dim=n_classes, input_dim= 512*3)
         elif fusion == 'film':
             self.fusion_module = FiLM(output_dim=n_classes, x_film=True)
         elif fusion == 'gated':

@@ -321,24 +321,6 @@ class AGMTrainer(BaseTrainer):
         loss_a = criterion(out_a, label)
         loss_v = criterion(out_v, label)
 
-
-        # # calculate acc
-        # prediction = softmax(out)
-        # pred_a = softmax(out_a)
-        # pred_v = softmax(out_v)
-        # for j in range(image.shape[0]):
-        #     ma = np.argmax(prediction[j].cpu().data.numpy())
-        #     v = np.argmax(pred_v[j].cpu().data.numpy())
-        #     a = np.argmax(pred_a[j].cpu().data.numpy())
-        #     num[label[j]] += 1.0
-
-        #     if np.asarray(label[j].cpu()) == ma:
-        #         acc[label[j]] += 1.0
-        #     if np.asarray(label[j].cpu()) == v:
-        #         acc_v[label[j]] += 1.0
-        #     if np.asarray(label[j].cpu()) == a:
-        #         acc_a[label[j]] += 1.0
-
         
         if torch.isnan(out_a).any() or torch.isnan(out_v).any():
             raise ValueError
@@ -479,7 +461,7 @@ class AGMTrainer(BaseTrainer):
 
             self.fabric.call("on_validation_batch_start", batch, batch_idx)
 
-            out, acc, acc_a, acc_v, acc_t = model.validation_step(batch, batch_idx)
+            out, acc, acc_a, acc_v, acc_t = model.net.validation_step(batch, batch_idx)
             # avoid gradients in stored/accumulated values -> prevents potential OOM
             out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
 
