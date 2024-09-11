@@ -23,6 +23,7 @@ class OGMTrainer(BaseTrainer):
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
+        self.modality = method_dict['modality']
 
     def train_loop(
         self,
@@ -98,6 +99,9 @@ class OGMTrainer(BaseTrainer):
         tanh = nn.Tanh()
         label = batch['label']
         label = label.to(model.device)
+        if self.modality == 3:
+            a, v, t, out = model(batch)
+            out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
         a, v, out = model(batch)
         out_a, out_v = model.AVCalculate(a, v, out)
         loss = criterion(out, label)
@@ -108,35 +112,55 @@ class OGMTrainer(BaseTrainer):
 
         score_v = sum([softmax(out_v)[i][label[i]] for i in range(out_v.size(0))])
         score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
-
-        ratio_v = score_v / score_a
-        ratio_a = 1 / ratio_v
-
-        """
-        Below is the Eq.(10) in our CVPR paper:
-                1 - tanh(alpha * rho_t_u), if rho_t_u > 1
-        k_t_u =
-                1,                         else
-        coeff_u is k_t_u, where t means iteration steps and u is modality indicator, either a or v.
-        """
-
-        if ratio_v > 1:
-            coeff_v = 1 - tanh(self.alpha * relu(ratio_v))
+        if self.modality == 3:
+            size = model.fusion_module.fc_out.weight.size(1)
+            dot_a = torch.mm(F.normalize(a, dim=1),
+                            F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :size//3], 0, 1),
+                                        dim=0))  # w[n_classes,feature_dim*2]->W[feature_dim, n_classes], norm at dim 0.
+            dot_v = torch.mm(F.normalize(v, dim=1),
+                            F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, size//3:size//3*2], 0, 1),
+                                        dim=0))
+            dot_t = torch.mm(F.normalize(t, dim=1),
+                            F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, size//3*2:], 0, 1),
+                                        dim=0))
+            score_a = sum([softmax(torch.cos(dot_t))[i][label[i]]] if label[i] == torch.argmax(out_t[i]) else 0 for i in range(len(out)) )
+            score_v = sum([softmax(torch.cos(dot_t))[i][label[i]]] if label[i] == torch.argmax(out_t[i]) else 0 for i in range(len(out)) )
+            score_t = sum([softmax(torch.cos(dot_t))[i][label[i]]] if label[i] == torch.argmax(out_t[i]) else 0 for i in range(len(out)) )
+            minscore = min([score_v, score_a, score_t])
+            ratio_a = score_a / minscore
+            ratio_v = score_v / minscore
+            ratio_t = score_t / minscore
             coeff_a = 1
-        else:
-            coeff_a = 1 - tanh(self.alpha * relu(ratio_a))
             coeff_v = 1
-        # for name, parms in model.named_parameters():
-        #     layer = str(name).split('.')[0]
-        #     if 'audio' in layer:
-        #         print('{:1}  {:0}'.format(len(parms.grad.size()),name) )
-            # if 'visual' in layer :
-            #     print('visual  {:0}'.format(len(parms.grad.size()))) 
+            coeff_t = 1
+            if ratio_a > 1:
+                coeff_a = 1 - tanh(self.alpha * relu(ratio_a))
+            if ratio_v > 1:
+                coeff_v = 1 - tanh(self.alpha * relu(ratio_v))
+            if ratio_t > 1:
+                coeff_t = 1 - tanh(self.alpha * relu(ratio_t))
+        else:
+            ratio_v = score_v / score_a
+            ratio_a = 1 / ratio_v
+
+            """
+            Below is the Eq.(10) in our CVPR paper:
+                    1 - tanh(alpha * rho_t_u), if rho_t_u > 1
+            k_t_u =
+                    1,                         else
+            coeff_u is k_t_u, where t means iteration steps and u is modality indicator, either a or v.
+            """
+            if ratio_v > 1:
+                coeff_v = 1 - tanh(self.alpha * relu(ratio_v))
+                coeff_a = 1
+            else:
+                coeff_a = 1 - tanh(self.alpha * relu(ratio_a))
+                coeff_v = 1
 
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
             for name, parms in model.named_parameters():
                 layer = str(name).split('.')[0]
-                if 'audio' in layer and len(parms.grad.size()) != 1: ## not layernorm or bias
+                if 'audio' in layer and len(parms.grad.size()) != 1: # according to your model 
                     if self.method == 'OGM_GE':  # bug fixed
                         parms.grad = parms.grad * coeff_a + \
                                     torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
@@ -149,6 +173,13 @@ class OGMTrainer(BaseTrainer):
                                     torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
                     elif self.method == 'OGM':
                         parms.grad *= coeff_v
+                if self.modality == 3:
+                    if 'text' in layer and len(parms.grad.size()) != 1:
+                        if self.method == 'OGM_GE':  # bug fixed
+                            parms.grad = parms.grad * coeff_t + \
+                                        torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
+                        elif self.method == 'OGM':
+                            parms.grad *= coeff_v
         else:
             pass
 

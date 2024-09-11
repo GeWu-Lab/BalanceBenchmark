@@ -132,6 +132,7 @@ class AVClassifierModel(nn.Module):
                 acc_v[label[i]] += 1.0
             if np.asarray(label[i].cpu()) == a:
                 acc_a[label[i]] += 1.0
+
         return loss, sum(acc), sum(acc_a), sum(acc_v), sum(acc_t)
 
     def AVCalculate(self, a, v, out):
@@ -207,7 +208,11 @@ class AVClassifier_gbModel(nn.Module):
             return out_a
         
         if types == 2:
-            v = self.visual_net(audio)
+            v = self.visual_net(visual)
+            (_, C, H, W) = v.size()
+            B = visual.size()[0]
+            v = v.view(B, -1, C, H, W)
+            v = v.permute(0, 2, 1, 3, 4)
             v = F.adaptive_avg_pool3d(v, 1)
             v = torch.flatten(v, 1)
             out_v = self.fc_v(v)
@@ -242,6 +247,42 @@ class AVClassifier_gbModel(nn.Module):
         a, v, out = self.fusion_module(a, v)
 
         return a, v, out
+    
+    def validation_step(self, batch, batch_idx) -> torch.Tensor | Mapping[str, any] | None:
+        
+        a, v, out = self(batch)
+        out_a, out_v = self.AVCalculate(a, v , out)
+        n_classes = self.n_classes
+        softmax  = nn.Softmax(dim = 1)
+        label = batch['label']
+        label = label.to(self.device)
+        loss = F.cross_entropy(out, label)
+        prediction = softmax(out)
+        pred_v = softmax(out_v)
+        pred_a = softmax(out_a)
+        num = [0.0 for _ in range(n_classes)]
+        acc = [0.0 for _ in range(n_classes)]
+        acc_a = [0.0 for _ in range(n_classes)]
+        acc_v = [0.0 for _ in range(n_classes)]
+        acc_t = [0.0 for _ in range(n_classes)]
+
+        for i in range(label.shape[0]):
+
+            ma = np.argmax(prediction[i].cpu().data.numpy())
+            v = np.argmax(pred_v[i].cpu().data.numpy())
+            a = np.argmax(pred_a[i].cpu().data.numpy())
+            num[label[i]] += 1.0
+
+            #pdb.set_trace()
+            if np.asarray(label[i].cpu()) == ma:
+                acc[label[i]] += 1.0
+            if np.asarray(label[i].cpu()) == v:
+                acc_v[label[i]] += 1.0
+            if np.asarray(label[i].cpu()) == a:
+                acc_a[label[i]] += 1.0
+
+        return loss, sum(acc), sum(acc_a), sum(acc_v), sum(acc_t)
+    
 class Transformer(nn.Module):
     """
     Extend to nn.Transformer.
@@ -306,8 +347,8 @@ class AVTClassifierModel(nn.Module):
         # self.audio_net = ResNet18(modality='audio')
         # self.visual_net = ResNet18(modality='visual')
         self.audio_net = Transformer(input_dim = 74, dim= 512)
-        self.visual_net = Transformer(input_dim = 35, dim = 512)
-        self.text_net = Transformer(dim = 512)
+        self.visual_net = Transformer(input_dim = 35, dim= 512)
+        self.text_net = Transformer(dim= 512)
         self.fc_a = nn.Linear(1024,1)
         self.fc_v = nn.Linear(1024,1)
         self.fc_t = nn.Linear(1024,1)
@@ -751,21 +792,3 @@ class VTClassifierModel(AVTClassifierModel):
             if np.asarray(label[i].cpu()) == a:
                 acc_a[label[i]] += 1.0
         return loss, sum(acc), sum(acc_a), sum(acc_v), sum(acc_t)
-
-    # def AVCalculate(self, a, v, out):
-    #     if self.fusion == 'sum':
-    #         out_v = (torch.mm(v, torch.transpose(self.fusion_module.fc_y.weight, 0, 1)) +
-    #                     self.fusion_module.fc_y.bias)
-    #         out_a = (torch.mm(a, torch.transpose(self.fusion_module.fc_x.weight, 0, 1)) +
-    #                     self.fusion_module.fc_x.bias)
-    #     elif self.fusion == 'concat':
-    #         weight_size = self.fusion_module.fc_out.weight.size(1)
-    #         out_v = self.v_out(v.detach().copy())
-    #         out_a = self.a_out(a.detach().copy())
-    #     elif self.fusion == 'film':
-    #         out_v = out
-    #         out_a = out
-    #     elif self.fusion == 'gated':
-    #         out_v = out
-    #         out_a = out
-    #     return out_a, out_v

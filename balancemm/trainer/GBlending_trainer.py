@@ -235,18 +235,21 @@ class GBlendingTrainer(BaseTrainer):
 
         now_a_loss_train = 0.0
         now_v_loss_train = 0.0
-        now_t_loss_train = 0.0
+        now_t_loss_train =0.0
         now_av_loss_train = 0.0
         now_avt_loss_train = 0.0
+
         pre_a_loss_test = 0.0
         pre_v_loss_test = 0.0
         pre_t_loss_test = 0.0
+        pre_av_loss_test = 0.0
         pre_avt_loss_test = 0.0
 
         now_a_loss_test = 0.0
         now_v_loss_test = 0.0
         now_t_loss_test = 0.0
         now_av_loss_test = 0.0
+        now_avt_loss_test = 0.0
         _loss_avt = 0.0
         _loss_av = 0.0
         _loss_a = 0.0
@@ -419,11 +422,14 @@ class GBlendingTrainer(BaseTrainer):
         o_v = o_v_now - o_v_pre
         weight_v = abs(g_v / (o_v * o_v))
 
-        g_t = pre_t_loss_test - now_t_loss_test
-        o_t_pre = pre_t_loss_test - pre_t_loss_train
-        o_t_now = now_t_loss_test - now_t_loss_train
-        o_t = o_t_now - o_t_pre
-        weight_t = abs(g_t / (o_t * o_t))
+        if self.modality == 3:
+            g_t = pre_t_loss_test - now_t_loss_test
+            o_t_pre = pre_t_loss_test - pre_t_loss_train
+            o_t_now = now_t_loss_test - now_t_loss_train
+            o_t = o_t_now - o_t_pre
+            weight_t = abs(g_t / (o_t * o_t))
+        else:
+            weight_t = 0.0
 
         g_avt = pre_avt_loss_test - now_avt_loss_test
         o_avt_pre = pre_avt_loss_test - pre_avt_loss_train

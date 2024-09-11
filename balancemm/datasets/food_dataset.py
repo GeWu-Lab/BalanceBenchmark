@@ -37,8 +37,8 @@ class UMPC_FoodDataset(Dataset):
         targ_dir = "/data/users/zequn_yang/Food101"
         phase = args['mode']
         mode = 'all'
-        resize = 384
-        # resize = 224
+        #resize = 384
+        resize = 224
         train_transforms = transforms.Compose([transforms.RandomRotation(30), 
                                                 transforms.Resize((resize,resize)),
                                                 transforms.RandomHorizontalFlip(),
@@ -64,7 +64,7 @@ class UMPC_FoodDataset(Dataset):
         # Create classes and class_to_idx attributes
         self.classes, self.class_to_idx,self.idx_to_class = find_classes(self.img_dir)
         self.mode=mode
-        print(phase)
+
     # 4. Make function to load images
     def load_image(self, index,img_path): #-> Image.Image:
         "Opens an image via a path and returns it."
@@ -96,17 +96,19 @@ class UMPC_FoodDataset(Dataset):
         
         class_name  = sample['label'] 
         class_idx = self.class_to_idx[class_name]
-        
         if self.mode =="all":
             img_path = os.path.join(self.img_dir,sample['label'] ,sample["Image_path"] )
             img = self.load_image(index,img_path)
             # Transform if necessary
             if self.transform:
-                # return {'visual':self.transform(img).unsqueeze(1),'audio':text_tokens['input_ids'],'text':txt, 'label':class_idx}
-                return {'visual':self.transform(img),'audio':text_tokens,'text':txt, 'label':class_idx}
+                return {'visual':self.transform(img).unsqueeze(1),'audio':text_tokens['input_ids'],'text':text_tokens['input_ids'], 'label':class_idx}
                 return self.transform(img).unsqueeze(1), text_tokens, txt, class_idx 
             else:
                 return img, text_tokens, txt, class_idx 
         elif self.mode =="Text_only":
             return  text_tokens, txt, class_idx            
-        
+
+if __name__ == '__main__':   
+    print('start')
+    a = UMPC_FoodDataset({'mode':'train'})
+    a.__getitem__(0)

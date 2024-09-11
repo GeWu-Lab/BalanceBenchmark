@@ -177,7 +177,7 @@ class GradMod_2(nn.Module):
 
         if self.extract_mm_feature is True:
             return total_out, pad_visual_out, pad_audio_out, zero_padding_out, m_a + m_v
-        return m_a, m_v, _ ,total_out 
+        return m_a, m_v, _ ,total_out
     
     def validation_step(self, batch, batch_idx) -> torch.Tensor | Mapping[str, any] | None:
         out_a, out_v, out_t , out = self(batch)
@@ -321,6 +321,24 @@ class AGMTrainer(BaseTrainer):
         loss_a = criterion(out_a, label)
         loss_v = criterion(out_v, label)
 
+
+        # # calculate acc
+        # prediction = softmax(out)
+        # pred_a = softmax(out_a)
+        # pred_v = softmax(out_v)
+        # for j in range(image.shape[0]):
+        #     ma = np.argmax(prediction[j].cpu().data.numpy())
+        #     v = np.argmax(pred_v[j].cpu().data.numpy())
+        #     a = np.argmax(pred_a[j].cpu().data.numpy())
+        #     num[label[j]] += 1.0
+
+        #     if np.asarray(label[j].cpu()) == ma:
+        #         acc[label[j]] += 1.0
+        #     if np.asarray(label[j].cpu()) == v:
+        #         acc_v[label[j]] += 1.0
+        #     if np.asarray(label[j].cpu()) == a:
+        #         acc_a[label[j]] += 1.0
+
         
         if torch.isnan(out_a).any() or torch.isnan(out_v).any():
             raise ValueError
@@ -461,7 +479,7 @@ class AGMTrainer(BaseTrainer):
 
             self.fabric.call("on_validation_batch_start", batch, batch_idx)
 
-            out, acc, acc_a, acc_v, acc_t = model.net.validation_step(batch, batch_idx)
+            out, acc, acc_a, acc_v, acc_t = model.validation_step(batch, batch_idx)
             # avoid gradients in stored/accumulated values -> prevents potential OOM
             out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
 
@@ -470,7 +488,7 @@ class AGMTrainer(BaseTrainer):
 
             self._format_iterable(iterable, self._current_val_return, "val")
 
-            count += len(batch)
+            count += len(out)
             _acc += acc
             _acc_a += acc_a
             _acc_v += acc_v

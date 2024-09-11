@@ -87,7 +87,7 @@ class PMRTrainer(BaseTrainer):
                                            audio_proto= audio_proto, visual_proto= visual_proto)
                 optimizer.step()
                 self.fabric.call("on_before_zero_grad", optimizer)
-                audio_proto, visual_proto = self.calculate_prototype(model, iterable)
+                audio_proto, visual_proto = self.calculate_prototype(model, iterable, audio_proto, visual_proto)
 
                 optimizer.zero_grad()
 
@@ -172,7 +172,7 @@ class PMRTrainer(BaseTrainer):
         loss.backward()
         return loss
     
-    def calculate_prototype(self, model, dataloader, a_proto=None, v_proto=None):
+    def calculate_prototype(self, model, dataloader, a_proto=0, v_proto=0):
     # todo customed output of prototype
         n_classes = model.n_classes
         device = next(model.parameters()).device
