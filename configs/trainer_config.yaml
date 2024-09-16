@@ -1,0 +1,54 @@
+trainer_para:
+  base:
+    grad_accum_steps: 1
+    max_epochs: 70
+    modulation_starts:
+    modulation_ends:
+  baseline:
+    alpha: 0.3
+    method: 'None'
+    modulation_starts: 10
+    modulation_ends: 80
+    modality: 2
+  OGM:
+    alpha: 0.3
+    method: 'OGM_GE'
+    modulation_starts: 10
+    modulation_ends: 80
+  AGM:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 10
+    modulation_ends: 80
+    modality: 2
+  AMCo:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 10
+    modulation_ends: 80
+    sigma: 0.5
+    U: 512
+    eps: 0.3
+    modality: 2
+  CML:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 10
+    modulation_ends: 80
+    lam: 0
+    modality: 2
+  GBlending:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+    super_epoch: 10
+    modality: 2
+  PMR:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+    modality: 2
+    embed_dim: 512
+    momentum_coef: 0.5

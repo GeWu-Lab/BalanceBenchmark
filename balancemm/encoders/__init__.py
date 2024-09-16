@@ -8,7 +8,7 @@ __all__ = ['find_encoder', 'create_encoder']
 # Dynamic instantiation
 # ----------------------
 
-# import dataset modules from those with '_dataset' in file names
+# import encoder modules from those with '_encoder' in file names
 _encoder_folder = osp.dirname(osp.abspath(__file__))
 _encoder_filenames = [
     osp.splitext(v)[0] for v in os.listdir(_encoder_folder)
@@ -19,17 +19,17 @@ _encoder_modules = [
     for file_name in _encoder_filenames
 ]
 
-# find dataset from dataset_opt
-def find_encoder(dataset_name: str) -> object:
-    dataset_cls = find_module(_encoder_modules, dataset_name, 'Dataset')
-    return dataset_cls
+# find encoder from encoder_opt
+def find_encoder(encoder_name: str) -> object:
+    encoder_cls = find_module(_encoder_modules, encoder_name, 'Dataset')
+    return encoder_cls
 
-# create dataset from dataset_opt
-def create_encoder(dataset_opt: dict):
-    if 'name' not in dataset_opt:
-        raise ValueError('Dataset name is required.')
-    dataset_cls = find_encoder(dataset_opt['name'])
-    dataset = dataset_cls(dataset_opt)
+# create encoder from encoder_opt
+def create_encoder(encoder_opt: dict):
+    if 'name' not in encoder_opt:
+        raise ValueError('encoder name is required.')
+    encoder_cls = find_encoder(encoder_opt['name'])
+    encoder = encoder_cls(encoder_opt)
 
-    print (f'Dataset {dataset.__class__.__name__} - {dataset_opt["name"]} is created.')
-    return dataset
+    print (f'Dataset {encoder.__class__.__name__} - {encoder_opt["name"]} is created.')
+    return encoder

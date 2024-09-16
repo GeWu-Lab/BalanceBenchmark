@@ -14,7 +14,80 @@ class BaseModel(nn.modules):
         self.fusion = args['fusion']
         self.modality_encoder = nn.ModuleDict(args['encoders'])
         self.modalitys = args['modality']
+        if self.fusion == 'sum':
+            self.fusion_module = SumFusion(output_dim = self.n_classes)
+        elif self.fusion == 'concat':
+            self.fusion_module = ConcatFusion(output_dim = self.n_classes)
+        elif self.fusion == 'film':
+            self.fusion_module = FiLM(output_dim = self.n_classes, x_film=True)
+        elif self.fusion == 'gated':
+            self.fusion_module = GatedFusion(output_dim = self.n_classes, x_gate=True)
+        else:
+            raise NotImplementedError('Incorrect fusion method: {}!'.format(self.fusion))
 
+    def forward(self,
+                batch,
+                pad_audio = False,
+                pad_visual = False, 
+                pad_text = False, 
+                mask = None, 
+                dependent_modality = {"audio": False, "visual": False, "text": False}, 
+                pt = 0,
+                types= 0):
+        visual = batch['visual']
+        audio = batch['audio']
+        visual = visual.to(self.device)
+        audio = audio.to(self.device)
+        if pad_audio:
+            audio = torch.zeros_like(audio, device=audio.device)
+        if pad_visual:
+            visual = torch.zeros_like(visual, device=visual.device)
+        visual = visual.permute(0, 2, 1, 3, 4).contiguous().float()
+        # audio = audio.unsqueeze(1).float()
+
+        if types == 1:
+            a = self.audio_net(audio)
+            a = F.adaptive_avg_pool2d(a, 1)
+            a = torch.flatten(a, 1)
+            out_a = self.fc_a(a)
+            return out_a
+        
+        if types == 2:
+            v = self.visual_net(audio)
+            v = F.adaptive_avg_pool3d(v, 1)
+            v = torch.flatten(v, 1)
+            out_v = self.fc_v(v)
+            return out_v
+        
+        a = self.audio_net(audio)
+        v = self.visual_net(visual)
+
+        (_, C, H, W) = v.size()
+        B = a.size()[0]
+        v = v.view(B, -1, C, H, W)
+        v = v.permute(0, 2, 1, 3, 4)
+
+        a = F.adaptive_avg_pool2d(a, 1)
+        v = F.adaptive_avg_pool3d(v, 1)
+
+        a = torch.flatten(a, 1)
+        v = torch.flatten(v, 1)
+        if dependent_modality['audio']:
+            a = torch.mul(a,mask)
+            if(abs(pt-1)>0.1):
+                a = a*1/(1-pt)
+            else:
+                a = a*10
+        elif dependent_modality['visual']:
+            v = torch.mul(v,mask)
+            if(abs(pt-1)>0.1):
+                v = v*1/(1-pt)
+            else:
+                v = v*10
+
+        a, v, out = self.fusion_module(a, v)
+
+        return a, v, out
 class AVClassifierModel(nn.Module):
     def __init__(self, args):
         super(AVClassifierModel, self).__init__()
@@ -36,7 +109,7 @@ class AVClassifierModel(nn.Module):
             self.fusion_module = GatedFusion(output_dim=n_classes, x_gate=True)
         else:
             raise NotImplementedError('Incorrect fusion method: {}!'.format(fusion))
-
+    
 
     def forward(self,
                 batch,

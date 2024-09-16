@@ -1,5 +1,3 @@
-name: "OGM_GE"
-mode: "train_and_test"
 seed: 42
 
 dataset:

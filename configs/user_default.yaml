@@ -1,7 +1,20 @@
-name: "base_pre_food"
 mode: "train_and_test"
 seed: 42
 
+Main_config:
+  dataset: 
+  model:
+  loss:
+  tasks:
+  trainer:
+  gpus:
+
+Train:
+  dataset:
+
+Test:
+  dataset:
+  
 dataset:
   dataloader:
     eff_batch_size: 64
