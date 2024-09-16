@@ -7,6 +7,14 @@ from .fusion_arch import SumFusion, ConcatFusion, FiLM, GatedFusion, ConcatFusio
 from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
+class BaseModel(nn.modules):
+    def __init__(self, args):
+        super(BaseModel, self).__init__()
+        self.n_class = args['n_classes']
+        self.fusion = args['fusion']
+        self.modality_encoder = nn.ModuleDict(args['encoders'])
+        self.modalitys = args['modality']
+
 class AVClassifierModel(nn.Module):
     def __init__(self, args):
         super(AVClassifierModel, self).__init__()
