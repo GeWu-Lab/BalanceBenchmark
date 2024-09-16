@@ -1,8 +1,8 @@
 model:
   encoders:
   fusion_name:
+  modality_size:
   
 fusion:
   Concat:
-    input_dim:
     out_put_dim:
