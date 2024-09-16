@@ -2,6 +2,8 @@ import importlib
 import os
 from os import path as osp
 from ..utils.parser_utils import find_module
+import torch.nn as nn
+import torch
 __all__ = ['find_encoder', 'create_encoder']
 
 # ----------------------

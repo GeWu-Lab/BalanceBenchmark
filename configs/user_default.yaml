@@ -7,14 +7,14 @@ Main_config:
   loss:
   tasks:
   trainer:
-  gpus:
+  device:
 
 Train:
   dataset:
 
 Test:
   dataset:
-  
+
 dataset:
   dataloader:
     eff_batch_size: 64

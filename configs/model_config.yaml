@@ -1,0 +1,8 @@
+model:
+  encoders:
+  fusion_name:
+  
+fusion:
+  Concat:
+    input_dim:
+    out_put_dim:
