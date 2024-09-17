@@ -30,36 +30,68 @@ def create_config(config_dict: dict):
     """Create configuration from cli and yaml."""
     with open(osp.join(root_path ,"configs", "global_config.yaml"), 'r') as f:
         global_settings = yaml.safe_load(f)
+    with open(osp.join(root_path ,"configs", "dataset_config.yaml"), 'r') as f:
+        dataset_settings = yaml.safe_load(f)
+    with open(osp.join(root_path ,"configs", "trainer_config.yaml"), 'r') as f:
+        trainer_settings = yaml.safe_load(f)
+    with open(osp.join(root_path ,"configs", "model_config.yaml"), 'r') as f:
+        model_settings = yaml.safe_load(f)
     config_dict = global_settings | config_dict
-
+    print(dataset_settings)
+    try:
+        #waiting for support iteration
+        config_dict['dataset'] = dataset_settings['dataset'][config_dict['Main_config']['dataset']]
+    except:
+        raise ValueError("Wrong Dataset name")
+    try:
+        Trainer_name = config_dict['Main_config']['trainer']
+        name = Trainer_name.split("Trainer", 1)[0]
+        config_dict['trainer'] = trainer_settings['trainer_para'][name] |\
+                                    trainer_settings['trainer_para']['base']
+    except:
+        raise ValueError("Wrong Trainer setting")
+    try:
+        config_dict['model'] = model_settings['model'][config_dict['Main_config']["model"]]
+        config_dict['fusion'] = model_settings['fusion'][config_dict['model']['fusion_name']]
+    except:
+        raise ValueError("Wrong model setting")
+    
     mode = config_dict.get("mode")
-    if config_dict.get('dataset') is None:
+    if config_dict['Train'].get('dataset') is None:
         raise ValueError("Dataset not specified.")
-    if config_dict['dataset'].get("test") is None:
+    if config_dict.get("Test") is None:
         raise ValueError("Test set not specified.")
 
     if mode == "train_and_test":
-        if config_dict['dataset'].get("train") is None:
+        if config_dict.get("Train") is None:
             raise ValueError("Train set not specified.")
-        if config_dict['dataset'].get("val") is None:
-            config_dict['dataset']['val'] = config_dict['dataset']['test'].copy()
+        if config_dict.get("Val") is None:
+            config_dict['Val'] = config_dict['Test'].copy()
             print ("No validation set specified. Using test set as validation set.")
         exp_name = f"train_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
         if config_dict['train']['checkpoint']['resume'] != '':
             config_dict["out_dir"] = exp_name['train']['checkpoint']['resume']
         else:
-            config_dict["out_dir"] = osp.join(root_path, 'experiments', config_dict["name"], exp_name)
+            config_dict['name'] = config_dict['Main_config']['model'] + '_' +name \
+                + '_' +config_dict['Train']['dataset'] +'_'+'task'
+            config_dict["out_dir"] = osp.join(root_path, mode, 'experiments', config_dict["name"], exp_name)
     elif mode == "test":
         config_dict.pop('train', None)
         config_dict.pop('trainer', None)
-        config_dict['dataset'].pop('train', None)
-        config_dict['dataset'].pop('val', None)
+        config_dict.pop('Train', None)
+        config_dict.pop('Val', None)
         exp_name = f"test_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        Trainer_name = config_dict['Main_config']['trainer']
+        name = Trainer_name.split("Trainer", 1)[0]
+        config_dict[name] = name
         config_dict["out_dir"] = osp.join(root_path, 'experiments', config_dict["name"], exp_name)
     else:
         raise ValueError(f"Invalid mode: {mode}")
     
     return config_dict
+
+def adjust_config(config_dict : dict)-> dict:
+    
 
 if __name__ == "__main__":
     # Create args. Priority: cli > user > global_default. High priority args overwrite low priority args.
@@ -87,7 +119,8 @@ if __name__ == "__main__":
     print (yaml.dump(args, sort_keys=False), end='')
     print('----------------------')
 
-    if args['mode'] == "train_and_test":
-        train_and_test(args)
-    elif args['mode'] == "test":
-        only_test(args)
+    exit()
+    # if args['mode'] == "train_and_test":
+    #     train_and_test(args)
+    # elif args['mode'] == "test":
+    #     only_test(args)

@@ -2,8 +2,6 @@ trainer_para:
   base:
     grad_accum_steps: 1
     max_epochs: 70
-    modulation_starts:
-    modulation_ends:
   baseline:
     alpha: 0.3
     method: 'None'

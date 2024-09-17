@@ -1,17 +1,13 @@
 from typing import Mapping
-from lightning import LightningModule
 from torch.optim.optimizer import Optimizer as Optimizer
 from .base_trainer import BaseTrainer
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from balancemm.models.avclassify_model import BaseModel
-import os
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
-
 import lightning as L
 import torch
 
@@ -150,7 +146,7 @@ class OGMTrainer(BaseTrainer):
             for name, parms in model.named_parameters():
                 layer = str(name).split('.')[0]
                 for modality in modality_list:
-                    if modality in layer and len(parms.grad.size()) != 1:
+                    if modality in layer and len(parms.grad.size()) != 1: ##Don't change the grad of bias for layer
                         if self.method == 'OGM_GE':  # bug fixed
                             parms.grad = parms.grad * coeffs[modality] + \
                                         torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)

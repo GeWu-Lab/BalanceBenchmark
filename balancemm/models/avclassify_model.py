@@ -8,7 +8,7 @@ from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
 
-class BaseModel(nn.modules):
+class BaseModel(nn.Module):
     def __init__(self, args):
         super(BaseModel, self).__init__()
         self.n_class = args['n_classes']
@@ -81,7 +81,7 @@ class BaseModel(nn.modules):
         modality_nums = 0
         all_nums = len(encoder_res.keys())-1
         Uni_res = {}
-        for modality, modality_res in encoder_res:
+        for modality in encoder_res.keys():
             if modality == 'output':
                 Uni_res[modality] = encoder_res[modality]
             if self.fusion == 'concat':

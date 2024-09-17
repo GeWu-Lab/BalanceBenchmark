@@ -1,8 +1,9 @@
 model:
-  encoders:
-  fusion_name:
-  modality_size:
+  BaseModel:
+    encoders: "transformer"
+    fusion_name: "concat"
+    modality_size: 512
   
 fusion:
-  Concat:
-    out_put_dim:
+  concat:
+    out_put_dim: 100

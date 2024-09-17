@@ -1,0 +1,81 @@
+seed: 42
+dataloader:
+  eff_batch_size: 1024
+  batch_size: -1
+  num_workers: 4
+  fast_run: false
+  shuffle: true
+  drop_last: true
+  pin_memory: true
+fabric:
+  accelerator: gpu
+  devices:
+  - 0
+  precision: 32-true
+  strategy: dp
+log:
+  logger_name:
+  - tensorboard
+  wandb_name: ''
+  log_interval: 100
+  log_per_epoch: -1
+  comment: ''
+train:
+  parameter:
+    total_epoch: 70
+    warmup: 10
+    base_lr: 0.001
+    lr: -1
+    base_batch_size: 2
+    lr_scaling_rule: linear
+  checkpoint:
+    resume: ''
+    checkpoint_frequency: 1
+    num_checkpoint_keep: 3
+  optimizer:
+    type: SGD
+    momentum: 0.9
+    weight_decay: 0.0001
+  scheduler:
+    type: StepLR
+    step_size: 30
+    gamma: 0.1
+  validation:
+    frequency: 1
+    select_best: last
+  loss:
+    type: CrossEntropyLoss
+mode: train_and_test
+Main_config:
+  model: BaseModel
+  tasks: Classifier
+  trainer: OGMTrainer
+  device: gpu:0
+  dataset: Mosei
+Train:
+  dataset: Mosei
+Test:
+  dataset: Mosei
+config: /home/shaoxuan_xu/BalanceMM/configs/user_default.yaml
+dataset:
+  dataset_path: /home/zequn_yang/MMT/data/
+  data: mosei_senti
+  if_align: false
+  classes: 7
+trainer:
+  alpha: 0.3
+  method: OGM_GE
+  modulation_starts: 10
+  modulation_ends: 80
+  grad_accum_steps: 1
+  max_epochs: 70
+model:
+  encoders: transformer
+  fusion_name: concat
+  modality_size: 512
+fusion:
+  out_put_dim: 100
+Val:
+  dataset: Mosei
+name: BaseModel_OGM_Mosei_task
+out_dir: /home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseModel_OGM_Mosei_task/train_20240917-141028
