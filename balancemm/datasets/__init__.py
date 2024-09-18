@@ -25,10 +25,11 @@ def find_dataset(dataset_name: str) -> object:
     return dataset_cls
 
 # create dataset from dataset_opt
-def create_dataset(dataset_opt: dict):
+def create_dataset(dataset_opt: dict, mode: str):
     if 'name' not in dataset_opt:
         raise ValueError('Dataset name is required.')
     dataset_cls = find_dataset(dataset_opt['name'])
+    dataset_opt['mode'] = mode
     dataset = dataset_cls(dataset_opt)
 
     print (f'Dataset {dataset.__class__.__name__} - {dataset_opt["name"]} is created.')

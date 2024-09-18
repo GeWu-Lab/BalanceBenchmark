@@ -12,17 +12,16 @@ def worker_init_fn(worker_id):
 
 def create_train_val_dataloader(fabric: L.Fabric, config: dict):
     config = SimpleNamespace(**config)
-    
-    train_dataset = create_dataset(config.train)
-    val_dataset = create_dataset(config.val)
+    train_dataset = create_dataset(config.dataset, 'train')
+    val_dataset = create_dataset(config.dataset, 'test')
     
     config_dataloader = SimpleNamespace(**config.dataloader)
     if config_dataloader.fast_run == True:
         train_dataset = torch.utils.data.Subset(train_dataset, list(range(config_dataloader.eff_batch_size*4)))
         val_dataset = torch.utils.data.Subset(val_dataset, list(range(config_dataloader.eff_batch_size*2)))
     # print len of datasets
-    fabric.print(f"Train dataset: {train_dataset.__class__.__name__} - {config.train['name']}, {len(train_dataset)} samples")
-    fabric.print(f"Val dataset: {val_dataset.__class__.__name__} - {config.val['name']}, {len(val_dataset)} samples")
+    fabric.print(f"Train dataset: {train_dataset.__class__.__name__} - {config.Train['dataset']}, {len(train_dataset)} samples")
+    fabric.print(f"Val dataset: {val_dataset.__class__.__name__} - {config.Val['dataset']}, {len(val_dataset)} samples")
 
     if (not hasattr(config_dataloader, 'batch_size')):
         config_dataloader.batch_size = round(config_dataloader.eff_batch_size/fabric.world_size) # using the effective batch_size to calculate the batch_size per gpu
@@ -37,7 +36,7 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
 
     val_dataloader = torch.utils.data.DataLoader(val_dataset,  batch_size=config_dataloader.batch_size, drop_last = config_dataloader.drop_last, num_workers = config_dataloader.num_workers, multiprocessing_context='spawn', pin_memory = config_dataloader.pin_memory)
 
-    if config.train['name'] == 'UMPC_Food':
+    if config.Train['dataset'] == 'UMPC_Food':
         g = torch.Generator()
         train_dataloader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=config_dataloader.batch_size, 

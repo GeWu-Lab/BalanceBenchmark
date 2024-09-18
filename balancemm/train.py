@@ -47,8 +47,8 @@ def train_and_test(args: dict):
         fabric.print('set float32 matmul precision to high')
         torch.set_float32_matmul_precision('high')
 
-    train_dataloader, val_dataloader = create_train_val_dataloader(fabric, args.dataset)
-    args.trainer_para['base']['checkpoint_dir'] = args.checkpoint_dir
+    train_dataloader, val_dataloader = create_train_val_dataloader(fabric, args)
+    args.trainer_para['base']['checkpoint_dir'] = args.checkpoint_dir ##
     model = create_model(args.model)
     if args.trainer['name'] == 'GBlending':
         args.model['type'] = args.model['type'] + '_gb'

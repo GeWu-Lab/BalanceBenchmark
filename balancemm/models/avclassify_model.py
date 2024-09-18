@@ -8,14 +8,22 @@ from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
 
+from ..encoders import find_encoder
+
+def build_encoders(config_dict: dict[str, str])->dict[str, nn.Module]:
+    modalitys = config_dict.keys()
+    for modality in modalitys:
+        encoder_class = find_encoder(modality, config_dict[modality]['name'])
+        config_dict[modality] = encoder_class(config_dict[modality])
+    return config_dict
 class BaseModel(nn.Module):
     def __init__(self, args):
         super(BaseModel, self).__init__()
         self.n_class = args['n_classes']
         self.fusion = args['fusion']
+        self.modalitys = args['encoders'].keys()
         self.enconders = args['encoders']
         self.modality_encoder = nn.ModuleDict(args['encoders'])
-        self.modalitys = args['modality']
         self.device = args['deivce']
         self.modality_size = args['modality_size']
         if self.fusion == 'sum':

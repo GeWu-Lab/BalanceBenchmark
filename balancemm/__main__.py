@@ -50,9 +50,13 @@ def create_config(config_dict: dict):
                                     trainer_settings['trainer_para']['base']
     except:
         raise ValueError("Wrong Trainer setting")
+    ## model settings
     try:
         config_dict['model'] = model_settings['model'][config_dict['Main_config']["model"]]
-        config_dict['fusion'] = model_settings['fusion'][config_dict['model']['fusion_name']]
+        config_dict['model']['type'] = config_dict['Main_config']['model']
+        config_dict['model']['device'] = config_dict['Main_config']['device']
+        config_dict['model']['n_classes'] = config_dict['dataset']['classes']
+        config_dict['fusion'] = model_settings['fusion'][config_dict['model']['fusion']]
     except:
         raise ValueError("Wrong model setting")
     
@@ -90,8 +94,6 @@ def create_config(config_dict: dict):
     
     return config_dict
 
-def adjust_config(config_dict : dict)-> dict:
-    
 
 if __name__ == "__main__":
     # Create args. Priority: cli > user > global_default. High priority args overwrite low priority args.

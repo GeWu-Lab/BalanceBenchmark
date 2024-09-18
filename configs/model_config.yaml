@@ -1,7 +1,7 @@
 model:
   BaseModel:
-    encoders: "transformer"
-    fusion_name: "concat"
+    encoders: {audio: transformer, visual: transformer, text: transformer}
+    fusion: "concat"
     modality_size: 512
   
 fusion:

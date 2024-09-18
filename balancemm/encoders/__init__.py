@@ -23,7 +23,7 @@ _encoder_modules = [
 
 # find encoder from encoder_opt
 def find_encoder(encoder_name: str) -> object:
-    encoder_cls = find_module(_encoder_modules, encoder_name, 'Dataset')
+    encoder_cls = find_module(_encoder_modules, encoder_name, 'encoder')
     return encoder_cls
 
 # create encoder from encoder_opt
@@ -33,5 +33,5 @@ def create_encoder(encoder_opt: dict):
     encoder_cls = find_encoder(encoder_opt['name'])
     encoder = encoder_cls(encoder_opt)
 
-    print (f'Dataset {encoder.__class__.__name__} - {encoder_opt["name"]} is created.')
+    print (f'Encoder {encoder.__class__.__name__} - {encoder_opt["name"]} is created.')
     return encoder
