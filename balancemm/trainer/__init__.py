@@ -29,12 +29,13 @@ def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args, logger):
     if trainer_cls is None:
         raise ValueError(f'trainer {trainer} is not found.')
 
-    trainer = trainer_cls(fabric, para_opt[trainer_opt['name']], para_opt['base'])
+    trainer = trainer_cls(fabric, para_opt, para_opt['base_para'])
     trainer.checkpoint_dir = args.checkpoint_dir
 
     print(
-        f'Trainer {trainer.__class__.__name__} - {trainer_opt["name"]} '
+        f'Trainer {trainer.__class__.__name__} - {trainer_opt["trainer"]} '
         'is created.')
-    logger.info("normal Settings: %s", para_opt['base'])
-    logger.info("trainer Settings: %s", para_opt[trainer_opt['name']])
+    para_opt['name'] = trainer_opt["trainer"]
+    # logger.info("normal Settings: %s", para_opt)
+    logger.info("trainer Settings: %s", para_opt)
     return trainer

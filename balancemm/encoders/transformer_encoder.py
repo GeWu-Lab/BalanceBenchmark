@@ -1,7 +1,7 @@
 import torch.nn as nn
-class TransformerEncoder(nn.Module):
+class Transformer(nn.Module):
     def __init__(self, d_model, num_heads, dim_feedforward, dropout=0.1):
-        super(TransformerEncoder, self).__init__()
+        super(Transformer, self).__init__()
         self.self_attn = nn.MultiheadAttention(d_model, num_heads, dropout=dropout)
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
@@ -26,16 +26,16 @@ class TransformerEncoder(nn.Module):
         src = src + self.dropout2(src2)
         src = self.norm2(src)
         return src
-class Transformer(nn.Module):
+class TransformerEncoder(nn.Module):
     """
     Extend to nn.Transformer.
     """
     def __init__(self,input_dim = 300, n_features = 512,dim = 1024,n_head = 4,n_layers = 2):
-        super(Transformer,self).__init__()
+        super(TransformerEncoder,self).__init__()
         self.embedding = nn.Linear(input_dim, n_features)
         self.embed_dim = dim
         self.conv = nn.Conv1d(n_features,self.embed_dim,kernel_size=1,padding=0,bias=False)
-        layer = TransformerEncoder(self.embed_dim,num_heads=n_head, dim_feedforward = n_features)
+        layer = Transformer(self.embed_dim,num_heads=n_head, dim_feedforward = n_features)
         self.transformer = nn.TransformerEncoder(layer,num_layers=n_layers)
 
 

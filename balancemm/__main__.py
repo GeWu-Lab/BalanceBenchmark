@@ -36,18 +36,22 @@ def create_config(config_dict: dict):
         trainer_settings = yaml.safe_load(f)
     with open(osp.join(root_path ,"configs", "model_config.yaml"), 'r') as f:
         model_settings = yaml.safe_load(f)
+    with open(osp.join(root_path ,"configs", "encoder_config.yaml"), 'r') as f:
+        encoder_settings = yaml.safe_load(f)
     config_dict = global_settings | config_dict
     print(dataset_settings)
     try:
         #waiting for support iteration
         config_dict['dataset'] = dataset_settings['dataset'][config_dict['Main_config']['dataset']]
+        config_dict['dataset']['name'] = config_dict['Main_config']['dataset']
     except:
         raise ValueError("Wrong Dataset name")
     try:
         Trainer_name = config_dict['Main_config']['trainer']
         name = Trainer_name.split("Trainer", 1)[0]
-        config_dict['trainer'] = trainer_settings['trainer_para'][name] |\
-                                    trainer_settings['trainer_para']['base']
+        config_dict['trainer'] = trainer_settings['trainer_para'][name] 
+        config_dict['trainer']['base_para'] = trainer_settings['trainer_para']['base']
+        
     except:
         raise ValueError("Wrong Trainer setting")
     ## model settings
@@ -57,6 +61,12 @@ def create_config(config_dict: dict):
         config_dict['model']['device'] = config_dict['Main_config']['device']
         config_dict['model']['n_classes'] = config_dict['dataset']['classes']
         config_dict['fusion'] = model_settings['fusion'][config_dict['model']['fusion']]
+        modalitys = config_dict['model']['encoders'].keys()
+        for modality in modalitys:
+            name = config_dict['model']['encoders'][modality] 
+            config_dict['model']['encoders'][modality] = encoder_settings[name][modality]
+            config_dict['model']['encoders'][modality]['input_dim'] = config_dict['dataset'][modality]['input_dim']
+            config_dict['model']['encoders'][modality]['name'] = name
     except:
         raise ValueError("Wrong model setting")
     
@@ -108,6 +118,7 @@ if __name__ == "__main__":
     default_config_path = osp.join(root_path, "configs", "user_default.yaml")
     config_path = ensure_and_get_config_path(args, default_config_path)
     custom_args = load_config_dict(config_path)
+    print(custom_args)
     
     # merge cli_args into yaml and create config.
     parse_cli_args_to_dict(args, custom_args)
@@ -121,8 +132,8 @@ if __name__ == "__main__":
     print (yaml.dump(args, sort_keys=False), end='')
     print('----------------------')
 
-    exit()
-    # if args['mode'] == "train_and_test":
-    #     train_and_test(args)
+
+    if args['mode'] == "train_and_test":
+        train_and_test(args)
     # elif args['mode'] == "test":
     #     only_test(args)

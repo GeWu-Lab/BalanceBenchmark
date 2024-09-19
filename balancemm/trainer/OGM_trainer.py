@@ -4,7 +4,7 @@ from .base_trainer import BaseTrainer
 
 import torch
 import torch.nn as nn
-from balancemm.models.avclassify_model import BaseModel
+from balancemm.models.avclassify_model import BaseClassifierModel
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
@@ -19,7 +19,7 @@ class OGMTrainer(BaseTrainer):
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
-        self.modality = method_dict['modality']
+        # self.modality = method_dict['modality']
 
     def train_loop(
         self,
@@ -64,13 +64,12 @@ class OGMTrainer(BaseTrainer):
                 # optimizer step runs train step internally through closure
                 optimizer.step(partial(self.training_step, model=model, batch=batch, batch_idx=batch_idx))
                 self.fabric.call("on_before_zero_grad", optimizer)
-
+                # torch.cuda.empty_cache()
                 optimizer.zero_grad()
 
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -86,7 +85,7 @@ class OGMTrainer(BaseTrainer):
 
         self.fabric.call("on_train_epoch_end")
     
-    def training_step(self, model : BaseModel, batch, batch_idx):
+    def training_step(self, model : BaseClassifierModel, batch, batch_idx):
 
         # TODO: make it simpler and easier to extend
         softmax = nn.Softmax(dim=1)
@@ -100,10 +99,9 @@ class OGMTrainer(BaseTrainer):
         #     out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
         # a, v, out = model(batch)
         # out_a, out_v = model.AVCalculate(a, v, out)
-        encoder_res = model(batch)
-        Uni_res = model.Unimodality_Calculate(encoder_res)
-        out = Uni_res['output']
-        loss = criterion(out, label)
+        model(batch)
+        Uni_res = model.Unimodality_Calculate()
+        loss = criterion(Uni_res['output'], label)
         loss.backward()
         modality_list = model.modalitys
 
@@ -113,12 +111,12 @@ class OGMTrainer(BaseTrainer):
         ratios = {}
         coeffs = {}
         minscore = float('inf')
-        ##Calculate the scores
+        #Calculate the scores
         for modality in modality_list:
             if modality_nums == 2:
-                score_modality = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(out.size(0))])
+                score_modality = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(Uni_res['output'].size(0))])
             elif modality_nums == 3:
-                score_modality = sum([softmax(torch.cos(Uni_res[modality]))[i][label[i]] if label[i] == torch.argmax(Uni_res[modality][i]) else 0 for i in range(out.size(0))])
+                score_modality = sum([softmax(torch.cos(Uni_res[modality]))[i][label[i]] if label[i] == torch.argmax(Uni_res[modality][i]) else 0 for i in range(Uni_res['output'].size(0))])
             else:
                 raise("Wrong number of modalitys for OGM, it should be 2 or 3, but given {:0}".format(modality_nums))
             scores[modality] = score_modality
@@ -131,9 +129,10 @@ class OGMTrainer(BaseTrainer):
                 for modality_another in modality_list:
                     if modality_another == modality: 
                         continue
-                    ratios[modality] /= scores[modality]
+                    ## 如果没有1e-3会显存爆炸
+                    ratios[modality] /= (scores[modality_another]+ 1e-3)
             if modality_nums == 3:
-                ratios[modality] /= minscore
+                ratios[modality] /= (minscore + 1e-3)
         
         #Calculate the coeffects
         for modality in modality_list:
@@ -144,7 +143,7 @@ class OGMTrainer(BaseTrainer):
 
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
             for name, parms in model.named_parameters():
-                layer = str(name).split('.')[0]
+                layer = str(name).split('.')[1]
                 for modality in modality_list:
                     if modality in layer and len(parms.grad.size()) != 1: ##Don't change the grad of bias for layer
                         if self.method == 'OGM_GE':  # bug fixed
@@ -156,6 +155,11 @@ class OGMTrainer(BaseTrainer):
             pass
 
 
-    
+        # model.Uni_res.clear()
+        # model.encoder_res.clear()
+        # scores.clear()
+        # ratios.clear()
+        # coeffs.clear()
+        # batch.clear()
 
         return loss

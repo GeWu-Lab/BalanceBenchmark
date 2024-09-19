@@ -155,9 +155,9 @@ class ResNet(nn.Module):
 
         return out
 
-class ResNet18(ResNet):
+class ResNet18encoder(ResNet):
     def __init__(self, **kwargs):
-        super(ResNet18, self).__init__(BasicBlock, [2, 2, 2, 2], **kwargs)
+        super(ResNet18encoder, self).__init__(BasicBlock, [2, 2, 2, 2], **kwargs)
 
 
 class Bottleneck(nn.Module):

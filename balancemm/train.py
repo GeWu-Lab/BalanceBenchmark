@@ -48,18 +48,20 @@ def train_and_test(args: dict):
         torch.set_float32_matmul_precision('high')
 
     train_dataloader, val_dataloader = create_train_val_dataloader(fabric, args)
-    args.trainer_para['base']['checkpoint_dir'] = args.checkpoint_dir ##
+    args.trainer['checkpoint_dir'] = args.checkpoint_dir ##
     model = create_model(args.model)
-    if args.trainer['name'] == 'GBlending':
+    if hasattr(args.trainer, 'name') and args.trainer['name'] == 'GBlending':
         args.model['type'] = args.model['type'] + '_gb'
         model = create_model(args.model)
         temp_model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
-    trainer = create_trainer(fabric, args.trainer, args.trainer_para, args, logger)
-    gpu_ids = args.trainer['gpus']
-
-    device = torch.device("cuda:" + gpu_ids if torch.cuda.is_available() else "cpu")
+    trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger)
+    device = args.Main_config['device']
+    if device == '':
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda:' + args.Main_config['device'])
     model.to(device)
     model.device = device
     if args.trainer['name'] == 'GBlending':

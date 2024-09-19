@@ -23,15 +23,26 @@ _encoder_modules = [
 
 # find encoder from encoder_opt
 def find_encoder(encoder_name: str) -> object:
-    encoder_cls = find_module(_encoder_modules, encoder_name, 'encoder')
+    encoder_cls = find_module(_encoder_modules, encoder_name, 'Encoder')
     return encoder_cls
 
 # create encoder from encoder_opt
-def create_encoder(encoder_opt: dict):
-    if 'name' not in encoder_opt:
-        raise ValueError('encoder name is required.')
-    encoder_cls = find_encoder(encoder_opt['name'])
-    encoder = encoder_cls(encoder_opt)
+# def create_encoder(encoder_opt: dict):
+#     if 'name' not in encoder_opt:
+#         raise ValueError('encoder name is required.')
+#     encoder_cls = find_encoder(encoder_opt['name'])
+#     encoder = encoder_cls(encoder_opt)
 
-    print (f'Encoder {encoder.__class__.__name__} - {encoder_opt["name"]} is created.')
-    return encoder
+#     print (f'Encoder {encoder.__class__.__name__} - {encoder_opt["name"]} is created.')
+#     return encoder
+def create_encoders(encoder_opt: dict[str, dict])->dict[str, nn.Module]:
+    modalitys = encoder_opt.keys()
+    encoders = {}
+    for modality in modalitys:
+        name = encoder_opt[modality]['name']
+        encoder = find_encoder(encoder_opt[modality]['name'])
+        del encoder_opt[modality]['name']
+        encoders[modality] = encoder(**encoder_opt[modality])
+        encoder_opt[modality]['name'] = name
+        print (f'Encoder {name} - {modality} is created.')
+    return encoders

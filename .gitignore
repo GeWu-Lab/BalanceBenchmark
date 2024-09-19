@@ -2,3 +2,4 @@
 experiments/
 # ignore python cache
 __pycache__/
+*.out

@@ -1,6 +1,6 @@
 model:
-  BaseModel:
-    encoders: {audio: transformer, visual: transformer, text: transformer}
+  BaseClassifier:
+    encoders: {audio: Transformer, visual: Transformer, text: Transformer}
     fusion: "concat"
     modality_size: 512
   

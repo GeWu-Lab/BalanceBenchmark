@@ -112,7 +112,7 @@ class BaseTrainer():
 
         """
         print(self.max_epochs)
-        self.fabric.launch()
+        # self.fabric.launch()
 
         # setup dataloaders
         train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
@@ -142,10 +142,14 @@ class BaseTrainer():
             logger.info("epoch: {:0}  ".format(self.current_epoch))
 
             if self.should_validate:
-                valid_loss, valid_acc, valid_acc_a,valid_acc_v, valid_acc_t=self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
-                
-                logger.info(" valid_loss: {:0}, valid_acc: {:1}, acc_a: {:2}, acc_v: {:3}, acc_t: {:4}"
-                        .format( valid_loss, valid_acc, valid_acc_a, valid_acc_v, valid_acc_t))
+                valid_loss, valid_acc =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
+                info = f'valid_loss: {valid_loss}'
+                for modality in valid_acc.keys():
+                    if modality == 'output':
+                        info += f", valid_acc: {valid_acc[modality]}"
+                    else:
+                        info += f", acc_{modality}: {valid_acc[modality]}"
+                logger.info(info)
                 for handler in logger.handlers:
                     handler.flush()
             # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
@@ -266,10 +270,7 @@ class BaseTrainer():
         iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
 
         count = 0
-        _acc = 0
-        _acc_a = 0
-        _acc_v = 0
-        _acc_t = 0
+        _acc = {}
         valid_loss = 0
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
@@ -278,7 +279,7 @@ class BaseTrainer():
 
             self.fabric.call("on_validation_batch_start", batch, batch_idx)
 
-            out, acc, acc_a, acc_v, acc_t = model.validation_step(batch, batch_idx)
+            out, acc = model.validation_step(batch, batch_idx)
             # avoid gradients in stored/accumulated values -> prevents potential OOM
             out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
 
@@ -286,28 +287,24 @@ class BaseTrainer():
             self._current_val_return = out
 
             self._format_iterable(iterable, self._current_val_return, "val")
-
-            
-            _acc += acc
-            _acc_a += acc_a
-            _acc_v += acc_v
-            _acc_t += acc_t
+            for modality in acc.keys():
+                if modality not in _acc:
+                    _acc[modality] = 0
+                _acc[modality] += sum(acc[modality])
             valid_loss += out
             count += len(batch['label'])
         valid_loss /= count
-        _acc /= count
-        _acc_a /= count
-        _acc_v /= count
-        _acc_t /= count
-        if _acc > self.best_acc:
+        for modality in acc.keys():
+                _acc[modality] /= count
+        if _acc['output'] > self.best_acc:
             self.should_save = True
-            self.best_acc = _acc
+            self.best_acc = _acc['output']
 
         self.fabric.call("on_validation_epoch_end")
 
         self.fabric.call("on_validation_model_train")
         torch.set_grad_enabled(True)
-        return valid_loss, _acc, _acc_a, _acc_v, _acc_t
+        return valid_loss, _acc
 
     def training_step(self, model: L.LightningModule, batch: Any, batch_idx: int) -> torch.Tensor:
         """A single training step, running forward and backward. The optimizer step is called separately, as this is

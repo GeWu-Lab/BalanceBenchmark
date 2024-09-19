@@ -9,10 +9,16 @@ dataloader:
 
 dataset:  
   Mosei:
-    dataset_path: /home/zequn_yang/MMT/data/
+    dataset_path: /home/zequn_yang/MMT/data/  #
     data : mosei_senti
     if_align: false
-    classes: 7
+    classes: 7  #
+    audio:  ###
+      input_dim: 74
+    visual:
+      input_dim: 35 
+    text:
+      input_dim: 300
 # train:
 #     name: UMPC_Food
 #     mode: train

@@ -14,7 +14,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 
 import lightning as L
 import torch
-
+from ..models.avclassify_model import BaseClassifierModel
 
 class baselineTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
@@ -91,16 +91,19 @@ class baselineTrainer(BaseTrainer):
 
         self.fabric.call("on_train_epoch_end")
     
-    def training_step(self, model, batch, batch_idx):
+    def training_step(self, model: BaseClassifierModel, batch, batch_idx):
 
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
         label = batch['label']
         label = label.to(model.device)
-        if self.modality == 2:
-            a, v, out = model(batch)
-        else:
-            a, v, t, out = model(batch)
+        # if self.modality == 2:
+        #     a, v, out = model(batch)
+        # else:
+        #     a, v, t, out = model(batch)
+        model(batch)
+        model.Unimodality_Calculate()
+        out = model.encoder_res['output']
         loss = criterion(out, label)
         loss.backward()
         return loss

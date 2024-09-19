@@ -8,24 +8,26 @@ from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
 
-from ..encoders import find_encoder
+from ..encoders import create_encoders
 
-def build_encoders(config_dict: dict[str, str])->dict[str, nn.Module]:
-    modalitys = config_dict.keys()
-    for modality in modalitys:
-        encoder_class = find_encoder(modality, config_dict[modality]['name'])
-        config_dict[modality] = encoder_class(config_dict[modality])
-    return config_dict
-class BaseModel(nn.Module):
+# def build_encoders(config_dict: dict[str, str])->dict[str, nn.Module]:
+#     modalitys = config_dict.keys()
+#     for modality in modalitys:
+#         encoder_class = find_encoder(modality, config_dict[modality]['name'])
+#         config_dict[modality] = encoder_class(config_dict[modality])
+#     return config_dict
+class BaseClassifierModel(nn.Module):
     def __init__(self, args):
-        super(BaseModel, self).__init__()
-        self.n_class = args['n_classes']
+        super(BaseClassifierModel, self).__init__()
+        self.n_classes = args['n_classes']
         self.fusion = args['fusion']
         self.modalitys = args['encoders'].keys()
         self.enconders = args['encoders']
-        self.modality_encoder = nn.ModuleDict(args['encoders'])
-        self.device = args['deivce']
+        self.modality_encoder = nn.ModuleDict(create_encoders(args['encoders']))
+        self.device = args['device']
         self.modality_size = args['modality_size']
+        self.encoder_res = {}
+        self.Uni_res = {}
         if self.fusion == 'sum':
             self.fusion_module = SumFusion(output_dim = self.n_classes)
         elif self.fusion == 'concat':
@@ -60,7 +62,7 @@ class BaseModel(nn.Module):
 
     def Encoder_Process(self, modality_data : torch.Tensor, modality_name: str) -> torch.Tensor:
         ## May be it could use getattr
-        encoder_name = self.enconders[modality_name]
+        encoder_name = self.enconders[modality_name]['name']
         if encoder_name == 'Resnet':
             res = self.Resnet_Process(modality_data = modality_data, modality = modality_name)
         elif encoder_name == 'Transformer':
@@ -74,57 +76,57 @@ class BaseModel(nn.Module):
                 dependent_modality = {"audio": False, "visual": False, "text": False}, 
                 pt = 0,
                 types= 0) -> dict[str, torch.Tensor]:
-        encoder_res = {}
+        self.encoder_res = {}
         for modality in self.modalitys:
             modality_data = batch[modality]
             modality_data = modality_data.to(self.device)
             if modality in padding:
                 modality_data = torch.zeros_like(modality_data, device=modality_data.device)
             modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
-            encoder_res[modality] = modality_res 
-        encoder_res['output'] = self.fusion_module(encoder_res)
-        return encoder_res
+            self.encoder_res[modality] = modality_res 
+        self.encoder_res['output'] = self.fusion_module(self.encoder_res)
+        return self.encoder_res
     
-    def Unimodality_Calculate(self, encoder_res : dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    def Unimodality_Calculate(self) -> dict[str, torch.Tensor]:
         modality_nums = 0
-        all_nums = len(encoder_res.keys())-1
-        Uni_res = {}
-        for modality in encoder_res.keys():
+        all_nums = len(self.encoder_res.keys())-1
+        self.Uni_res = {}
+        for modality in self.encoder_res.keys():
             if modality == 'output':
-                Uni_res[modality] = encoder_res[modality]
+                self.Uni_res[modality] = self.encoder_res[modality]
+                continue
             if self.fusion == 'concat':
                 weight_size = self.fusion_module.fc_out.weight.size(1)
-                Uni_res[modality] = (torch.mm(encoder_res[modality],\
+                self.Uni_res[modality] = (torch.mm(self.encoder_res[modality],\
                                                torch.transpose(self.fusion_module.fc_out.weight[:,\
                                                                                                 weight_size * modality_nums // all_nums :\
                                                                                                 weight_size * (modality_nums+1) // all_nums], 0, 1))
                                     + self.fusion_module.fc_out.bias / all_nums)
             modality_nums += 1
-        return Uni_res
+        return self.Uni_res
 
     def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int) -> tuple[torch.Tensor, dict[str, list]]:
-        encoder_res = self(batch)
-        Uni_res = self.Unimodality_Calculate(encoder_res = encoder_res)
+        self(batch)
+        self.Uni_res = self.Unimodality_Calculate()
         n_classes = self.n_classes
         softmax  = nn.Softmax(dim = 1)
         label = batch['label']
         label = label.to(self.device)
-        out = Uni_res['output']
+        out = self.Uni_res['output']
         loss = F.cross_entropy(out, label)
         num = [0.0 for _ in range(n_classes)]
         acc_res = {}
         pred_res = {}
-        for modality in Uni_res.keys():
+        for modality in self.Uni_res.keys():
             acc_res[modality] = [0.0 for _ in range(n_classes)]
-            pred_res[modality] = softmax[Uni_res[modality]]
+            pred_res[modality] = softmax(self.Uni_res[modality])
         for i in range(label.shape[0]):
-            for modality in Uni_res.keys():
+            for modality in self.Uni_res.keys():
                 modality_pred = np.argmax(pred_res[modality][i].cpu().data.numpy())
                 if np.asarray(label[i].cpu()) == modality_pred:
                     acc_res[modality][label[i]] += 1.0
             
             num[label[i]] += 1.0
-
         return loss, acc_res
 
 class AVClassifierModel(nn.Module):

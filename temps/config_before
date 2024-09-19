@@ -1,7 +1,6 @@
 seed: 42
 dataloader:
-  eff_batch_size: 1024
-  batch_size: -1
+  eff_batch_size: 64
   num_workers: 4
   fast_run: false
   shuffle: true
@@ -47,7 +46,7 @@ train:
     type: CrossEntropyLoss
 mode: train_and_test
 Main_config:
-  model: BaseModel
+  model: BaseClassifier
   tasks: Classifier
   trainer: OGMTrainer
   device: gpu:0
@@ -62,6 +61,13 @@ dataset:
   data: mosei_senti
   if_align: false
   classes: 7
+  audio:
+    input_dim: 75
+  visual:
+    input_dim: 35
+  text:
+    input_dim: 300
+  name: Mosei
 trainer:
   alpha: 0.3
   method: OGM_GE
@@ -70,12 +76,36 @@ trainer:
   grad_accum_steps: 1
   max_epochs: 70
 model:
-  encoders: transformer
-  fusion_name: concat
+  encoders:
+    audio:
+      n_features: 512
+      dim: 1024
+      n_head: 4
+      n_layers: 2
+      input_dim: 75
+      name: Transformer
+    visual:
+      n_features: 512
+      dim: 1024
+      n_head: 4
+      n_layers: 2
+      input_dim: 35
+      name: Transformer
+    text:
+      n_features: 512
+      dim: 1024
+      n_head: 4
+      n_layers: 2
+      input_dim: 300
+      name: Transformer
+  fusion: concat
   modality_size: 512
+  type: BaseClassifier
+  device: gpu:0
+  n_classes: 7
 fusion:
   out_put_dim: 100
 Val:
   dataset: Mosei
-name: BaseModel_OGM_Mosei_task
-out_dir: /home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseModel_OGM_Mosei_task/train_20240917-141028
+name: BaseClassifier_Transformer_Mosei_task
+out_dir: /home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseClassifier_Transformer_Mosei_task/train_20240919-061516

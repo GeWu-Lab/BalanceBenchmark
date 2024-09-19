@@ -2,10 +2,10 @@ mode: "train_and_test"
 seed: 42
 
 Main_config:
-  model: "BaseModel"
-  tasks: "Classifier"
+  model: "BaseClassifier" #
+  tasks: "Classifier" #
   trainer: "OGMTrainer"
-  device: "gpu:0"
+  device: '0'
   dataset: Mosei
 
 Train:

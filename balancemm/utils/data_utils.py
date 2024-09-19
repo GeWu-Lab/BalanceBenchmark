@@ -11,7 +11,7 @@ def worker_init_fn(worker_id):
     random.seed(worker_seed)
 
 def create_train_val_dataloader(fabric: L.Fabric, config: dict):
-    config = SimpleNamespace(**config)
+    # config = SimpleNamespace(**config)
     train_dataset = create_dataset(config.dataset, 'train')
     val_dataset = create_dataset(config.dataset, 'test')
     
@@ -23,7 +23,7 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
     fabric.print(f"Train dataset: {train_dataset.__class__.__name__} - {config.Train['dataset']}, {len(train_dataset)} samples")
     fabric.print(f"Val dataset: {val_dataset.__class__.__name__} - {config.Val['dataset']}, {len(val_dataset)} samples")
 
-    if (not hasattr(config_dataloader, 'batch_size')):
+    if (not hasattr(config_dataloader, 'batch_size') or config_dataloader.batch_size == -1):
         config_dataloader.batch_size = round(config_dataloader.eff_batch_size/fabric.world_size) # using the effective batch_size to calculate the batch_size per gpu
     
     train_dataloader = torch.utils.data.DataLoader(train_dataset,  

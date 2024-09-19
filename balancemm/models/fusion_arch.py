@@ -24,7 +24,7 @@ class ConcatFusion(nn.Module):
 
 class ConcatFusion_N(nn.Module):
     def __init__(self, input_dim=3072, output_dim=100):
-        super(ConcatFusion, self).__init__()
+        super(ConcatFusion_N, self).__init__()
         self.fc_out = nn.Linear(input_dim, output_dim)
     def forward(self, encoder_res):
         output = torch.cat(list(encoder_res.values()),dim = 1)

@@ -1,0 +1,17 @@
+
+Transformer:
+  audio:
+    n_features: 512
+    dim: 1024
+    n_head: 4
+    n_layers: 2
+  visual:
+    n_features: 512
+    dim: 1024
+    n_head: 4
+    n_layers: 2
+  text:
+    n_features: 512
+    dim: 1024
+    n_head: 4
+    n_layers: 2
