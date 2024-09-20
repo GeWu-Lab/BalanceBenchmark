@@ -15,3 +15,8 @@ Transformer:
     dim: 1024
     n_head: 4
     n_layers: 2
+Resnet18:
+  audio:
+    modality: 'audio'
+  visual:
+    modality: 'visual'

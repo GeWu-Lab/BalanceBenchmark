@@ -239,6 +239,7 @@ class BaseTrainer():
         model: L.LightningModule,
         val_loader: Optional[torch.utils.data.DataLoader],
         limit_batches: Union[int, float] = float("inf"),
+        limit_modalitys: list = ['ALL']
     ):
         """The validation loop ruunning a single validation epoch.
 

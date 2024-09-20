@@ -86,8 +86,8 @@ def create_config(config_dict: dict):
         if config_dict['train']['checkpoint']['resume'] != '':
             config_dict["out_dir"] = exp_name['train']['checkpoint']['resume']
         else:
-            config_dict['name'] = config_dict['Main_config']['model'] + '_' +name \
-                + '_' +config_dict['Train']['dataset'] +'_'+'task'
+            config_dict['name'] = config_dict['Main_config']['model'] + '_' +config_dict['Main_config']['trainer'] \
+                + '_' +config_dict['Train']['dataset']
             config_dict["out_dir"] = osp.join(root_path, mode, 'experiments', config_dict["name"], exp_name)
     elif mode == "test":
         config_dict.pop('train', None)

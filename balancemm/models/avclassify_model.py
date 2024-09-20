@@ -105,7 +105,7 @@ class BaseClassifierModel(nn.Module):
             modality_nums += 1
         return self.Uni_res
 
-    def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int) -> tuple[torch.Tensor, dict[str, list]]:
+    def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int, limit_modality: list) -> tuple[torch.Tensor, dict[str, list]]:
         self(batch)
         self.Uni_res = self.Unimodality_Calculate()
         n_classes = self.n_classes
