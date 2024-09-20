@@ -7,7 +7,6 @@ from .fusion_arch import SumFusion, ConcatFusion, FiLM, GatedFusion, ConcatFusio
 from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
-
 from ..encoders import create_encoders
 
 # def build_encoders(config_dict: dict[str, str])->dict[str, nn.Module]:
@@ -28,6 +27,7 @@ class BaseClassifierModel(nn.Module):
         self.modality_size = args['modality_size']
         self.encoder_res = {}
         self.Uni_res = {}
+        self.pridiction = {}
         if self.fusion == 'sum':
             self.fusion_module = SumFusion(output_dim = self.n_classes)
         elif self.fusion == 'concat':
@@ -123,16 +123,19 @@ class BaseClassifierModel(nn.Module):
         acc_res = {}
         pred_res = {}
         for modality in self.Uni_res.keys():
-            acc_res[modality] = [0.0 for _ in range(n_classes)]
-            pred_res[modality] = softmax(self.Uni_res[modality])
-        for i in range(label.shape[0]):
-            for modality in self.Uni_res.keys():
-                modality_pred = np.argmax(pred_res[modality][i].cpu().data.numpy())
-                if np.asarray(label[i].cpu()) == modality_pred:
-                    acc_res[modality][label[i]] += 1.0
+            softmax_res = softmax(self.Uni_res[modality])
+            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        # for modality in self.Uni_res.keys():
+        #     acc_res[modality] = [0.0 for _ in range(n_classes)]
+        #     pred_res[modality] = softmax(self.Uni_res[modality])
+        # for i in range(label.shape[0]):
+        #     for modality in self.Uni_res.keys():
+        #         modality_pred = np.argmax(pred_res[modality][i].cpu().data.numpy())
+        #         if np.asarray(label[i].cpu()) == modality_pred:
+        #             acc_res[modality][label[i]] += 1.0
             
-            num[label[i]] += 1.0
-        return loss, acc_res
+        #     num[label[i]] += 1.0
+        return loss
 
 class AVClassifierModel(nn.Module):
     def __init__(self, args):

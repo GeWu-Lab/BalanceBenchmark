@@ -12,8 +12,8 @@ from lightning.fabric.wrappers import _unwrap_objects
 from lightning.pytorch.utilities.model_helpers import is_overridden
 from lightning_utilities import apply_to_collection
 from tqdm import tqdm
-from ..evaluation.precision import 
-
+from ..evaluation.precisions import BatchMetricsCalculator
+from ..models.avclassify_model import BaseClassifierModel
 class BaseTrainer():
     def __init__(
         self,
@@ -142,13 +142,26 @@ class BaseTrainer():
             logger.info("epoch: {:0}  ".format(self.current_epoch))
 
             if self.should_validate:
-                valid_loss, valid_acc =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
+                valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
                 info = f'valid_loss: {valid_loss}'
-                for modality in valid_acc.keys():
-                    if modality == 'output':
-                        info += f", valid_acc: {valid_acc[modality]}"
-                    else:
-                        info += f", acc_{modality}: {valid_acc[modality]}"
+                output_info = ''
+                for metircs in Metrics_res.keys():
+                    if metircs == 'acc':
+                        valid_acc = Metrics_res[metircs]
+                        for modality in valid_acc.keys():
+                            if modality == 'output':
+                                output_info += f", valid_acc: {valid_acc[modality]}"
+                            else:
+                                info += f", acc_{modality}: {valid_acc[modality]}"
+                    if metircs == 'f1':
+                        valid_f1 = Metrics_res[metircs]
+                        for modality in valid_f1.keys():
+                            if modality == 'output':
+                                output_info += f", valid_f1: {valid_f1[modality]}"
+                            else:
+                                info += f", f1_{modality}: {valid_f1[modality]}"
+                info = output_info+ ', ' + info
+                    
                 logger.info(info)
                 for handler in logger.handlers:
                     handler.flush()
@@ -236,7 +249,7 @@ class BaseTrainer():
 
     def val_loop(
         self,
-        model: L.LightningModule,
+        model: BaseClassifierModel,
         val_loader: Optional[torch.utils.data.DataLoader],
         limit_batches: Union[int, float] = float("inf"),
         limit_modalitys: list = ['ALL']
@@ -275,7 +288,9 @@ class BaseTrainer():
         count = 0
         _acc = {}
         valid_loss = 0
-        Calculator = 
+        modalitys = list(model.modalitys)
+        modalitys.append('output')
+        MetricsCalculator = BatchMetricsCalculator(model.n_classes, modalitys)
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -283,7 +298,7 @@ class BaseTrainer():
 
             self.fabric.call("on_validation_batch_start", batch, batch_idx)
 
-            out, acc = model.validation_step(batch, batch_idx)
+            out = model.validation_step(batch, batch_idx,limit_modalitys)
             # avoid gradients in stored/accumulated values -> prevents potential OOM
             out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
 
@@ -291,24 +306,25 @@ class BaseTrainer():
             self._current_val_return = out
 
             self._format_iterable(iterable, self._current_val_return, "val")
-            for modality in acc.keys():
-                if modality not in _acc:
-                    _acc[modality] = 0
-                _acc[modality] += sum(acc[modality])
+            # for modality in acc.keys():
+            #     if modality not in _acc:
+            #         _acc[modality] = 0
+            #     _acc[modality] += sum(acc[modality])
+            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             valid_loss += out
-            count += len(batch['label'])
-        valid_loss /= count
-        for modality in acc.keys():
-                _acc[modality] /= count
-        if _acc['output'] > self.best_acc:
+            # count += len(batch['label'])
+        valid_loss /= MetricsCalculator.total_samples
+        Metrics_res = MetricsCalculator.compute_metrics()
+        print(Metrics_res['acc'].keys())
+        if Metrics_res['acc']['output'] > self.best_acc:
             self.should_save = True
-            self.best_acc = _acc['output']
+            self.best_acc = Metrics_res['acc']['output']
 
         self.fabric.call("on_validation_epoch_end")
 
         self.fabric.call("on_validation_model_train")
         torch.set_grad_enabled(True)
-        return valid_loss, _acc
+        return valid_loss, Metrics_res
 
     def training_step(self, model: L.LightningModule, batch: Any, batch_idx: int) -> torch.Tensor:
         """A single training step, running forward and backward. The optimizer step is called separately, as this is

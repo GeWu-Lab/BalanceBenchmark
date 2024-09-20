@@ -21,7 +21,7 @@ def generate_all_combinations(input_list: list[str], include_empty: bool = True)
 
 def Calculate_sharply(trainer: BaseTrainer, model: BaseClassifierModel, CalcuLoader) -> dict[str: float]:
     modalitys = model.modalitys
-    sharply = defaultdict(0)
+    sharply = defaultdict(int) ##default is 0
     for modality in modalitys:
         temp_modalitys = modalitys.copy()
         temp_modalitys.remove(modality)
