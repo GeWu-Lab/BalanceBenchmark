@@ -1,7 +1,7 @@
-# from ..trainer.base_trainer import BaseTrainer
-# from ..models.avclassify_model import BaseClassifierModel
+from ..trainer.base_trainer import BaseTrainer
+from ..models.avclassify_model import BaseClassifierModel
 from itertools import combinations
-
+from collections import defaultdict
 def generate_all_combinations(input_list: list[str], include_empty: bool = True):
     """
     生成输入列表的所有可能组合。
@@ -19,10 +19,19 @@ def generate_all_combinations(input_list: list[str], include_empty: bool = True)
     # 将组合转换为列表
     return [list(combo) for combo in all_combinations]
 
-def Calculate_sharply(trainer, model) -> dict[str: float]:
+def Calculate_sharply(trainer: BaseTrainer, model: BaseClassifierModel, CalcuLoader) -> dict[str: float]:
     modalitys = model.modalitys
+    sharply = defaultdict(0)
     for modality in modalitys:
         temp_modalitys = modalitys.copy()
         temp_modalitys.remove(modality)
-
-print(generate_all_combinations(['a','v','t']))
+        combinations = generate_all_combinations(temp_modalitys, include_empty = True)
+        for combo in combinations:
+            v_combo = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= combo)
+            if modality not in combo:
+                add = combo.append(modality)
+                v_add = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= add)
+            else:
+                v_add = v_combo
+            sharply[modality] += (v_add['output'] - v_combo['output'])
+    return sharply

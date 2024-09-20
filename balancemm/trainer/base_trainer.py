@@ -12,7 +12,7 @@ from lightning.fabric.wrappers import _unwrap_objects
 from lightning.pytorch.utilities.model_helpers import is_overridden
 from lightning_utilities import apply_to_collection
 from tqdm import tqdm
-
+from ..evaluation.precision import 
 
 class BaseTrainer():
     def __init__(
@@ -269,10 +269,13 @@ class BaseTrainer():
         self.fabric.call("on_validation_epoch_start")
 
         iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
-
+        
+        if limit_modalitys == ["ALL"]:
+            limit_modalitys = model.modalitys
         count = 0
         _acc = {}
         valid_loss = 0
+        Calculator = 
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:

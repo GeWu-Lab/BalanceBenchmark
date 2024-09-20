@@ -81,7 +81,8 @@ class BaseClassifierModel(nn.Module):
             modality_data = batch[modality]
             modality_data = modality_data.to(self.device)
             if modality in padding:
-                modality_data = torch.zeros_like(modality_data, device=modality_data.device)
+                if mask is None:
+                    modality_data = torch.zeros_like(modality_data, device=modality_data.device)
             modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
             self.encoder_res[modality] = modality_res 
         self.encoder_res['output'] = self.fusion_module(self.encoder_res)
@@ -106,7 +107,11 @@ class BaseClassifierModel(nn.Module):
         return self.Uni_res
 
     def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int, limit_modality: list) -> tuple[torch.Tensor, dict[str, list]]:
-        self(batch)
+        padding = []
+        for modality in self.modalitys:
+            if modality not in limit_modality:
+                padding.append(modality)
+        self(batch, padding = padding)
         self.Uni_res = self.Unimodality_Calculate()
         n_classes = self.n_classes
         softmax  = nn.Softmax(dim = 1)
