@@ -147,6 +147,7 @@ class BaseTrainer():
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
                 info = f'valid_loss: {valid_loss}'
                 output_info = ''
+                ##parse the Metrics
                 for metircs in Metrics_res.keys():
                     if metircs == 'acc':
                         valid_acc = Metrics_res[metircs]
