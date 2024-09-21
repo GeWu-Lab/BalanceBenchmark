@@ -26,6 +26,7 @@ class BaseTrainer():
         use_distributed_sampler: bool = True,
         checkpoint_dir: str = "./experiments/checkpoints",
         checkpoint_frequency: int = 1,
+        should_train: bool = True
     ) -> None:
         """Exemplary Trainer with Fabric. This is a very simple trainer focused on readablity but with reduced
         featureset. As a trainer with more included features, we recommend using the
@@ -69,7 +70,7 @@ class BaseTrainer():
 
         self.max_epochs = max_epochs
         self.should_stop = False
-        
+        self.should_train = should_train
         self.should_save = False
         self.best_acc = 0.0
         # ensures limit_X_batches is either int or inf
@@ -115,7 +116,8 @@ class BaseTrainer():
         # self.fabric.launch()
 
         # setup dataloaders
-        train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
+        if self.should_train:
+            train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
         if val_loader is not None:
             val_loader = self.fabric.setup_dataloaders(val_loader, use_distributed_sampler=self.use_distributed_sampler)
         # optimizer, scheduler_cfg = self._parse_optimizers_schedulers(model.configure_optimizers())
@@ -136,11 +138,11 @@ class BaseTrainer():
                     self.should_stop = True
 
         while not self.should_stop:
-            self.train_loop(
-                model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg
-            )
-            logger.info("epoch: {:0}  ".format(self.current_epoch))
-
+            if self.should_train:
+                self.train_loop(
+                    model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg
+                )
+                logger.info("epoch: {:0}  ".format(self.current_epoch))
             if self.should_validate:
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
                 info = f'valid_loss: {valid_loss}'
@@ -166,7 +168,8 @@ class BaseTrainer():
                 for handler in logger.handlers:
                     handler.flush()
             # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
-            scheduler_cfg.step()
+            if scheduler_cfg is not None:
+                scheduler_cfg.step()
 
             self.current_epoch += 1
 

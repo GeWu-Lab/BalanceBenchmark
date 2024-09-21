@@ -26,6 +26,7 @@ class Transformer(nn.Module):
         src = src + self.dropout2(src2)
         src = self.norm2(src)
         return src
+    
 class TransformerEncoder(nn.Module):
     """
     Extend to nn.Transformer.

@@ -6,7 +6,10 @@ import torch.nn as nn
 from lightning.fabric.loggers import CSVLogger, TensorBoardLogger
 from lightning.pytorch.loggers import WandbLogger
 
-
+import random
+import numpy as np
+import torch
+import os
 def num_parameters(module: nn.Module, requires_grad: Optional[bool] = None) -> int:
     total = 0
     for p in module.parameters():
@@ -27,3 +30,24 @@ def choose_logger(logger_name: str, log_dir, project: Optional[str] = None, comm
 def get_checkpoint_files(checkpoint_dir):
     checkpoint_files = sorted(glob.glob(os.path.join(checkpoint_dir, "*.ckpt")))
     return checkpoint_files
+
+def set_seed(seed):
+    """
+    设置整个训练过程的随机种子
+    
+    Args:
+        seed (int): 随机种子值
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    
+    # 设置 CuDNN
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
+    # 设置 Python 的 hash seed
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    print(f"Random seed set as {seed}")

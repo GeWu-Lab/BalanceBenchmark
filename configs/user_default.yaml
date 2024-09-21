@@ -1,4 +1,6 @@
-mode: "train_and_test"
+mode: "test"
+check_point_path: '/home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseClassifier_OGMTrainer_Mosei/train_20240921-063744/checkpoints/epoch_normal.ckpt'
+
 seed: 42
 
 Main_config:

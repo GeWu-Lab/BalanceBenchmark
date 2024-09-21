@@ -23,7 +23,7 @@ from balancemm.train import train_and_test
 from balancemm.test import only_test
 from lightning import fabric
 import datetime
-
+from .utils.train_utils import set_seed
 root_path = osp.dirname(osp.dirname(__file__))
 
 def create_config(config_dict: dict): 
@@ -90,15 +90,16 @@ def create_config(config_dict: dict):
                 + '_' +config_dict['Train']['dataset']
             config_dict["out_dir"] = osp.join(root_path, 'experiments', config_dict["name"], mode, exp_name)
     elif mode == "test":
-        config_dict.pop('train', None)
-        config_dict.pop('trainer', None)
-        config_dict.pop('Train', None)
-        config_dict.pop('Val', None)
+        # config_dict.pop('train', None)
+        # config_dict.pop('trainer', None)
+        # config_dict.pop('Train', None)
+        # config_dict.pop('Val', None)
+        config_dict['Val'] = config_dict['Test'].copy()
         exp_name = f"test_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        Trainer_name = config_dict['Main_config']['trainer']
-        name = Trainer_name.split("Trainer", 1)[0]
-        config_dict[name] = name
-        config_dict["out_dir"] = osp.join(root_path, 'experiments', config_dict["name"], exp_name)
+        config_dict['name'] = config_dict['Main_config']['model'] + '_' +config_dict['Main_config']['trainer'] \
+                + '_' +config_dict['Train']['dataset']
+        config_dict["out_dir"] = osp.join(root_path, 'experiments', config_dict["name"], mode, exp_name)
+        config_dict['trainer']['base_para']['should_train'] = False
     else:
         raise ValueError(f"Invalid mode: {mode}")
     
@@ -125,7 +126,7 @@ if __name__ == "__main__":
     
     # merge custom_args into default global config(balancemm/config.toml)
     args = create_config(custom_args)
-    
+    set_seed(args['seed'])
     # print args in yaml format
     print ("BalanceMM")
     print('------Load Config-----')
@@ -135,5 +136,5 @@ if __name__ == "__main__":
 
     if args['mode'] == "train_and_test":
         train_and_test(args)
-    # elif args['mode'] == "test":
-    #     only_test(args)
+    elif args['mode'] == "test":
+        only_test(args)

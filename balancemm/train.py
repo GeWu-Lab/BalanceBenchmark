@@ -69,9 +69,7 @@ def train_and_test(args: dict):
         temp_model.device = device
         trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger)
         return
-    #trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger)
-    check_point = torch.load('/home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseClassifier_OGMTrainer_Mosei/train_20240921-063744/checkpoints/epoch_normal.ckpt')
-    model.load_state_dict(check_point['model'])
+    trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger)
     Calculate_sharply(trainer = trainer, model = model, CalcuLoader = val_dataloader, logger= logger)
     
 
