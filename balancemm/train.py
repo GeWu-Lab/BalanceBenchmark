@@ -13,7 +13,7 @@ import os
 import torch
 import yaml
 import logging
-
+from .evaluation.modalitys import Calculate_sharply
 def train_and_test(args: dict):
     args = SimpleNamespace(**args)
 
@@ -69,6 +69,10 @@ def train_and_test(args: dict):
         temp_model.device = device
         trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger)
         return
-    trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger)
+    #trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger)
+    check_point = torch.load('/home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseClassifier_OGMTrainer_Mosei/train_20240921-063744/checkpoints/epoch_normal.ckpt')
+    model.load_state_dict(check_point['model'])
+    Calculate_sharply(trainer = trainer, model = model, CalcuLoader = val_dataloader, logger= logger)
+    
 
     

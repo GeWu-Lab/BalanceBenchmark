@@ -315,7 +315,6 @@ class BaseTrainer():
             # count += len(batch['label'])
         valid_loss /= MetricsCalculator.total_samples
         Metrics_res = MetricsCalculator.compute_metrics()
-        print(Metrics_res['acc'].keys())
         if Metrics_res['acc']['output'] > self.best_acc:
             self.should_save = True
             self.best_acc = Metrics_res['acc']['output']

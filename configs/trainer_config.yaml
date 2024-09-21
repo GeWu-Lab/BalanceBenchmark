@@ -1,7 +1,7 @@
 trainer_para:
   base:
     grad_accum_steps: 1
-    max_epochs: 2
+    max_epochs: 10
   baseline:
     alpha: 0.3
     method: 'None'
