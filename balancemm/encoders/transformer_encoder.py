@@ -31,7 +31,7 @@ class TransformerEncoder(nn.Module):
     """
     Extend to nn.Transformer.
     """
-    def __init__(self,input_dim = 300, n_features = 512,dim = 1024,n_head = 4,n_layers = 2):
+    def __init__(self, input_dim = 300, n_features = 512,dim = 1024,n_head = 4,n_layers = 2):
         super(TransformerEncoder,self).__init__()
         self.embedding = nn.Linear(input_dim, n_features)
         self.embed_dim = dim

@@ -62,11 +62,16 @@ def create_config(config_dict: dict):
         config_dict['model']['n_classes'] = config_dict['dataset']['classes']
         config_dict['fusion'] = model_settings['fusion'][config_dict['model']['fusion']]
         modalitys = config_dict['model']['encoders'].keys()
+        ##new
+        config_dict['model']['modality_size'] = {}
         for modality in modalitys:
             name = config_dict['model']['encoders'][modality] 
             config_dict['model']['encoders'][modality] = encoder_settings[name][modality]
             config_dict['model']['encoders'][modality]['input_dim'] = config_dict['dataset'][modality]['input_dim']
             config_dict['model']['encoders'][modality]['name'] = name
+
+            ###new
+            config_dict['model']['modality_size'][modality] = encoder_settings[name]['output_dim']
     except:
         raise ValueError("Wrong model setting")
     

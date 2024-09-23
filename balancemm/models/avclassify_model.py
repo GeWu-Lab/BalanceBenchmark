@@ -31,7 +31,7 @@ class BaseClassifierModel(nn.Module):
         if self.fusion == 'sum':
             self.fusion_module = SumFusion(output_dim = self.n_classes)
         elif self.fusion == 'concat':
-            self.fusion_module = ConcatFusion_N(output_dim = self.n_classes)
+            self.fusion_module = ConcatFusion_N(input_dim = sum(self.modality_size.values()) ,output_dim = self.n_classes)
         elif self.fusion == 'film':
             self.fusion_module = FiLM(output_dim = self.n_classes, x_film=True)
         elif self.fusion == 'gated':
@@ -63,7 +63,7 @@ class BaseClassifierModel(nn.Module):
     def Encoder_Process(self, modality_data : torch.Tensor, modality_name: str) -> torch.Tensor:
         ## May be it could use getattr
         encoder_name = self.enconders[modality_name]['name']
-        if encoder_name == 'Resnet':
+        if encoder_name == 'ResNet18':
             res = self.Resnet_Process(modality_data = modality_data, modality = modality_name)
         elif encoder_name == 'Transformer':
             res = self.Transformer_Process(modality_data = modality_data, modality = modality_name)
@@ -92,6 +92,7 @@ class BaseClassifierModel(nn.Module):
         modality_nums = 0
         all_nums = len(self.encoder_res.keys())-1
         self.Uni_res = {}
+        now_size = 0
         for modality in self.encoder_res.keys():
             if modality == 'output':
                 self.Uni_res[modality] = self.encoder_res[modality]
@@ -100,9 +101,10 @@ class BaseClassifierModel(nn.Module):
                 weight_size = self.fusion_module.fc_out.weight.size(1)
                 self.Uni_res[modality] = (torch.mm(self.encoder_res[modality],\
                                                torch.transpose(self.fusion_module.fc_out.weight[:,\
-                                                                                                weight_size * modality_nums // all_nums :\
-                                                                                                weight_size * (modality_nums+1) // all_nums], 0, 1))
+                                                                                                now_size :\
+                                                                                                now_size + self.modality_size[modality]], 0, 1))
                                     + self.fusion_module.fc_out.bias / all_nums)
+                now_size += self.modality_size[modality]
             modality_nums += 1
         return self.Uni_res
 

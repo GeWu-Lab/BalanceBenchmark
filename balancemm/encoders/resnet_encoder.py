@@ -55,7 +55,7 @@ class BasicBlock(nn.Module):
 class ResNet(nn.Module):
     def __init__(self, block, layers, modality, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None):
+                 norm_layer=None, input_dim = None):
         super(ResNet, self).__init__()
         self.modality = modality
         if norm_layer is None:
@@ -155,10 +155,9 @@ class ResNet(nn.Module):
 
         return out
 
-class ResNet18encoder(ResNet):
+class ResNet18Encoder(ResNet):
     def __init__(self, **kwargs):
-        super(ResNet18encoder, self).__init__(BasicBlock, [2, 2, 2, 2], **kwargs)
-
+        super(ResNet18Encoder, self).__init__(BasicBlock, [2, 2, 2, 2], **kwargs)
 
 class Bottleneck(nn.Module):
     expansion = 4

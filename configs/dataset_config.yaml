@@ -19,6 +19,15 @@ dataset:
       input_dim: 35 
     text:
       input_dim: 300
+
+  UMPC_Food:
+    dataset_path: /data/users/zequn_yang/Food101
+    classes: 101
+    text:
+      input_dim: 40
+    visual:
+      input_dim: 224
+
 # train:
 #     name: UMPC_Food
 #     mode: train
