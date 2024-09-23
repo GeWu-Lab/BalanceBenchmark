@@ -34,7 +34,8 @@ class UMPC_FoodDataset(Dataset):
     # 2. Initialize with a targ_dir and transform (optional) parameter
     def __init__(self, args:dict,transform=None):
         # 3. Create class attributes
-        targ_dir = "/data/users/zequn_yang/Food101"
+        # targ_dir = args['dataset_path']
+        targ_dir = '/data/users/zequn_yang/Food101'
         phase = args['mode']
         mode = 'all'
         #resize = 384
@@ -93,7 +94,7 @@ class UMPC_FoodDataset(Dataset):
         txt=sample['text'] 
         txt = self.clean_text(txt)
         text_tokens= self.tokenize(txt)
-        
+        text_tokens['input_ids'] = text_tokens['input_ids'].float()
         class_name  = sample['label'] 
         class_idx = self.class_to_idx[class_name]
         if self.mode =="all":
@@ -101,7 +102,8 @@ class UMPC_FoodDataset(Dataset):
             img = self.load_image(index,img_path)
             # Transform if necessary
             if self.transform:
-                return {'visual':self.transform(img).unsqueeze(1),'audio':text_tokens['input_ids'],'text':text_tokens['input_ids'], 'label':class_idx}
+                x = {'visual':self.transform(img).unsqueeze(1),'text':text_tokens['input_ids'].unsqueeze(0), 'label':class_idx} ##text:40 
+                return x
                 return self.transform(img).unsqueeze(1), text_tokens, txt, class_idx 
             else:
                 return img, text_tokens, txt, class_idx 

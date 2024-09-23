@@ -1,8 +1,7 @@
 model:
   BaseClassifier:
-    encoders: {audio: Transformer, visual: Transformer, text: Transformer}
+    encoders: {visual: ResNet18, text: Transformer}
     fusion: "concat"
-    modality_size: 512
   
 fusion:
   concat:

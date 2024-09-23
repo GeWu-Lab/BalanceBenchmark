@@ -1,5 +1,6 @@
 
 Transformer:
+  output_dim: 1024
   audio:
     n_features: 512
     dim: 1024
@@ -15,7 +16,8 @@ Transformer:
     dim: 1024
     n_head: 4
     n_layers: 2
-Resnet18:
+ResNet18:
+  output_dim: 512
   audio:
     modality: 'audio'
   visual:
