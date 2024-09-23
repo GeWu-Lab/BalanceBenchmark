@@ -22,3 +22,5 @@ ResNet18:
     modality: 'audio'
   visual:
     modality: 'visual'
+  flow:
+    modality: 'visual'

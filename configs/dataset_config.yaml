@@ -27,6 +27,20 @@ dataset:
       input_dim: 40
     visual:
       input_dim: 224
+  
+  UCF:
+    classes: 101
+    stat_path : '/data/users/zequn_yang/UCF-101/classInd.txt'
+    train_txt : '/data/users/zequn_yang/UCF-101/trainlist01.txt'
+    test_txt : '/data/users/zequn_yang/UCF-101/testlist01.txt'
+    visual_path : '/data/users/zequn_yang/UCF-101/ucf101-frames-1fps/video-set/'
+    flow_path_v : '/data/users/zequn_yang/UCF-101/v/'
+    flow_path_u : '/data/users/zequn_yang/UCF-101/u/'
+    flow:
+      input_dim: 224
+    visual:
+      input_dim: 224
+
 
 # train:
 #     name: UMPC_Food

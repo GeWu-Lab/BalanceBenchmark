@@ -1,6 +1,6 @@
 model:
   BaseClassifier:
-    encoders: {visual: ResNet18, text: Transformer}
+    encoders: {visual: ResNet18, flow: ResNet18}
     fusion: "concat"
   
 fusion:

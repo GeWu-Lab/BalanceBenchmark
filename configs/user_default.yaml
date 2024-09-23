@@ -6,15 +6,15 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "baselineTrainer"
-  device: '0'
-  dataset: UMPC_Food
+  trainer: "OGMTrainer"
+  device: '1'
+  dataset: UCF
 
 Train:
-  dataset: UMPC_Food
+  dataset: UCF
 
 Test:
-  dataset: UMPC_Food
+  dataset: UCF
 
 # dataset:
 #   dataloader:
