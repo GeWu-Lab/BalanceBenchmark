@@ -21,12 +21,14 @@ def generate_all_combinations(input_list: list[str], include_empty: bool = True)
     # 将组合转换为列表
     return [list(combo) for combo in all_combinations]
 
-def Calculate_sharply(trainer: BaseTrainer, model: BaseClassifierModel, CalcuLoader: Dataset, logger: logging.Logger) -> dict[str: float]:
+def Calculate_sharply(trainer: BaseTrainer, model: BaseClassifierModel, CalcuLoader: Dataset, logger: logging.Logger, include_empty: bool = False) -> dict[str: float]:
     modalitys = model.modalitys
     sharply = defaultdict(int) ##default is 0
     res_cahce = defaultdict(lambda:float('inf')) ## store the middle results
     for modality in modalitys:
         temp_modalitys = list(modalitys)
+        if include_empty:
+            temp_modalitys.append([])
         temp_modalitys.remove(modality)
         combinations = generate_all_combinations(temp_modalitys, include_empty = True)
         for combo in combinations:

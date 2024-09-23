@@ -178,7 +178,7 @@ class BaseTrainer():
             if self.max_epochs is not None and self.current_epoch >= self.max_epochs:
                 self.should_stop = True
             
-            if self.should_save:
+            if self.should_save and self.should_train:
                 self.save(state)
                 self.should_save = False
 
