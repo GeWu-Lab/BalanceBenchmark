@@ -71,7 +71,10 @@ class PMRTrainer(BaseTrainer):
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
-        proto = self.calculate_prototype(model, iterable, proto0=torch.zeros(modality_num))
+        proto0 = {}
+        for modality in modality_list:
+            proto0[modality] = 0
+        proto = self.calculate_prototype(model, iterable, proto0=proto0)
         model.train()
         iterable = self.progbar_wrapper(
                     train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
