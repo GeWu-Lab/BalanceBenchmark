@@ -67,7 +67,8 @@ def create_config(config_dict: dict):
         for modality in modalitys:
             name = config_dict['model']['encoders'][modality] 
             config_dict['model']['encoders'][modality] = encoder_settings[name][modality]
-            config_dict['model']['encoders'][modality]['input_dim'] = config_dict['dataset'][modality]['input_dim']
+            if config_dict['dataset'][modality]['input_dim'] is not None:
+                config_dict['model']['encoders'][modality]['input_dim'] = config_dict['dataset'][modality]['input_dim']
             config_dict['model']['encoders'][modality]['name'] = name
 
             ###new

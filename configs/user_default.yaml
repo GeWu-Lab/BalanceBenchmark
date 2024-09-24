@@ -6,7 +6,7 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "baselineTrainer"
+  trainer: "PMRTrainer"
   device: '0'
   dataset: UMPC_Food
 
