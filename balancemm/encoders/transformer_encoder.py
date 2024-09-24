@@ -47,8 +47,11 @@ class TransformerEncoder(nn.Module):
         """
         if type(x) is list:
             x = x[0]
+        # print(x.shape)
         x = self.embedding(x)
+        # print(x.shape)
         x = self.conv(x.permute([0,2,1]))
         x = x.permute([2,0,1])
         x = self.transformer(x)[0]
+        # print(x.shape)
         return x
