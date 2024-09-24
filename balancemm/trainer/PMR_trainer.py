@@ -139,6 +139,8 @@ class PMRTrainer(BaseTrainer):
 
         score_p = {}
         score = {}
+        loss_proto = {}
+        loss_modality = {}
         if  self.modulation_starts <= self.current_epoch <= self.modulation_ends:
             for modality in modality_list:
                 score_p[modality] = sum([softmax(sim[modality])[i][label[i]] for i in range(sim[modality].size(0))])
@@ -152,7 +154,6 @@ class PMRTrainer(BaseTrainer):
             # score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
             ratio_a = score[key[0]] / score[key[1]]
 
-            loss_proto = {}
             for modality in modality_list:
                 loss_proto[modality] = criterion(sim[modality],label)
             # loss_proto_a = criterion(audio_sim, label)
@@ -166,7 +167,6 @@ class PMRTrainer(BaseTrainer):
                 lam = 0
 
             loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]
-            loss_modality = {}
             for modality in modality_list:
                 loss_modality[modality] = criterion(Uni_res[modality],label)
             # loss_v = criterion(out_v, label)
