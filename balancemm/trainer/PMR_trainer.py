@@ -69,6 +69,10 @@ class PMRTrainer(BaseTrainer):
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
         audio_proto, visual_proto = self.calculate_prototype(model, iterable)
+        model.train()
+        iterable = self.progbar_wrapper(
+                    train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
+                )
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -83,11 +87,8 @@ class PMRTrainer(BaseTrainer):
                 self.fabric.call("on_before_optimizer_step", optimizer, 0)
 
                 # optimizer step runs train step internally through closure
-                loss = self.training_step(model=model, batch=batch, batch_idx=batch_idx,\
-                                           audio_proto= audio_proto, visual_proto= visual_proto)
-                optimizer.step()
+                optimizer.step(partial(self.training_step, model=model, batch=batch, batch_idx=batch_idx, audio_proto= audio_proto, visual_proto= visual_proto))
                 self.fabric.call("on_before_zero_grad", optimizer)
-                audio_proto, visual_proto = self.calculate_prototype(model, iterable, audio_proto, visual_proto)
 
                 optimizer.zero_grad()
 
@@ -115,8 +116,9 @@ class PMRTrainer(BaseTrainer):
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
-        a, v, out = model(batch)
-        out_a, out_v = model.AVCalculate(a, v, out)
+        a, v = model(batch)['audio'], model(batch)['visual']
+        Uni_res = model.Unimodality_Calculate()
+        out_v,out_a,out = Uni_res['visual'], Uni_res['audio'], Uni_res['output']
         label = batch['label']
         label = label.to(model.device)
 
@@ -181,12 +183,12 @@ class PMRTrainer(BaseTrainer):
         count_class = [0 for _ in range(n_classes)]
 
         # calculate prototype
-        model.eval()
+        # model.eval()
         with torch.no_grad():
             sample_count = 0
             all_num = len(dataloader)
             for batch_idx, batch in enumerate(dataloader):
-                a, v, _ = model(batch, batch_idx)
+                a, v = model(batch)['audio'],model(batch)['visual']
                 label = batch['label']
                 # TODO: make it simpler and easier to extend
 

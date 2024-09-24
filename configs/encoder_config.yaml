@@ -23,4 +23,4 @@ ResNet18:
   visual:
     modality: 'visual'
   flow:
-    modality: 'visual'
+    modality: 'flow'

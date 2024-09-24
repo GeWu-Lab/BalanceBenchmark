@@ -12,15 +12,15 @@ import numpy as np
 import random
 import copy
 
-class balanceDataset(Dataset):
+class BalanceDataset(Dataset):
 
     def __init__(self, args: dict, transforms=None):
         self.data = []
         self.label = []
         self.mode = None
-        csv_path = '/home/ruize_xu/Imbalance_train_test_val.json'
-        self.visual_path = '/home/ruize_xu/imbalance/all_frame/'
-        self.audio_path = '/home/ruize_xu/imbalance/all_spec/'
+        csv_path = args['csv_path']
+        self.visual_path = args['visual_path']
+        self.audio_path = args['audio_path']
         
         self.mode = args['mode']
 
@@ -114,4 +114,4 @@ class balanceDataset(Dataset):
         label = self.label[idx]
 
         return {'visual':image_n, 'audio':spectrogram, 'label': label}
-        return  image_n,spectrogram,label,idx
+        # return  image_n,spectrogram,label,idx

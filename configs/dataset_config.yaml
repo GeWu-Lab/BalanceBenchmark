@@ -41,6 +41,17 @@ dataset:
     visual:
       input_dim: 224
 
+  
+  Balance:
+    csv_path: /home/ruize_xu/Imbalance_train_test_val.json
+    visual_path: /home/ruize_xu/imbalance/all_frame/
+    audio_path: /home/ruize_xu/imbalance/all_spec/
+    classes: 30  
+    audio:
+      input_dim: None
+    visual:
+      input_dim: None
+
 
 # train:
 #     name: UMPC_Food
