@@ -64,7 +64,6 @@ class PMRTrainer(BaseTrainer):
 
         """
         modality_list = model.modalitys
-        modality_num = len(modality_list)
         
         self.fabric.call("on_train_epoch_start")
 
