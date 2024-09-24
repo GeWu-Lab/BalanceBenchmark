@@ -33,7 +33,7 @@ class CMLTrainer(BaseTrainer):
         self.modulation_ends = method_dict['modulation_ends']
 
         self.lam = method_dict['lam']
-        self.modality = method_dict['modality']
+        # self.modality = method_dict['modality']
 
     def train_loop(
         self,
@@ -61,10 +61,12 @@ class CMLTrainer(BaseTrainer):
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
-        if self.modality == 3:
-            random_dict = ["audio", "visual", "text"]
-        else:
-            random_dict = ['audio', "visual" ]
+        
+        random_dict = list(model.modalitys)
+        # if self.modality == 3:
+        #     random_dict = ["audio", "visual", "text"]
+        # else:
+        #     random_dict = ['audio', "visual" ]
         random.shuffle(random_dict)
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
@@ -112,17 +114,26 @@ class CMLTrainer(BaseTrainer):
         label = batch['label']
         
         _loss_c = 0
-        if self.modality == 3:
+        modality_num = len(model.modalitys)
+        modality_list = model.modalitys
+        key = list(modality_list)
+        m = {}
+        if modality_num == 3:
             if self.modulation_starts <= self.current_epoch <= self.modulation_ends: ######
                 pad_audio = False
                 pad_visual = False
                 pad_text = False
                 loss_mm = 0
-                a, v, t, out = model(batch)
-                out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
-                out_s = out
+                for modality in modality_list:
+                    m[modality] = model(batch)[modality]
+                m['out'] = model(batch)['output']
+                # a, v, t, out = model(batch)
+                Uni_res = model.Unimodality_Calculate()
+                out_s = Uni_res['output']
+                # out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
+                # out_s = out
                 random_dict = random_dict_.copy()
-                for i in range(self.modality - 1):
+                for i in range(modality_num - 1):
                     removed_mm = random_dict.pop()
                     ### cuda out of memory
                     # _, _, _, out_s = model(batch, pad_audio = pad_audio, pad_visual = pad_visual, pad_text =pad_text)
@@ -133,12 +144,13 @@ class CMLTrainer(BaseTrainer):
                     # else:
                     #     pad_text = True
                     # _, _, _, out_t = model(batch, pad_audio = pad_audio, pad_visual = pad_visual, pad_text =pad_text)
-                    if removed_mm == 'audio':
-                        out_p = out_s - out_a + model.fusion_module.fc_out.bias/3
-                    elif removed_mm == 'visual':
-                        out_p = out_s - out_v + model.fusion_module.fc_out.bias/3
-                    else:
-                        out_p = out_s - out_t + model.fusion_module.fc_out.bias/3
+                    out_p = out_s - Uni_res[removed_mm] +model.fusion_module.fc_out.bias/3
+                    # if removed_mm == 'audio':
+                    #     out_p = out_s - out_a + model.fusion_module.fc_out.bias/3
+                    # elif removed_mm == 'visual':
+                    #     out_p = out_s - out_v + model.fusion_module.fc_out.bias/3
+                    # else:
+                    #     out_p = out_s - out_t + model.fusion_module.fc_out.bias/3
                     prediction_s = softmax(out_s)
                     conf_s, pred_s = torch.max(prediction_s, dim=1)
 
@@ -173,13 +185,18 @@ class CMLTrainer(BaseTrainer):
                     #     _loss_c += loss_vc
                 loss = (loss) / 3 +self.lam * _loss_c
             else:
-                a, v, t, out = model(batch)
-                out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
+                for modality in modality_list:
+                    m[modality] = model(batch)[modality]
+                m['out'] = model(batch)['output']
+                # a, v, t, out = model(batch)
+                Uni_res = model.Unimodality_Calculate()
+                out_s = Uni_res['output']
+                # out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
                 # print(a.shape, v.shape, model.head.weight.shape)
 
                 ## our modality-wise normalization on weight and feature
             
-                loss = criterion(out, label)
+                loss = criterion(m['out'], label)
 
         else:
             if self.modulation_starts <= self.current_epoch <= self.modulation_ends: ######
@@ -187,11 +204,13 @@ class CMLTrainer(BaseTrainer):
                 pad_visual = False
                 pad_text = False
                 loss_mm = 0
-                a, v, out = model(batch)
-                out_a, out_v = model.AVCalculate(a, v, out)
-                out_s = out
+                for modality in modality_list:
+                    m[modality] = model(batch)[modality]
+                m['out'] = model(batch)['output']
+                Uni_res = model.Unimodality_Calculate()
+                out_s = Uni_res['output']
                 random_dict = random_dict_.copy()
-                for i in range(self.modality - 1):
+                for i in range(modality_num - 1):
                     removed_mm = random_dict.pop()
                     ### cuda out of memory
                     # _, _, _, out_s = model(batch, pad_audio = pad_audio, pad_visual = pad_visual, pad_text =pad_text)
@@ -202,10 +221,11 @@ class CMLTrainer(BaseTrainer):
                     # else:
                     #     pad_text = True
                     # _, _, _, out_t = model(batch, pad_audio = pad_audio, pad_visual = pad_visual, pad_text =pad_text)
-                    if removed_mm == 'audio':
-                        out_p = out_s - out_a + model.fusion_module.fc_out.bias/2
-                    elif removed_mm == 'visual':
-                        out_p = out_s - out_v + model.fusion_module.fc_out.bias/2
+                    out_p = out_s - Uni_res[removed_mm] +model.fusion_module.fc_out.bias/2
+                    # if removed_mm == 'audio':
+                    #     out_p = out_s - out_a + model.fusion_module.fc_out.bias/2
+                    # elif removed_mm == 'visual':
+                    #     out_p = out_s - out_v + model.fusion_module.fc_out.bias/2
 
                     prediction_s = softmax(out_s)
                     conf_s, pred_s = torch.max(prediction_s, dim=1)
@@ -223,10 +243,12 @@ class CMLTrainer(BaseTrainer):
                     out_s = out_p
                 loss = (loss) / 2 +self.lam * _loss_c
             else:
-                a, v, out = model(batch)
-                out_a, out_v = model.AVCalculate(a, v, out)
+                for modality in modality_list:
+                    m[modality] = model(batch)[modality]
+                m['out'] = model(batch)['output']
+                # out_a, out_v = model.AVCalculate(a, v, out)
             
-                loss = criterion(out, label)
+                loss = criterion(m['out'], label)
         loss.backward()
 
         return loss
