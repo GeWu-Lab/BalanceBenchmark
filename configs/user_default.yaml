@@ -11,10 +11,10 @@ Main_config:
   dataset: UCF
 
 Train:
-  dataset: UCF
+  dataset: UMPC_Food
 
 Test:
-  dataset: UCF
+  dataset: UMPC_Food
 
 # dataset:
 #   dataloader:

@@ -1,7 +1,8 @@
 model:
   BaseClassifier:
-    encoders: {visual: ResNet18, flow: ResNet18}
+    encoders: {text: Transformer, visual: ResNet18}
     fusion: "concat"
+    modality_size: 512
   
 fusion:
   concat:
