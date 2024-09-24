@@ -141,5 +141,5 @@ class UCFDataset(Dataset):
 
 if __name__ == '__main__':   
     print('start')
-    a = UCF_Dataset({'mode':'train'})
+    a = UCFDataset({'mode':'train'})
     a.__getitem__(0)

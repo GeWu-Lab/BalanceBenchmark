@@ -6,7 +6,7 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "OGMTrainer"
+  trainer: "baselineTrainer"
   device: '1'
   dataset: UCF
 
