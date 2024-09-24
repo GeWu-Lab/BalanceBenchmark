@@ -103,7 +103,7 @@ class baselineTrainer(BaseTrainer):
         #     a, v, t, out = model(batch)
         model(batch)
         model.Unimodality_Calculate()
-        out = model.encoder_res['output']
+        out = model.encoder_res['output']        
         loss = criterion(out, label)
         loss.backward()
         return loss

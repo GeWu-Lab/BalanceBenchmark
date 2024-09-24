@@ -8,7 +8,6 @@ from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
 from ..encoders import create_encoders
-
 # def build_encoders(config_dict: dict[str, str])->dict[str, nn.Module]:
 #     modalitys = config_dict.keys()
 #     for modality in modalitys:
@@ -124,9 +123,6 @@ class BaseClassifierModel(nn.Module):
         label = label.to(self.device)
         out = self.Uni_res['output']
         loss = F.cross_entropy(out, label)
-        num = [0.0 for _ in range(n_classes)]
-        acc_res = {}
-        pred_res = {}
         for modality in self.Uni_res.keys():
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)

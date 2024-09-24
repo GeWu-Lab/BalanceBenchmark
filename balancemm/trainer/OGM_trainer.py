@@ -130,9 +130,9 @@ class OGMTrainer(BaseTrainer):
                     if modality_another == modality: 
                         continue
                     ## 如果没有1e-3会显存爆炸
-                    ratios[modality] /= (scores[modality_another]+ 1e-3)
+                    ratios[modality] /= (scores[modality_another]+ 1e-1)
             if modality_nums == 3:
-                ratios[modality] /= (minscore + 1e-3)
+                ratios[modality] /= (minscore + 1e-1)
         
         #Calculate the coeffects
         for modality in modality_list:

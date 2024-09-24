@@ -39,10 +39,20 @@ def create_encoders(encoder_opt: dict[str, dict])->dict[str, nn.Module]:
     modalitys = encoder_opt.keys()
     encoders = {}
     for modality in modalitys:
+        pre_train = encoder_opt[modality]['if_pretrain']
+        path = encoder_opt[modality]['pretrain_path']
         name = encoder_opt[modality]['name']
+        del encoder_opt[modality]['pretrain_path']
+        del encoder_opt[modality]['if_pretrain']
         encoder = find_encoder(encoder_opt[modality]['name'])
         del encoder_opt[modality]['name']
         encoders[modality] = encoder(**encoder_opt[modality])
         encoder_opt[modality]['name'] = name
+        if pre_train:
+            state = torch.load(path)
+            if modality == 'flow':
+                del state['conv1.weight']
+            encoders[modality].load_state_dict(state, strict=False)
+            print('pretrain load finish')
         print (f'Encoder {name} - {modality} is created.')
     return encoders

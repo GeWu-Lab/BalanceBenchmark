@@ -141,7 +141,7 @@ class ResNet(nn.Module):
         if self.modality == 'visual' or self.modality == 'flow':
             (B, T, C, H, W) = x.size()
             x = x.view(B * T, C, H, W)
-
+        
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)

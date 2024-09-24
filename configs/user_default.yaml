@@ -6,9 +6,9 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "baselineTrainer"
+  trainer: "OGMTrainer"
   device: '1'
-  dataset: UCF
+  dataset: UMPC_Food
 
 Train:
   dataset: UMPC_Food

@@ -13,7 +13,7 @@ dataloader:
   fast_run: false # if true, only use part of the dataset
   shuffle: true # if true, shuffle the dataset
   drop_last: true # if true, drop the last batch if the size is not equal to batch_size
-  pin_memory: true # if true, use pin_memory for dataloader
+  pin_memory: false # if true, use pin_memory for dataloader
 
 fabric:
   accelerator: "gpu" # "cpu", "gpu", "cuda", "mps", "tpu"

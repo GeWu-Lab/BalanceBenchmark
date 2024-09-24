@@ -1,5 +1,7 @@
 
 Transformer:
+  if_pretrain: False
+  pretrain_path: ''
   output_dim: 1024
   audio:
     n_features: 512
@@ -18,6 +20,8 @@ Transformer:
     n_layers: 2
 ResNet18:
   output_dim: 512
+  if_pretrain: true
+  pretrain_path: '/data/users/shaoxuan_xu/3_OGM/Pretrained_model/resnet18.pth'
   audio:
     modality: 'audio'
   visual:
