@@ -15,7 +15,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 import lightning as L
 import torch
 import numpy as np
-
+from ..models.avclassify_model import BaseClassifierModel
 
 class AMCoTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
@@ -31,7 +31,7 @@ class AMCoTrainer(BaseTrainer):
         self.modality = method_dict['modality']
     def train_loop(
         self,
-        model: L.LightningModule,
+        model: BaseClassifierModel,
         optimizer: torch.optim.Optimizer,
         train_loader: torch.utils.data.DataLoader,
         limit_batches: Union[int, float] = float("inf"),
@@ -56,9 +56,10 @@ class AMCoTrainer(BaseTrainer):
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
         
-        dependent_modality = {"audio": False, "visual": False, "text": False}
+        dependent_modality = {}
+        for modality in model.modalitys:
+            dependent_modality[modality] = False
         l_t = 0
-
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -68,8 +69,8 @@ class AMCoTrainer(BaseTrainer):
 
             # prepare the mask
             pt = np.sin(np.pi/2*(min(self.eps,l_t)/self.eps))
-            N = int(pt * self.U)
-            mask_t = np.ones(self.U-N)
+            N = int(pt * model.n_classes)
+            mask_t = np.ones(model.n_classes-N)
             mask_t = np.pad(mask_t,(0,N))
             np.random.shuffle(mask_t)
             mask_t = torch.from_numpy(mask_t)
@@ -112,77 +113,42 @@ class AMCoTrainer(BaseTrainer):
 
         self.fabric.call("on_train_epoch_end")
     
-    def training_step(self, model, batch, batch_idx, dependent_modality, mask ,pt):
+    def training_step(self, model: BaseClassifierModel, batch, batch_idx, dependent_modality, mask ,pt):
 
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
-        if self.modality == 3:
-            if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-                    a, v, t, out = model(batch,dependent_modality = dependent_modality, mask = mask,\
-                                                pt = pt)
-            else:
-                a, v, t, out = model(batch)
-            out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
+        if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
+            model(batch,dependent_modality = dependent_modality, mask = mask,\
+                                            pt = pt)
         else:
-            if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-                    a, v,out = model(batch,dependent_modality = dependent_modality, mask = mask,\
-                                                pt = pt)
-            else:
-                a, v, out = model(batch)
-            out_a, out_v = model.AVCalculate(a, v, out)
+            model(batch)
+        model.Unimodality_Calculate(mask, dependent_modality)
+      
         label = batch['label']
         label = label.to(model.device)
         # print(a.shape, v.shape, model.head.weight.shape)
 
         ## our modality-wise normalization on weight and feature
-    
+        out = model.Uni_res['output']
         loss = criterion(out, label) 
-        if self.modality == 3:
-            if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-                loss_v = criterion(out_v, label)
-                loss_a = criterion(out_a, label)
-                loss_t = criterion(out_t, label)
-                loss.backward(retain_graph=True)
-                loss_v.backward()
-                loss_a.backward()
-                loss_t.backward()
-
-                out_combine = torch.cat((out_a, out_v, out_t),1)
-                sft_out = softmax(out_combine)
-                sft_oa = torch.sum(sft_out[:, 0: model.n_classes])/(len(label))
-                sft_ov = torch.sum(sft_out[:, model.n_classes:2* model.n_classes])/(len(label))
-                sft_ot = torch.sum(sft_out[:, 2*model.n_classes: ])/(len(label))
-                # print(sft_oa,sft_ov,sft_out.size())
-                if(sft_oa>=self.sigma):
-                    dependent_modality['audio'] = True
-                elif(sft_ov>=self.sigma):
-                    dependent_modality['visual'] = True
-                elif(sft_ot>=self.sigma):
-                    dependent_modality['text'] = True
-            else: 
-                loss.backward()
+        if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
+            loss.backward(retain_graph = True)
+            for modality in model.modalitys:      
+                loss_uni = criterion(model.Uni_res[modality],label)
+                loss_uni.backward()
+            out_combine = torch.cat([value for key,value in model.Uni_res.items() if key != 'output'],1)
+            sft_out = softmax(out_combine)
+            now_dim = 0
+            for modality in model.modalitys:
+                if now_dim < sft_out.shape[1] - model.n_classes:
+                    sft_uni = torch.sum(sft_out[:, now_dim: now_dim + model.n_classes])/(len(label))
+                else:
+                    sft_uni = torch.sum(sft_out[:, now_dim: ])/(len(label))
+                dependent_modality[modality] = sft_uni > self.sigma
+                now_dim += model.n_classes
         else:
-            if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-                loss_v = criterion(out_v, label)
-                loss_a = criterion(out_a, label)
-                loss.backward(retain_graph=True)
-                loss_v.backward()
-                loss_a.backward()
-
-                out_combine = torch.cat((out_a, out_v),1)
-                sft_out = softmax(out_combine)
-                sft_oa = torch.sum(sft_out[:, 0: model.n_classes])/(len(label))
-                sft_ov = torch.sum(sft_out[:, model.n_classes:])/(len(label))
-                # print(sft_oa,sft_ov,sft_out.size())
-                if(sft_oa>=self.sigma):
-                    dependent_modality['audio'] = True
-                elif(sft_ov>=self.sigma):
-                    dependent_modality['visual'] = True
-            else: 
-                loss.backward()
-        
-
+            loss.backward()
 
         return loss, dependent_modality
 

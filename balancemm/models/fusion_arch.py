@@ -21,8 +21,18 @@ class ConcatFusion(nn.Module):
         output = torch.cat((x, y), dim=1)
         output = self.fc_out(output)
         return x, y, output
+    
 
 class ConcatFusion_N(nn.Module):
+    def __init__(self, input_dim=3072, output_dim=100):
+        super(ConcatFusion_N, self).__init__()
+        self.fc_out = nn.Linear(input_dim, output_dim)
+    def forward(self, encoder_res):
+        output = torch.cat(list(encoder_res.values()),dim = 1)
+        output = self.fc_out(output)
+        return output
+    
+class ConcatFusion_Mask(nn.Module):
     def __init__(self, input_dim=3072, output_dim=100):
         super(ConcatFusion_N, self).__init__()
         self.fc_out = nn.Linear(input_dim, output_dim)

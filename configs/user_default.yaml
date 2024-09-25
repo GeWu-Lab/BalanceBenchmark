@@ -7,14 +7,14 @@ Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
   trainer: "OGMTrainer"
-  device: '1'
-  dataset: UMPC_Food
+  device: '2'
+  dataset: Cremad
 
 Train:
-  dataset: UMPC_Food
+  dataset: Cremad
 
 Test:
-  dataset: UMPC_Food
+  dataset: Cremad
 
 # dataset:
 #   dataloader:

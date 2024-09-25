@@ -38,7 +38,7 @@ trainer_para:
   GBlending:
     alpha: 0.1
     method: "None"
-    modulation_starts: 0
+    modulation_starts: 10
     modulation_ends: 80
     super_epoch: 10
     modality: 2
