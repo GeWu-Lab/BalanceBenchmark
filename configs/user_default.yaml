@@ -6,15 +6,15 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "OGMTrainer"
-  device: '2'
-  dataset: Cremad
+  trainer: "CMLTrainer"
+  device: '0'
+  dataset: UCF
 
 Train:
-  dataset: Cremad
+  dataset: UCF
 
 Test:
-  dataset: Cremad
+  dataset: UCF
 
 # dataset:
 #   dataloader:

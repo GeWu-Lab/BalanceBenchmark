@@ -40,8 +40,8 @@ class BaseClassifierModel(nn.Module):
         
     def Resnet_Process(self, modality_data : torch.Tensor, modality : str) -> torch.Tensor:
         B = len(modality_data)
-        if modality == 'visual' or modality == 'flow':
-            if modality == 'visual': 
+        if modality == 'visual' or modality == 'flow': 
+            if modality == 'visual':
                 modality_data = modality_data.permute(0, 2, 1, 3, 4).contiguous().float()
             else:
                 modality_data = modality_data.contiguous().float()
