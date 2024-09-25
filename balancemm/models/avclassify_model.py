@@ -8,7 +8,6 @@ from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
 from ..encoders import create_encoders
-
 # def build_encoders(config_dict: dict[str, str])->dict[str, nn.Module]:
 #     modalitys = config_dict.keys()
 #     for modality in modalitys:
@@ -124,9 +123,6 @@ class BaseClassifierModel(nn.Module):
         label = label.to(self.device)
         out = self.Uni_res['output']
         loss = F.cross_entropy(out, label)
-        num = [0.0 for _ in range(n_classes)]
-        acc_res = {}
-        pred_res = {}
         for modality in self.Uni_res.keys():
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
@@ -142,6 +138,61 @@ class BaseClassifierModel(nn.Module):
         #     num[label[i]] += 1.0
         return loss
 
+
+class BaseClassifier_AMCoModel(BaseClassifierModel):
+    def __init__(self, args):
+        super(BaseClassifier_AMCoModel, self).__init__(args)
+        self.linear_star = nn.Linear(in_features=self.n_classes, out_features= self.n_classes)
+    def forward(self,
+                batch,
+                padding = [],
+                mask = None, 
+                dependent_modality = {}, 
+                pt = 0,
+                types= 0) -> dict[str, torch.Tensor]:
+        self.encoder_res = {}
+        for modality in self.modalitys:
+            modality_data = batch[modality]
+            modality_data = modality_data.to(self.device)
+            if modality in padding:
+                modality_data = torch.zeros_like(modality_data, device=modality_data.device)
+                modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
+            elif dependent_modality.get(modality, False) == True:
+                modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
+            else :
+                modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
+            self.encoder_res[modality] = modality_res 
+        self.encoder_res['output'] = self.fusion_module(self.encoder_res)
+        if True not in dependent_modality.values():
+            self.Unimodality_Calculate(mask,dependent_modality)
+        self.encoder_res['output'] = self.linear_star(self.encoder_res['output'])
+        self.Uni_res['output'] = self.encoder_res['output'] 
+        return self.encoder_res
+    
+    def Unimodality_Calculate(self, mask= None, dependent_modality = {}) -> dict[str, torch.Tensor]:
+        modality_nums = 0
+        all_nums = len(self.encoder_res.keys())-1
+        self.Uni_res = {}
+        self.Uni_res['output'] = torch.zeros_like(self.encoder_res['output'])
+        now_size = 0
+        for modality in self.encoder_res.keys():
+            if modality == 'output':
+                continue
+            if self.fusion == 'concat':
+                weight_size = self.fusion_module.fc_out.weight.size(1)
+                self.Uni_res[modality] = (torch.mm(self.encoder_res[modality],\
+                                               torch.transpose(self.fusion_module.fc_out.weight[:,\
+                                                                                                now_size :\
+                                                                                                now_size + self.modality_size[modality]], 0, 1))
+                                    + self.fusion_module.fc_out.bias / all_nums)
+                now_size += self.modality_size[modality]
+            if dependent_modality.get(modality, False):
+                self.Uni_res[modality] = torch.mul(self.Uni_res[modality], mask)
+            self.Uni_res['output'] += self.Uni_res[modality]
+            modality_nums += 1
+        self.encoder_res['output'] = self.Uni_res['output']
+        return self.Uni_res
+    
 class AVClassifierModel(nn.Module):
     def __init__(self, args):
         super(AVClassifierModel, self).__init__()

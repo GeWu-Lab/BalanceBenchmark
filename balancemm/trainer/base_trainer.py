@@ -139,11 +139,13 @@ class BaseTrainer():
 
         while not self.should_stop:
             if self.should_train:
+                model.train()
                 self.train_loop(
                     model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg
                 )
                 logger.info("epoch: {:0}  ".format(self.current_epoch))
             if self.should_validate:
+                model.eval()
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
                 info = f'valid_loss: {valid_loss}'
                 output_info = ''
@@ -280,7 +282,6 @@ class BaseTrainer():
         #     return
 
         self.fabric.call("on_validation_model_eval")  # calls `model.eval()`
-
         torch.set_grad_enabled(False)
 
         self.fabric.call("on_validation_epoch_start")
@@ -288,7 +289,7 @@ class BaseTrainer():
         iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
         
         if limit_modalitys == ["ALL"]:
-            limit_modalitys = model.modalitys
+            limit_modalitys = list(model.modalitys).copy()
         count = 0
         _acc = {}
         valid_loss = 0

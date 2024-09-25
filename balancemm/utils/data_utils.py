@@ -25,7 +25,7 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
 
     if (not hasattr(config_dataloader, 'batch_size') or config_dataloader.batch_size == -1):
         config_dataloader.batch_size = round(config_dataloader.eff_batch_size/fabric.world_size) # using the effective batch_size to calculate the batch_size per gpu
-    
+
     train_dataloader = torch.utils.data.DataLoader(train_dataset,  
                                                    batch_size=config_dataloader.batch_size, 
                                                    shuffle=config_dataloader.shuffle, 
@@ -34,7 +34,10 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
                                                      multiprocessing_context='spawn', 
                                                      pin_memory = config_dataloader.pin_memory)
 
-    val_dataloader = torch.utils.data.DataLoader(val_dataset,  batch_size=config_dataloader.batch_size, drop_last = config_dataloader.drop_last, num_workers = config_dataloader.num_workers, multiprocessing_context='spawn', pin_memory = config_dataloader.pin_memory)
+    val_dataloader = torch.utils.data.DataLoader(val_dataset,  batch_size=config_dataloader.batch_size, drop_last = config_dataloader.drop_last, 
+                                                 num_workers = config_dataloader.num_workers, 
+                                                multiprocessing_context='spawn', 
+                                                pin_memory = config_dataloader.pin_memory)
 
     if config.Train['dataset'] == 'UMPC_Food':
         g = torch.Generator()

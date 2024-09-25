@@ -2,10 +2,10 @@
 dataloader:
   eff_batch_size: 64
   num_workers: 4 # number of workers for dataloader
-  fast_run: false # if true, only use part of the dataset
-  shuffle: true # if true, shuffle the dataset
-  drop_last: true # if true, drop the last batch if the size is not equal to batch_size
-  pin_memory: true # if true, use pin_memory for dataloader
+  fast_run: False # if true, only use part of the dataset
+  shuffle: True # if true, shuffle the dataset
+  drop_last: True # if true, drop the last batch if the size is not equal to batch_size
+  pin_memory: True # if true, use pin_memory for dataloader
 
 dataset:  
   Mosei:
@@ -47,6 +47,19 @@ dataset:
     visual_path: /home/ruize_xu/imbalance/all_frame/
     audio_path: /home/ruize_xu/imbalance/all_spec/
     classes: 30  
+    audio:
+      input_dim: None
+    visual:
+      input_dim: None
+  
+  Cremad:
+    classes: 6
+    fps: 2
+    visual_path : '/data/users/public/cremad/visual/'
+    audio_path : '/data/users/public/cremad/audio/'
+    stat_path : '/data/users/public/cremad/stat.csv'
+    train_txt : '/data/users/public/cremad/train.csv'
+    test_txt : '/data/users/public/cremad/test.csv'
     audio:
       input_dim: None
     visual:

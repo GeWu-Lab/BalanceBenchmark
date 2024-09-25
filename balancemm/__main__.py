@@ -70,6 +70,8 @@ def create_config(config_dict: dict):
             if config_dict['dataset'][modality]['input_dim'] is not None:
                 config_dict['model']['encoders'][modality]['input_dim'] = config_dict['dataset'][modality]['input_dim']
             config_dict['model']['encoders'][modality]['name'] = name
+            config_dict['model']['encoders'][modality]['if_pretrain'] = encoder_settings[name]['if_pretrain']
+            config_dict['model']['encoders'][modality]['pretrain_path'] = encoder_settings[name]['pretrain_path']
 
             ###new
             config_dict['model']['modality_size'][modality] = encoder_settings[name]['output_dim']
