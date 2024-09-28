@@ -15,6 +15,7 @@ from ..encoders import create_encoders
 #         config_dict[modality] = encoder_class(config_dict[modality])
 #     return config_dict
 class BaseClassifierModel(nn.Module):
+    # mid fusion
     def __init__(self, args):
         super(BaseClassifierModel, self).__init__()
         self.n_classes = args['n_classes']
@@ -88,6 +89,8 @@ class BaseClassifierModel(nn.Module):
             modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
             self.encoder_res[modality] = modality_res 
         self.encoder_res['output'] = self.fusion_module(self.encoder_res)
+        ##new
+        self.Unimodality_Calculate()
         return self.encoder_res
     
     def Unimodality_Calculate(self) -> dict[str, torch.Tensor]:
@@ -108,9 +111,15 @@ class BaseClassifierModel(nn.Module):
                                     + self.fusion_module.fc_out.bias / all_nums)
                 now_size += self.modality_size[modality]
             modality_nums += 1
+            ##new
+        softmax =nn.Softmax(dim= 1)
+        for modality in self.Uni_res.keys():
+            softmax_res = softmax(self.Uni_res[modality])
+            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
         return self.Uni_res
 
     def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int, limit_modality: list) -> tuple[torch.Tensor, dict[str, list]]:
+        # ** drop
         padding = []
         for modality in self.modalitys:
             if modality not in limit_modality:

@@ -15,7 +15,7 @@ import os
 import torch
 import yaml
 import logging
-from .evaluation.modalitys import Calculate_sharply
+from .evaluation.modalitys import Calculate_Shapley
 
 def only_test(args: dict):
     args = SimpleNamespace(**args)
@@ -70,4 +70,4 @@ def only_test(args: dict):
     model.load_state_dict(check_point['model'])
     trainer.max_epochs = 1
     trainer.fit(model, None, val_dataloader, None, None, logger)
-    Calculate_sharply(trainer = trainer, model = model, CalcuLoader = val_dataloader, logger= logger)
+    Calculate_Shapley(trainer = trainer, model = model, CalcuLoader = val_dataloader, logger= logger)

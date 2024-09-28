@@ -6,6 +6,7 @@ class BatchMetricsCalculator:
     def __init__(self, num_classes: int, modalitys: list):
         self.num_classes = num_classes
         self.confusion_matrix = {}
+        self.modalitys = modalitys
         for modality in modalitys:
             self.confusion_matrix[modality] = np.zeros((num_classes, num_classes))
         self.total_samples = 0
@@ -33,5 +34,9 @@ class BatchMetricsCalculator:
                               where=(precisions + recalls) != 0)
             Metrics_res['f1'][modality] = np.mean(f1_scores)
             Metrics_res['acc'][modality] = accuracy
-
         return Metrics_res
+    def ClearAll(self):
+        for modality in self.modalitys:
+            self.confusion_matrix[modality] = np.zeros((self.num_classes, self.num_classes))
+        self.total_samples = 0
+        

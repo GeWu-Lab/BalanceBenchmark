@@ -15,7 +15,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 import lightning as L
 import torch
 from ..models.avclassify_model import BaseClassifierModel
-
+from ..evaluation.complex import profile_flops
 class baselineTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(baselineTrainer,self).__init__(fabric,**para_dict)
@@ -23,9 +23,10 @@ class baselineTrainer(BaseTrainer):
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
-
         self.modality = method_dict['modality']
 
+        ##new
+    @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -101,8 +102,7 @@ class baselineTrainer(BaseTrainer):
         #     a, v, out = model(batch)
         # else:
         #     a, v, t, out = model(batch)
-        model(batch)
-        model.Unimodality_Calculate()
+        _ = model.validation_step(batch= batch, batch_idx= batch_idx, limit_modality = model.modalitys)
         out = model.encoder_res['output']        
         loss = criterion(out, label)
         loss.backward()

@@ -8,11 +8,13 @@ dataloader:
   pin_memory: True # if true, use pin_memory for dataloader
 
 dataset:  
+  #名称规范化
   Mosei:
     dataset_path: /home/zequn_yang/MMT/data/  #
     data : mosei_senti
     if_align: false
     classes: 7  #
+    validation: True
     audio:  ###
       input_dim: 74
     visual:
@@ -23,6 +25,7 @@ dataset:
   UMPC_Food:
     dataset_path: /data/users/zequn_yang/Food101
     classes: 101
+    validation: false
     text:
       input_dim: 40
     visual:
@@ -30,6 +33,7 @@ dataset:
   
   UCF:
     classes: 101
+    validation: false
     stat_path : '/data/users/zequn_yang/UCF-101/classInd.txt'
     train_txt : '/data/users/zequn_yang/UCF-101/trainlist01.txt'
     test_txt : '/data/users/zequn_yang/UCF-101/testlist01.txt'
@@ -46,6 +50,7 @@ dataset:
     csv_path: /home/ruize_xu/Imbalance_train_test_val.json
     visual_path: /home/ruize_xu/imbalance/all_frame/
     audio_path: /home/ruize_xu/imbalance/all_spec/
+    validation: false
     classes: 30  
     audio:
       input_dim: None
@@ -60,6 +65,7 @@ dataset:
     stat_path : '/data/users/public/cremad/stat.csv'
     train_txt : '/data/users/public/cremad/train.csv'
     test_txt : '/data/users/public/cremad/test.csv'
+    validation: false
     audio:
       input_dim: None
     visual:
