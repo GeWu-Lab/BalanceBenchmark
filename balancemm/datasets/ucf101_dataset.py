@@ -108,7 +108,7 @@ class UCFDataset(Dataset):
         ####### RGB
         file_num = 6
         
-        pick_num = 1
+        pick_num = 3
         seg = int(file_num/pick_num)
         image_arr = []
 
@@ -124,7 +124,7 @@ class UCFDataset(Dataset):
         images = torch.cat(image_arr)
 
         num_u = len(os.listdir(self.flow_path_u + datum))
-        pick_num = 1
+        pick_num = 3
         flow_arr = []
         seg = int(num_u/pick_num)
 

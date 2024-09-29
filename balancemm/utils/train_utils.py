@@ -33,21 +33,19 @@ def get_checkpoint_files(checkpoint_dir):
 
 def set_seed(seed):
     """
-    设置整个训练过程的随机种子
+    Set random seed for training
     
     Args:
-        seed (int): 随机种子值
+        seed (int): random value
     """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    
-    # 设置 CuDNN
+
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    
-    # 设置 Python 的 hash seed
+
     os.environ['PYTHONHASHSEED'] = str(seed)
     
     print(f"Random seed set as {seed}")

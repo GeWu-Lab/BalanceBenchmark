@@ -94,11 +94,6 @@ class OGMTrainer(BaseTrainer):
         tanh = nn.Tanh()
         label = batch['label']
         label = label.to(model.device)
-        # if self.modality == 3:
-        #     a, v, t, out = model(batch)
-        #     out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
-        # a, v, out = model(batch)
-        # out_a, out_v = model.AVCalculate(a, v, out)
         model(batch)
         Uni_res = model.Unimodality_Calculate()
         loss = criterion(Uni_res['output'], label)
@@ -112,6 +107,7 @@ class OGMTrainer(BaseTrainer):
         coeffs = {}
         minscore = float('inf')
         #Calculate the scores
+
         for modality in modality_list:
             if modality_nums == 2:
                 score_modality = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(Uni_res['output'].size(0))])
@@ -119,25 +115,23 @@ class OGMTrainer(BaseTrainer):
                 score_modality = sum([softmax(torch.cos(Uni_res[modality]))[i][label[i]] if label[i] == torch.argmax(Uni_res[modality][i]) else 0 for i in range(Uni_res['output'].size(0))])
             else:
                 raise("Wrong number of modalitys for OGM, it should be 2 or 3, but given {:0}".format(modality_nums))
-            scores[modality] = score_modality
+            scores[modality] = score_modality.detach().clone()
             minscore = min(score_modality, minscore)
-        
         ##Calculate the ratios
         for modality in modality_list:
-            ratios[modality] = scores[modality]
+            ratios[modality] = scores[modality].detach().clone()
             if modality_nums == 2:
                 for modality_another in modality_list:
                     if modality_another == modality: 
                         continue
                     ## 如果没有1e-3会显存爆炸
-                    ratios[modality] /= (scores[modality_another]+ 1e-1)
+                    ratios[modality] /= (scores[modality_another]+ 1e-5)
             if modality_nums == 3:
-                ratios[modality] /= (minscore + 1e-1)
-        
+                ratios[modality] /= (minscore + 1e-5)
         #Calculate the coeffects
         for modality in modality_list:
             if ratios[modality] > 1 :
-                coeffs[modality] = 1 - tanh(self.alpha * relu(ratios[modality]))
+                coeffs[modality] = max(1 - tanh(self.alpha * relu(ratios[modality])),0)
             else:
                 coeffs[modality] = 1
 
@@ -145,6 +139,7 @@ class OGMTrainer(BaseTrainer):
             for name, parms in model.named_parameters():
                 layer = str(name).split('.')[1]
                 for modality in modality_list:
+
                     if modality in layer and len(parms.grad.size()) != 1: ##Don't change the grad of bias for layer
                         if self.method == 'OGM_GE':  # bug fixed
                             parms.grad = parms.grad * coeffs[modality] + \

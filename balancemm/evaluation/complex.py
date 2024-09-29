@@ -4,79 +4,45 @@ import torch
 from thop import profile
 from ..models.avclassify_model import BaseClassifierModel
 from typing import Callable, Any, Tuple
+## flops库 
+## 命名规范
+from torch.profiler import profile, record_function, ProfilerActivity
+import functools
 
-def get_model_complexity(model, input_size=(1, 3, 224, 224)):
-    input = torch.randn(input_size)
-    flops, params = profile(model, inputs=(input, ))
-    return flops, params
+def profile_flops(logger=None):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            # 尝试获取 logger
+            nonlocal logger
+            if logger is None:
+                logger = getattr(self, 'logger', None)
+            
+            if logger is None:
+                # 如果还是没有 logger，可以创建一个默认的或抛出异常
+                raise ValueError("No logger found")
 
-def getallparams(model: BaseClassifierModel) -> int:
-    params = 0
-    for param in model.parameters():
-        params += param.numel()
-    return params
+            with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                         with_flops=True,
+                         profile_memory=True) as prof:
+                with record_function(func.__name__):
+                    result = func(self, *args, **kwargs)
+            
+            for event in prof.key_averages():
+                if event.key == "cuda":  # 或使用 "cpu" 如果你想看 CPU 内存
+                    max_memory = max(max_memory, event.cpu_memory_usage, event.cuda_memory_usage)
+                else :
+                    max_memory = max(max_memory, event.cpu_memory_usage)
 
-def all_in_one_train(trainprocess: callable, model, logger):
-    starttime = time.time()
-    mem = max(memory_usage(proc=trainprocess))
-    endtime = time.time()
-    logger.info(f"Training Time: {endtime-starttime:.2f} seconds")
-    logger.info(f"Training Peak Mem: {mem:.2f} MiB")
-    logger.info(f"Training Params: {getallparams(model)}")
-    
-    # New metrics
-    flops, _ = get_model_complexity(model)
-    logger.info(f"FLOPs: {flops/1e9:.2f} G")
+            # print(f"Max memory usage in {func.__name__}: {max_memory / (1024 * 1024):.2f} MB")
 
-def all_in_one_test(testprocess, model, logger):
-    teststart = time.time()
-    testprocess()
-    testend = time.time()
-    logger.info(f"Inference Time: {testend-teststart:.2f} seconds")
-    logger.info(f"Inference Params: {getallparams(model)}")
+            # 计算并记录 FLOPs
+            total_flops = sum(event.flops for event in prof.events())
+            logger.info('Total flops is : {:0}, memory usage is {:1} GB'.format(total_flops, max_memory))
+            print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
 
-def advanced_model_profiler(
-    trainprocess: Callable,
-    model: torch.nn.Module,
-    logger: Any,
-    input_size: Tuple[int, ...] = (1, 3, 224, 224),
-    *args,
-    **kwargs
-):
-    """
-    Profile the training process and model complexity.
+            # ... 其他日志记录逻辑 ...
 
-    :param trainprocess: The training function to be profiled
-    :param model: The PyTorch model
-    :param logger: Logger object for recording information
-    :param input_size: Input size for FLOPs calculation (default: (1, 3, 224, 224))
-    :param args: Additional positional arguments for trainprocess
-    :param kwargs: Additional keyword arguments for trainprocess
-    """
-    # Measure training time and memory usage
-    starttime = time.time()
-    mem = max(memory_usage(proc=(trainprocess, args, kwargs)))
-    endtime = time.time()
-
-    # Log training time and memory usage
-    logger.info(f"Training Time: {endtime-starttime:.2f} seconds")
-    logger.info(f"Training Peak Mem: {mem:.2f} MiB")
-
-    # Log model parameters
-    total_params = getallparams(model)
-    logger.info(f"Training Params: {total_params:,}")
-
-    # Calculate and log FLOPs
-    flops, _ = get_model_complexity(model, input_size)
-    logger.info(f"FLOPs: {flops/1e9:.2f} G")
-
-    # Calculate and log model size
-    model_size = sum(p.numel() * p.element_size() for p in model.parameters()) / (1024 * 1024)  # Size in MB
-    logger.info(f"Model Size: {model_size:.2f} MB")
-
-    # Log theoretical memory requirements
-    batch_size = input_size[0]
-    theoretical_memory = (total_params * 4 + flops * 4) / (1024 * 1024)  # Assuming 4 bytes per parameter and operation
-    logger.info(f"Theoretical Memory Requirement (batch size {batch_size}): {theoretical_memory:.2f} MB")
-
-    # You can add more profiling metrics here as needed
+            return result
+        return wrapper
+    return decorator

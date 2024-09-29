@@ -2,7 +2,7 @@ import os
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
-
+from lightning.pytorch.loggers import CSVLogger, WandbLogger, TensorBoardLogger
 import lightning as L
 import torch
 from lightning.fabric.accelerators import Accelerator
@@ -14,6 +14,8 @@ from lightning_utilities import apply_to_collection
 from tqdm import tqdm
 from ..evaluation.precisions import BatchMetricsCalculator
 from ..models.avclassify_model import BaseClassifierModel
+from ..evaluation.complex import profile_flops
+from logging import Logger
 class BaseTrainer():
     def __init__(
         self,
@@ -26,7 +28,8 @@ class BaseTrainer():
         use_distributed_sampler: bool = True,
         checkpoint_dir: str = "./experiments/checkpoints",
         checkpoint_frequency: int = 1,
-        should_train: bool = True
+        should_train: bool = True,
+        logger:Logger = None
     ) -> None:
         """Exemplary Trainer with Fabric. This is a very simple trainer focused on readablity but with reduced
         featureset. As a trainer with more included features, we recommend using the
@@ -89,7 +92,10 @@ class BaseTrainer():
 
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_frequency = checkpoint_frequency
-
+        self.PrecisionCalculatorType = BatchMetricsCalculator
+        self.PrecisionCalculator = None
+        self._current_metrics = {}
+        self.logger = logger
     def fit(
         self,
         model,
@@ -114,7 +120,8 @@ class BaseTrainer():
         """
         print(self.max_epochs)
         # self.fabric.launch()
-
+        # setup calculator
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
         # setup dataloaders
         if self.should_train:
             train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
@@ -144,23 +151,45 @@ class BaseTrainer():
                     model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg
                 )
                 logger.info("epoch: {:0}  ".format(self.current_epoch))
+                output_info = ''
+                info = ''
+                ##parse the Metrics
+                Metrics_res = self._current_metrics
+                for metircs in sorted(Metrics_res.keys()):
+                    if metircs == 'acc':
+                        valid_acc = Metrics_res[metircs]
+                        for modality in sorted(valid_acc.keys()):
+                            if modality == 'output':
+                                output_info += f"train_acc: {valid_acc[modality]}"
+                            else:
+                                info += f", acc_{modality}: {valid_acc[modality]}"
+                    if metircs == 'f1':
+                        valid_f1 = Metrics_res[metircs]
+                        for modality in sorted(valid_f1.keys()):
+                            if modality == 'output':
+                                output_info += f", train_f1: {valid_f1[modality]}"
+                            else:
+                                info += f", f1_{modality}: {valid_f1[modality]}"
+                info = output_info+ ', ' + info
+                    
+                logger.info(info)
             if self.should_validate:
                 model.eval()
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
                 info = f'valid_loss: {valid_loss}'
                 output_info = ''
                 ##parse the Metrics
-                for metircs in Metrics_res.keys():
+                for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':
                         valid_acc = Metrics_res[metircs]
-                        for modality in valid_acc.keys():
+                        for modality in sorted(valid_acc.keys()):
                             if modality == 'output':
-                                output_info += f", valid_acc: {valid_acc[modality]}"
+                                output_info += f"valid_acc: {valid_acc[modality]}"
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
-                        for modality in valid_f1.keys():
+                        for modality in sorted(valid_f1.keys()):
                             if modality == 'output':
                                 output_info += f", valid_f1: {valid_f1[modality]}"
                             else:
@@ -187,6 +216,7 @@ class BaseTrainer():
         # reset for next fit call
         self.should_stop = False
 
+    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,
@@ -208,11 +238,11 @@ class BaseTrainer():
                 for supported values.
 
         """
+        ## loop和step合并
         self.fabric.call("on_train_epoch_start")
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
-
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -237,7 +267,7 @@ class BaseTrainer():
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -250,6 +280,7 @@ class BaseTrainer():
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
 
         self.fabric.call("on_train_epoch_end")
 
@@ -320,6 +351,7 @@ class BaseTrainer():
             # count += len(batch['label'])
         valid_loss /= MetricsCalculator.total_samples
         Metrics_res = MetricsCalculator.compute_metrics()
+        self._current_metrics = Metrics_res
         if Metrics_res['acc']['output'] > self.best_acc:
             self.should_save = True
             self.best_acc = Metrics_res['acc']['output']
@@ -340,8 +372,13 @@ class BaseTrainer():
             batch_idx: index of the current batch w.r.t the current epoch
 
         """
-        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.training_step(batch, batch_idx=batch_idx)
-
+        model.validation_step(batch, batch_idx=batch_idx)
+        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.encoder_res
+        #calculate
+        # model.Unimodal_Calculate()
+        # for modality in self.Uni_res.keys():
+        #     softmax_res = softmax(self.Uni_res[modality])
+        #     self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
         loss = outputs if isinstance(outputs, torch.Tensor) else outputs["loss"]
 
         self.fabric.call("on_before_backward", loss)
@@ -495,3 +532,15 @@ class BaseTrainer():
 
             if postfix_str:
                 prog_bar.set_postfix_str(postfix_str)
+    # def on_train_epoch_end(loggers):
+    #      # 示例：如何为不同的 logger 添加自定义日志
+    #     for logger in loggers:
+    #         if isinstance(logger, CSVLogger):
+    #             # CSVLogger 特定的操作（如果需要）
+    #             pass
+    #         elif isinstance(logger, TensorBoardLogger):
+    #             # TensorBoard 特定的操作
+    #             logger.experiment.add_histogram('weights', self.model[0].weight, self.current_epoch)
+    #         elif isinstance(self.logger, WandbLogger):
+    #             # Wandb 特定的操作
+    #             self.logger.experiment.log({"custom_metric": self.train_acc.compute()})
