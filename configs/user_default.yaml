@@ -6,15 +6,15 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "baselineTrainer"
-  device: '2'
-  dataset: UMPC_Food
+  trainer: "CMLTrainer"
+  device: '1'
+  dataset: Balance
 
 Train:
-  dataset: UMPC_Food
+  dataset: Balance
 
 Test:
-  dataset: UMPC_Food
+  dataset: Balance
 
 # dataset:
 #   dataloader:

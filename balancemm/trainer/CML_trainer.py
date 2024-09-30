@@ -11,6 +11,7 @@ import os
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
+from ..evaluation.complex import profile_flops
 
 import lightning as L
 import torch
@@ -35,6 +36,7 @@ class CMLTrainer(BaseTrainer):
         self.lam = method_dict['lam']
         # self.modality = method_dict['modality']
 
+    @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -124,9 +126,10 @@ class CMLTrainer(BaseTrainer):
                 pad_visual = False
                 pad_text = False
                 loss_mm = 0
+                model(batch)
                 for modality in modality_list:
-                    m[modality] = model(batch)[modality]
-                m['out'] = model(batch)['output']
+                    m[modality] = model.encoder_res[modality]
+                m['out'] = model.encodr_res['output']
                 # a, v, t, out = model(batch)
                 Uni_res = model.Unimodality_Calculate()
                 out_s = Uni_res['output']
@@ -185,9 +188,10 @@ class CMLTrainer(BaseTrainer):
                     #     _loss_c += loss_vc
                 loss = (loss) / 3 +self.lam * _loss_c
             else:
+                model(batch)
                 for modality in modality_list:
-                    m[modality] = model(batch)[modality]
-                m['out'] = model(batch)['output']
+                    m[modality] = model.encoder_res[modality]
+                m['out'] = model.encoder_res['output']
                 # a, v, t, out = model(batch)
                 Uni_res = model.Unimodality_Calculate()
                 out_s = Uni_res['output']
@@ -204,9 +208,10 @@ class CMLTrainer(BaseTrainer):
                 pad_visual = False
                 pad_text = False
                 loss_mm = 0
+                model(batch)
                 for modality in modality_list:
-                    m[modality] = model(batch)[modality]
-                m['out'] = model(batch)['output']
+                    m[modality] = model.encoder_res[modality]
+                m['out'] = model.encoder_res['output']
                 Uni_res = model.Unimodality_Calculate()
                 out_s = Uni_res['output']
                 random_dict = random_dict_.copy()
@@ -243,9 +248,10 @@ class CMLTrainer(BaseTrainer):
                     out_s = out_p
                 loss = (loss) / 2 +self.lam * _loss_c
             else:
+                model(batch)
                 for modality in modality_list:
-                    m[modality] = model(batch)[modality]
-                m['out'] = model(batch)['output']
+                    m[modality] = model.encoder_res[modality]
+                m['out'] = model.encoder_res['output']
                 # out_a, out_v = model.AVCalculate(a, v, out)
             
                 loss = criterion(m['out'], label)
