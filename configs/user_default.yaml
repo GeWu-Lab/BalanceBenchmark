@@ -7,7 +7,7 @@ Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
   trainer: "CMLTrainer"
-  device: '2'
+  device: '1'
   dataset: Balance
 
 Train:
