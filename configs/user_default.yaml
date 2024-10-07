@@ -6,7 +6,7 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "MBSDTrainer"
+  trainer: "MMCosineTrainer"
   device: '2'
   dataset: Balance
 

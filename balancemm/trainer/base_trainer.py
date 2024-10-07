@@ -173,8 +173,10 @@ class BaseTrainer():
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
+                self.PrecisionCalculator.ClearAll()
             if self.should_validate:
                 model.eval()
+                print("before val_loop")
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
                 info = f'valid_loss: {valid_loss}'
                 output_info = ''
