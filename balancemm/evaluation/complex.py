@@ -39,7 +39,7 @@ def profile_flops(logger=None):
 
             # 计算并记录 FLOPs
             total_flops = sum(event.flops for event in prof.events())
-            logger.info('Total flops is : {:0}, memory usage is {:1} GB'.format(total_flops, max_memory/(1024**3)))
+            logger.info('Total flops is : {:0}, memory usage is {:1} GB'.format(total_flops, max_memory))
             print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
 
             # ... 其他日志记录逻辑 ...
