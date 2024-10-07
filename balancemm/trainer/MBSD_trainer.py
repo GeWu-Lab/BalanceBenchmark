@@ -24,7 +24,7 @@ class MBSDTrainer(BaseTrainer):
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
 
-    @profile_flops
+    @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -96,7 +96,6 @@ class MBSDTrainer(BaseTrainer):
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
-        modality_num = len(model.modalitys)
         modality_list = model.modalitys
         key = list(modality_list)
         m = {}
@@ -107,7 +106,7 @@ class MBSDTrainer(BaseTrainer):
         for modality in modality_list:
             m[modality] = model.encoder_res[modality]
         m['out'] = model.encoder_res['output']
-        Uni_res = model.Unimodality_Calculate()    
+        model.Unimodality_Calculate()    
         # out_a, out_v = model.AVCalculate(a, v, out)
         label = batch['label']
         device = model.device
@@ -117,16 +116,16 @@ class MBSDTrainer(BaseTrainer):
     
         loss['out'] = criterion(m['out'], label)
         for modality in modality_list:
-            loss[modality] = criterion(Uni_res[modality], label)
+            loss[modality] = criterion(model.Uni_res[modality], label)
         # loss_v = criterion(Uni_res[], label)
         # loss_a = criterion(out_a, label)
 
         for modality in modality_list:
-            prediction[modality] = softmax(Uni_res[modality])
+            prediction[modality] = softmax(model.Uni_res[modality])
         # prediction_a = softmax(out_a)
         # prediction_v = softmax(out_v)
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-            loss_RS = 1/Uni_res[key[0]].shape[1] * torch.sum((Uni_res[key[0]] - Uni_res[key[1]])**2, dim = 1)
+            loss_RS = 1/model.Uni_res[key[0]].shape[1] * torch.sum((model.Uni_res[key[0]] - model.Uni_res[key[1]])**2, dim = 1)
 
             w = torch.tensor([0.0 for _ in range(len(m['out']))])
             w = w.to(device)
@@ -154,5 +153,15 @@ class MBSDTrainer(BaseTrainer):
             loss_RS = loss_RS.reshape(-1,1)
             loss_RS = torch.mm(w, loss_RS) / len(m['out'])
             total_loss = loss['out'] + loss[key[0]] + loss[key[1]] + loss_RS.squeeze() + loss_KL.squeeze() ## erase the dim of 1
+            
+        else:
+            # model(batch)
+            # for modality in modality_list:
+            #     m[modality] = model.encoder_res[modality]
+            # m['out'] = model.encoder_res['output']
+            # out_a, out_v = model.AVCalculate(a, v, out)
+        
+            total_loss = loss['out']
+        total_loss.backward()
 
         return total_loss

@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 from ..evaluation.complex import profile_flops
-
+from lightning_utilities import apply_to_collection
 import lightning as L
 import torch
 import random
@@ -93,6 +93,7 @@ class CMLTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -100,12 +101,12 @@ class CMLTrainer(BaseTrainer):
             #     self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
 
             # add output values to progress bar
-            
             self._format_iterable(iterable, self._current_train_return, "train")
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
 
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model, batch, batch_idx, random_dict_ ):
@@ -255,6 +256,13 @@ class CMLTrainer(BaseTrainer):
                 # out_a, out_v = model.AVCalculate(a, v, out)
             
                 loss = criterion(m['out'], label)
-        loss.backward()
+        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.encoder_res
+        self.fabric.call("on_before_backward", loss)
+        self.fabric.backward(loss)
+        self.fabric.call("on_after_backward")
+
+        # # avoid gradients in stored/accumulated values -> prevents potential OOM
+        # self._current_train_return = apply_to_collection(outputs, dtype=torch.Tensor, function=lambda x: x.detach())
+
 
         return loss

@@ -31,9 +31,9 @@ trainer_para:
   CML:
     alpha: 0.1
     method: "None"
-    modulation_starts: 10
+    modulation_starts: 0
     modulation_ends: 80
-    lam: 20
+    lam: 5
     modality: 2
   GBlending:
     alpha: 0.1
@@ -50,9 +50,16 @@ trainer_para:
     modality: 2
     embed_dim: 512
     momentum_coef: 0.5
-  MBSD :
+  MBSD:
     alpha: 0.1
     method: "None"
     modulation_starts: 10
     modulation_ends: 80
     modality: 2
+  MMCosine:
+    alpha: 0.1
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+    modality: 2
+    scaling: 5
