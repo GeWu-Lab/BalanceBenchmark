@@ -28,11 +28,12 @@ def profile_flops(logger=None):
                 with record_function(func.__name__):
                     result = func(self, *args, **kwargs)
             
+            max_memory = 0
             for event in prof.key_averages():
                 if event.key == "cuda":  # 或使用 "cpu" 如果你想看 CPU 内存
-                    max_memory = max(max_memory, event.cpu_memory_usage, event.cuda_memory_usage)
+                    max_memory = max(max_memory, event.cpu_memory_usage, event.cuda_memory_usage) / (1024**3)
                 else :
-                    max_memory = max(max_memory, event.cpu_memory_usage)
+                    max_memory = max(max_memory, event.cpu_memory_usage) / (1024**3)
 
             # print(f"Max memory usage in {func.__name__}: {max_memory / (1024 * 1024):.2f} MB")
 
