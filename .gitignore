@@ -3,3 +3,5 @@ experiments/
 # ignore python cache
 __pycache__/
 *.out
+# ignore temps
+temps/
