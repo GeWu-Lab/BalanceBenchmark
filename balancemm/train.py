@@ -65,14 +65,15 @@ def train_and_test(args: dict):
         device = torch.device('cuda:' + args.Main_config['device'])
     model.to(device)
     model.device = device
+        
+    # 记录开始时间
+    start_time = datetime.now()
     if args.trainer['name'] == 'GBlending':
         temp_model.to(device)
         temp_model.device = device
         trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger)
-        return
-    # 记录开始时间
-    start_time = datetime.now()
-    trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger) 
+    else :
+        trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger) 
     end_time = datetime.now()
     total_time = end_time - start_time
     total_time = total_time.total_seconds() / 3600

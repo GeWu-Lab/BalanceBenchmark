@@ -202,6 +202,7 @@ class BaseClassifier_AMCoModel(BaseClassifierModel):
         self.encoder_res['output'] = self.Uni_res['output']
         return self.Uni_res
     
+    
 class AVClassifierModel(nn.Module):
     def __init__(self, args):
         super(AVClassifierModel, self).__init__()

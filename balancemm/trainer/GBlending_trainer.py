@@ -15,7 +15,8 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 import lightning as L
 import torch
 import numpy as np
-
+from ..evaluation.complex import profile_flops
+from ..models.avclassify_model import BaseClassifierModel
 class GBlendingTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(GBlendingTrainer,self).__init__(fabric,**para_dict)
@@ -26,6 +27,8 @@ class GBlendingTrainer(BaseTrainer):
         
         self.super_epoch = method_dict['super_epoch']
         self.modality = method_dict['modality']
+        if self.method == 'offline':
+            self.super_epoch = self.max_epochs 
 
     def fit(
         self,
@@ -73,24 +76,64 @@ class GBlendingTrainer(BaseTrainer):
                 # check if we even need to train here
                 if self.max_epochs is not None and self.current_epoch >= self.max_epochs:
                     self.should_stop = True
-        weight_a = 0
-        weight_v = 0
-        weight_t = 0
-        weight_avt = 0
+
+        weights = {}
         while not self.should_stop:
             if self.current_epoch % self.super_epoch == 0:
-                weight_a, weight_v, weight_t, weight_avt = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, optimizer,logger)
+                model.train()
+                weights = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, optimizer,logger)
+            model.train()
             self.train_loop(
                 model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg,
-                weight_a = weight_a, weight_v = weight_v, weight_t = weight_t, weight_avt = weight_avt
+                weights = weights
             )
             logger.info("epoch: {:0}  ".format(self.current_epoch))
+            output_info = ''
+            info = ''
+            ##parse the Metrics
+            Metrics_res = self._current_metrics
+            for metircs in sorted(Metrics_res.keys()):
+                if metircs == 'acc':
+                    valid_acc = Metrics_res[metircs]
+                    for modality in sorted(valid_acc.keys()):
+                        if modality == 'output':
+                            output_info += f"train_acc: {valid_acc[modality]}"
+                        else:
+                            info += f", acc_{modality}: {valid_acc[modality]}"
+                if metircs == 'f1':
+                    valid_f1 = Metrics_res[metircs]
+                    for modality in sorted(valid_f1.keys()):
+                        if modality == 'output':
+                            output_info += f", train_f1: {valid_f1[modality]}"
+                        else:
+                            info += f", f1_{modality}: {valid_f1[modality]}"
+            info = output_info+ ', ' + info
+            logger.info(info)
 
             if self.should_validate:
-                valid_loss, valid_acc, valid_acc_a,valid_acc_v, valid_acc_t=self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
-                
-                logger.info(" valid_loss: {:0}, valid_acc: {:1}, acc_a: {:2}, acc_v: {:3}, acc_t: {:4}"
-                        .format( valid_loss, valid_acc, valid_acc_a, valid_acc_v, valid_acc_t))
+                model.eval()
+                valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
+                info = f'valid_loss: {valid_loss}'
+                output_info = ''
+                ##parse the Metrics
+                for metircs in sorted(Metrics_res.keys()):
+                    if metircs == 'acc':
+                        valid_acc = Metrics_res[metircs]
+                        for modality in sorted(valid_acc.keys()):
+                            if modality == 'output':
+                                output_info += f"valid_acc: {valid_acc[modality]}"
+                            else:
+                                info += f", acc_{modality}: {valid_acc[modality]}"
+                    if metircs == 'f1':
+                        valid_f1 = Metrics_res[metircs]
+                        for modality in sorted(valid_f1.keys()):
+                            if modality == 'output':
+                                output_info += f", valid_f1: {valid_f1[modality]}"
+                            else:
+                                info += f", f1_{modality}: {valid_f1[modality]}"
+                info = output_info+ ', ' + info
+                    
+                logger.info(info)
                 for handler in logger.handlers:
                     handler.flush()
             # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
@@ -108,6 +151,8 @@ class GBlendingTrainer(BaseTrainer):
 
         # reset for next fit call
         self.should_stop = False
+        
+    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,
@@ -184,266 +229,302 @@ class GBlendingTrainer(BaseTrainer):
 
         self.fabric.call("on_train_epoch_end")
     
-    def training_step(self, model, batch, batch_idx, weight_a, weight_v, weight_t, weight_avt):
+    def training_step(self, model: BaseClassifierModel, batch, batch_idx, weights):
 
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
-        softmax = nn.Softmax(dim=1)
-        if self.modality == 3:
-            out_a, out_v, out_t, out = model(batch)
-            label = batch['label']
-            label = label.to(model.device)
-            model.train()
-            loss_a = criterion(out_a, label)
-            loss_v = criterion(out_v, label)
-            loss_t = criterion(out_t, label)
-            loss_avt = criterion(out, label)
-
-            if self.modulation_starts <= self.current_epoch < self.modulation_ends:
-                loss = weight_a * loss_a + weight_v * loss_v + weight_avt * loss_avt +weight_t * loss_t    
-            else:
-                loss = loss_avt
-            
-        elif self.modality == 2:
-            out_a, out_v, out = model(batch)
-            label = batch['label']
-            label = label.to(model.device)
-            model.train()
-            loss_a = criterion(out_a, label)
-            loss_v = criterion(out_v, label)
-            loss_avt = criterion(out, label)
-
-            if self.modulation_starts <= self.current_epoch < self.modulation_ends:
-                loss = weight_a * loss_a + weight_v * loss_v + weight_avt * loss_avt  
-            else:
-                loss = loss_avt
+        model(batch)
+        label = batch['label']
+        label = label.to(model.device)
+        loss = 0
+        for modality in model.Uni_res.keys():
+            loss += weights[modality] * criterion(model.Uni_res[modality], label)
         loss.backward()
         return loss
-    def super_training_step(self, model, batch, batch_idx, types = 0):
-        out = model(batch, batch_idx,types = types)
-        criterion = nn.CrossEntropyLoss()
-        loss = criterion(out, batch['label'].to(model.device))
+    
+    # def super_training_step(self, model, batch, batch_idx, padding):
+    #     model(batch, batch_idx,padding = padding)
+    #     out = model['output']
+    #     criterion = nn.CrossEntropyLoss()
+    #     loss = criterion(out, batch['label'].to(model.device))
+    #     loss.backward() #
         
-        return loss
+    #     return loss
                 
     def super_epoch_origin(self, model, temp_model, limit_batches, train_loader, test_loader, optimizer, logger):
-        pre_a_loss_train = 0.0
-        pre_v_loss_train = 0.0
-        pre_t_loss_train = 0.0
-        pre_av_loss_train = 0.0
-        pre_avt_loss_train = 0.0
-
-        now_a_loss_train = 0.0
-        now_v_loss_train = 0.0
-        now_t_loss_train =0.0
-        now_av_loss_train = 0.0
-        now_avt_loss_train = 0.0
-
-        pre_a_loss_test = 0.0
-        pre_v_loss_test = 0.0
-        pre_t_loss_test = 0.0
-        pre_av_loss_test = 0.0
-        pre_avt_loss_test = 0.0
-
-        now_a_loss_test = 0.0
-        now_v_loss_test = 0.0
-        now_t_loss_test = 0.0
-        now_av_loss_test = 0.0
-        now_avt_loss_test = 0.0
-        _loss_avt = 0.0
-        _loss_av = 0.0
-        _loss_a = 0.0
-        _loss_v = 0.0
-        _loss_t = 0.0
-        _loss_av_test = 0.0
-        _loss_a_test = 0.0
-        _loss_v_test = 0.0
-        _loss_t_test = 0.0
-        _loss_avt_test = 0.0
+        temp_model.load_state_dict(model.state_dict(),strict=True)
         criterion = nn.CrossEntropyLoss()
-        softmax = nn.Softmax(dim=1)
-        print('super start')
-        # train_dataloader = self.progbar_wrapper(
-        #     train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
-        # )
-        train_dataloader = train_loader
-        test_dataloader = test_loader
-        # test_dataloader = self.progbar_wrapper(
-        #     test_loader, total=min(len(test_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
-        # )
-        #audio flow
-        temp_model.load_state_dict(model.state_dict(),strict=True)
-        for epoch in range(self.super_epoch):
-            _loss_a = 0.0
-            _loss_a_test = 0.0
-            temp_model.train()
-            for batch_idx, batch in enumerate(train_dataloader):
-                optimizer.zero_grad()
-                # image = image.to(device)
-                loss_a = self.super_training_step(temp_model,batch, batch_idx, types = 1)
-                _loss_a += loss_a.item()
-                optimizer.step()
-
-
-            _loss_a /= len(train_dataloader)
-
-            if epoch == 0 or epoch == self.super_epoch - 1:
-                with torch.no_grad():
-                    temp_model.eval()
-                    for batch_idx, batch in enumerate(test_dataloader):
-                        loss_a = self.super_training_step(model, batch, batch_idx, types = 1)
-                        _loss_a_test += loss_a.item()
-                    _loss_a_test /= len(test_dataloader)
-
-                    if epoch == 0:
-                        pre_a_loss_train = _loss_a
-                        pre_a_loss_test = _loss_a_test
-                    else:
-                        now_a_loss_train = _loss_a
-                        now_a_loss_test = _loss_a_test
-
-        # visual
-        temp_model.load_state_dict(model.state_dict(),strict=True)
-        for epoch in range(self.super_epoch):
-            _loss_v = 0.0
-            _loss_v_test = 0.0
-            temp_model.train()
-            for batch_idx, batch in enumerate(train_dataloader):
-                optimizer.zero_grad()
-                # image = image.to(device)
-                loss_v = self.super_training_step(temp_model,batch, batch_idx, types = 2)
-                _loss_v += loss_v.item()
-                optimizer.step()
-
-            _loss_v /= len(train_dataloader)
-
-            if epoch == 0 or epoch == self.super_epoch - 1:
-                with torch.no_grad():
-                    temp_model.eval()
-                    for batch_idx, batch in enumerate(test_dataloader):
-
-                        loss_v = self.super_training_step(model, batch, batch_idx, types = 2)
-
-                        _loss_v_test += loss_v.item()
-
-                    _loss_v_test /= len(test_dataloader)
-
-                    if epoch == 0:
-                        pre_v_loss_train = _loss_v
-                        pre_v_loss_test = _loss_v_test
-                    else:
-                        now_v_loss_train = _loss_v
-                        now_v_loss_test = _loss_v_test
-
-        # text
-        if self.modality == 3:
+        weights = {}
+        train_dataloader = self.progbar_wrapper(
+            train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
+        )
+        test_dataloader = self.progbar_wrapper(
+            test_loader, total=min(len(test_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
+        )
+        for modality in temp_model.Uni_res.keys():
             temp_model.load_state_dict(model.state_dict(),strict=True)
+            padding = []
+            pre_train_loss = 0
+            now_train_loss = 0
+            pre_validation_loss = 0
+            now_validation_loss = 0
+            for other_modality in temp_model.modalitys:
+                if other_modality != modality and modality !='output':
+                    padding.append(modality)
             for epoch in range(self.super_epoch):
-                _loss_t = 0.0
-                _loss_t_test = 0.0
                 temp_model.train()
-                for batch_idx, batch in enumerate(train_dataloader):
+                _loss = 0.0
+                for batch, batch_idx in enumerate(train_dataloader):
                     optimizer.zero_grad()
-                    # image = image.to(device)
-                    loss_t = self.super_training_step(temp_model,batch, batch_idx, types = 3)
-                    _loss_t += loss_t.item()
+                    temp_model(batch, padding = padding)
+                    out = temp_model.Uni_res['output']
+                    loss = criterion(out, batch['label'].to(temp_model.device))
+                    loss.backward() #
                     optimizer.step()
-
-                _loss_t /= len(train_dataloader)
-
-                if epoch == 0 or epoch == self.super_epoch - 1:
-                    with torch.no_grad():
-                        temp_model.eval()
-                        for batch_idx, batch in enumerate(test_dataloader):
-
-                            loss_t = self.super_training_step(model, batch, batch_idx, types = 3)
-                            _loss_t_test += loss_t.item()
-
-                        _loss_t_test /= len(test_dataloader)
-
-                        if epoch == 0:
-                            pre_t_loss_train = _loss_t
-                            pre_t_loss_test = _loss_t_test
-                        else:
-                            now_t_loss_train = _loss_t
-                            now_t_loss_test = _loss_t_test
-
-        # all
-        temp_model.load_state_dict(model.state_dict(),strict=True)
-        for epoch in range(self.super_epoch):
-            temp_model.train()
-            _loss_avt = 0.0
-            _loss_avt_test = 0.0
-            for batch_idx, batch in enumerate(train_dataloader):
-                optimizer.zero_grad()
-                label = batch['label'].to(model.device)
-                # image = image.to(device)
-                if self.modality == 3:
-                    _, _, _, out_avt = temp_model(batch, batch_idx)
-                else:
-                    _, _, out_avt = temp_model(batch, batch_idx)
-                loss_avt = criterion(out_avt, label)
-                loss_avt.backward()
-                _loss_avt += loss_avt.item()
-                optimizer.step()
-
-            _loss_avt /= len(train_dataloader)
-
-            if epoch == 0 or epoch == self.super_epoch - 1:
-                with torch.no_grad():
+                    _loss += loss.item()
+                if epoch == 0 or epoch == self.super_epoch - 1 :
                     temp_model.eval()
-                    for batch_idx,batch in enumerate(test_dataloader):
-                        label = batch['label'].to(model.device)
-                        if self.modality == 3:
-                            _, _, _, out_avt = temp_model(batch, batch_idx)
-                        else:
-                            _, _, out_avt = temp_model(batch, batch_idx)
-                        loss_avt = criterion(out_avt, label)
-                        _loss_avt_test += loss_avt.item()
-
-                    _loss_avt_test /= len(test_dataloader)
-
+                    _loss_v = 0
+                    for batch, batch_idx in enumerate(test_dataloader):
+                        temp_model(batch, padding = padding)
+                        out = temp_model.Uni_res['output']
+                        loss = criterion(out, batch['label'].to(temp_model.device))
+                        _loss_v += loss.item()
                     if epoch == 0:
-                        pre_avt_loss_train = _loss_avt
-                        pre_avt_loss_test = _loss_avt_test
+                        pre_train_loss = _loss
+                        pre_validation_loss = _loss_v
                     else:
-                        now_avt_loss_train = _loss_avt
-                        now_avt_loss_test = _loss_avt_test
+                        now_train_loss = _loss
+                        now_validation_loss = _loss_v
+            g = now_validation_loss - pre_validation_loss
+            o_pre = pre_validation_loss - pre_train_loss
+            o_now = now_validation_loss - now_train_loss
+            o = o_now - o_pre
+            weights[modality] = abs(g/(o**2))
+        sums = sum(weights.values())
+        info = ''
+        logger.info(f'super_epoch begin in {self.current_epoch}')
+        for modality in weights.keys():
+            weights[modality]/=sums
+            info += f'{modality} weight is {weights[modality]} || '
+        logger.info(info)
+        # pre_a_loss_train = 0.0
+        # pre_v_loss_train = 0.0
+        # pre_t_loss_train = 0.0
+        # pre_av_loss_train = 0.0
+        # pre_avt_loss_train = 0.0
+
+        # now_a_loss_train = 0.0
+        # now_v_loss_train = 0.0
+        # now_t_loss_train =0.0
+        # now_av_loss_train = 0.0
+        # now_avt_loss_train = 0.0
+
+        # pre_a_loss_test = 0.0
+        # pre_v_loss_test = 0.0
+        # pre_t_loss_test = 0.0
+        # pre_av_loss_test = 0.0
+        # pre_avt_loss_test = 0.0
+
+        # now_a_loss_test = 0.0
+        # now_v_loss_test = 0.0
+        # now_t_loss_test = 0.0
+        # now_av_loss_test = 0.0
+        # now_avt_loss_test = 0.0
+        # _loss_avt = 0.0
+        # _loss_av = 0.0
+        # _loss_a = 0.0
+        # _loss_v = 0.0
+        # _loss_t = 0.0
+        # _loss_av_test = 0.0
+        # _loss_a_test = 0.0
+        # _loss_v_test = 0.0
+        # _loss_t_test = 0.0
+        # _loss_avt_test = 0.0
+        # criterion = nn.CrossEntropyLoss()
+        # softmax = nn.Softmax(dim=1)
+        # print('super start')
+        # # train_dataloader = self.progbar_wrapper(
+        # #     train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
+        # # )
+        # train_dataloader = train_loader
+        # test_dataloader = test_loader
+        # # test_dataloader = self.progbar_wrapper(
+        # #     test_loader, total=min(len(test_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
+        # # )
+        # #audio flow
+        # temp_model.load_state_dict(model.state_dict(),strict=True)
+        # for epoch in range(self.super_epoch):
+        #     _loss_a = 0.0
+        #     _loss_a_test = 0.0
+        #     temp_model.train()
+        #     for batch_idx, batch in enumerate(train_dataloader):
+        #         optimizer.zero_grad()
+        #         # image = image.to(device)
+        #         loss_a = self.super_training_step(temp_model,batch, batch_idx, types = 1)
+        #         _loss_a += loss_a.item()
+        #         optimizer.step()
+
+
+        #     _loss_a /= len(train_dataloader)
+
+        #     if epoch == 0 or epoch == self.super_epoch - 1:
+        #         with torch.no_grad():
+        #             temp_model.eval()
+        #             for batch_idx, batch in enumerate(test_dataloader):
+        #                 loss_a = self.super_training_step(model, batch, batch_idx, types = 1)
+        #                 _loss_a_test += loss_a.item()
+        #             _loss_a_test /= len(test_dataloader)
+
+        #             if epoch == 0:
+        #                 pre_a_loss_train = _loss_a
+        #                 pre_a_loss_test = _loss_a_test
+        #             else:
+        #                 now_a_loss_train = _loss_a
+        #                 now_a_loss_test = _loss_a_test
+
+        # # visual
+        # temp_model.load_state_dict(model.state_dict(),strict=True)
+        # for epoch in range(self.super_epoch):
+        #     _loss_v = 0.0
+        #     _loss_v_test = 0.0
+        #     temp_model.train()
+        #     for batch_idx, batch in enumerate(train_dataloader):
+        #         optimizer.zero_grad()
+        #         # image = image.to(device)
+        #         loss_v = self.super_training_step(temp_model,batch, batch_idx, types = 2)
+        #         _loss_v += loss_v.item()
+        #         optimizer.step()
+
+        #     _loss_v /= len(train_dataloader)
+
+        #     if epoch == 0 or epoch == self.super_epoch - 1:
+        #         with torch.no_grad():
+        #             temp_model.eval()
+        #             for batch_idx, batch in enumerate(test_dataloader):
+
+        #                 loss_v = self.super_training_step(model, batch, batch_idx, types = 2)
+
+        #                 _loss_v_test += loss_v.item()
+
+        #             _loss_v_test /= len(test_dataloader)
+
+        #             if epoch == 0:
+        #                 pre_v_loss_train = _loss_v
+        #                 pre_v_loss_test = _loss_v_test
+        #             else:
+        #                 now_v_loss_train = _loss_v
+        #                 now_v_loss_test = _loss_v_test
+
+        # # text
+        # if self.modality == 3:
+        #     temp_model.load_state_dict(model.state_dict(),strict=True)
+        #     for epoch in range(self.super_epoch):
+        #         _loss_t = 0.0
+        #         _loss_t_test = 0.0
+        #         temp_model.train()
+        #         for batch_idx, batch in enumerate(train_dataloader):
+        #             optimizer.zero_grad()
+        #             # image = image.to(device)
+        #             loss_t = self.super_training_step(temp_model,batch, batch_idx, types = 3)
+        #             _loss_t += loss_t.item()
+        #             optimizer.step()
+
+        #         _loss_t /= len(train_dataloader)
+
+        #         if epoch == 0 or epoch == self.super_epoch - 1:
+        #             with torch.no_grad():
+        #                 temp_model.eval()
+        #                 for batch_idx, batch in enumerate(test_dataloader):
+
+        #                     loss_t = self.super_training_step(model, batch, batch_idx, types = 3)
+        #                     _loss_t_test += loss_t.item()
+
+        #                 _loss_t_test /= len(test_dataloader)
+
+        #                 if epoch == 0:
+        #                     pre_t_loss_train = _loss_t
+        #                     pre_t_loss_test = _loss_t_test
+        #                 else:
+        #                     now_t_loss_train = _loss_t
+        #                     now_t_loss_test = _loss_t_test
+
+        # # all
+        # temp_model.load_state_dict(model.state_dict(),strict=True)
+        # for epoch in range(self.super_epoch):
+        #     temp_model.train()
+        #     _loss_avt = 0.0
+        #     _loss_avt_test = 0.0
+        #     for batch_idx, batch in enumerate(train_dataloader):
+        #         optimizer.zero_grad()
+        #         label = batch['label'].to(model.device)
+        #         # image = image.to(device)
+        #         if self.modality == 3:
+        #             _, _, _, out_avt = temp_model(batch, batch_idx)
+        #         else:
+        #             _, _, out_avt = temp_model(batch, batch_idx)
+        #         loss_avt = criterion(out_avt, label)
+        #         loss_avt.backward()
+        #         _loss_avt += loss_avt.item()
+        #         optimizer.step()
+
+        #     _loss_avt /= len(train_dataloader)
+
+        #     if epoch == 0 or epoch == self.super_epoch - 1:
+        #         with torch.no_grad():
+        #             temp_model.eval()
+        #             for batch_idx,batch in enumerate(test_dataloader):
+        #                 label = batch['label'].to(model.device)
+        #                 if self.modality == 3:
+        #                     _, _, _, out_avt = temp_model(batch, batch_idx)
+        #                 else:
+        #                     _, _, out_avt = temp_model(batch, batch_idx)
+        #                 loss_avt = criterion(out_avt, label)
+        #                 _loss_avt_test += loss_avt.item()
+
+        #             _loss_avt_test /= len(test_dataloader)
+
+        #             if epoch == 0:
+        #                 pre_avt_loss_train = _loss_avt
+        #                 pre_avt_loss_test = _loss_avt_test
+        #             else:
+        #                 now_avt_loss_train = _loss_avt
+        #                 now_avt_loss_test = _loss_avt_test
             
-        g_a = pre_a_loss_test - now_a_loss_test
-        o_a_pre = pre_a_loss_test - pre_a_loss_train
-        o_a_now = now_a_loss_test - now_a_loss_train
-        o_a = o_a_now - o_a_pre
-        weight_a = abs(g_a / (o_a * o_a))
+        # g_a = pre_a_loss_test - now_a_loss_test
+        # o_a_pre = pre_a_loss_test - pre_a_loss_train
+        # o_a_now = now_a_loss_test - now_a_loss_train
+        # o_a = o_a_now - o_a_pre
+        # weight_a = abs(g_a / (o_a * o_a))
 
-        g_v = pre_v_loss_test - now_v_loss_test
-        o_v_pre = pre_v_loss_test - pre_v_loss_train
-        o_v_now = now_v_loss_test - now_v_loss_train
-        o_v = o_v_now - o_v_pre
-        weight_v = abs(g_v / (o_v * o_v))
+        # g_v = pre_v_loss_test - now_v_loss_test
+        # o_v_pre = pre_v_loss_test - pre_v_loss_train
+        # o_v_now = now_v_loss_test - now_v_loss_train
+        # o_v = o_v_now - o_v_pre
+        # weight_v = abs(g_v / (o_v * o_v))
 
-        if self.modality == 3:
-            g_t = pre_t_loss_test - now_t_loss_test
-            o_t_pre = pre_t_loss_test - pre_t_loss_train
-            o_t_now = now_t_loss_test - now_t_loss_train
-            o_t = o_t_now - o_t_pre
-            weight_t = abs(g_t / (o_t * o_t))
-        else:
-            weight_t = 0.0
+        # if self.modality == 3:
+        #     g_t = pre_t_loss_test - now_t_loss_test
+        #     o_t_pre = pre_t_loss_test - pre_t_loss_train
+        #     o_t_now = now_t_loss_test - now_t_loss_train
+        #     o_t = o_t_now - o_t_pre
+        #     weight_t = abs(g_t / (o_t * o_t))
+        # else:
+        #     weight_t = 0.0
 
-        g_avt = pre_avt_loss_test - now_avt_loss_test
-        o_avt_pre = pre_avt_loss_test - pre_avt_loss_train
-        o_avt_now = now_avt_loss_test - now_avt_loss_train
-        o_avt = o_avt_now - o_avt_pre
-        weight_avt = abs(g_avt / (o_avt * o_avt))
+        # g_avt = pre_avt_loss_test - now_avt_loss_test
+        # o_avt_pre = pre_avt_loss_test - pre_avt_loss_train
+        # o_avt_now = now_avt_loss_test - now_avt_loss_train
+        # o_avt = o_avt_now - o_avt_pre
+        # weight_avt = abs(g_avt / (o_avt * o_avt))
 
-        sums = weight_a + weight_v + weight_avt + weight_t
+        # sums = weight_a + weight_v + weight_avt + weight_t
 
-        weight_a /= sums
-        weight_v /= sums
-        weight_avt /= sums
-        weight_t /= sums
-        logger.info("super epoch in epoch {:0}".format(self.current_epoch))
-        logger.info("pre_a_loss_train:{:0}, pre_v_loss_train:{:1}, pre_avt_loss_train:{:2}".format(pre_a_loss_train, pre_v_loss_train, pre_avt_loss_train))
-        logger.info("now_a_loss_train:{:0}, now_v_loss_train:{:1}, now_avt_loss_train:{:2}".format(now_a_loss_train, now_v_loss_train, now_avt_loss_train))
-        return weight_a, weight_v, weight_t, weight_avt
+        # weight_a /= sums
+        # weight_v /= sums
+        # weight_avt /= sums
+        # weight_t /= sums
+        # logger.info("super epoch in epoch {:0}".format(self.current_epoch))
+        # logger.info("pre_a_loss_train:{:0}, pre_v_loss_train:{:1}, pre_avt_loss_train:{:2}".format(pre_a_loss_train, pre_v_loss_train, pre_avt_loss_train))
+        # logger.info("now_a_loss_train:{:0}, now_v_loss_train:{:1}, now_avt_loss_train:{:2}".format(now_a_loss_train, now_v_loss_train, now_avt_loss_train))
+        return weights

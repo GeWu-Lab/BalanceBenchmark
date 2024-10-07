@@ -10,7 +10,7 @@ from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 import lightning as L
 import torch
-
+from ..evaluation.complex import profile_flops
 
 class OGMTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
@@ -21,6 +21,7 @@ class OGMTrainer(BaseTrainer):
         self.modulation_ends = method_dict['modulation_ends']
         # self.modality = method_dict['modality']
 
+    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,
