@@ -51,6 +51,7 @@ def create_config(config_dict: dict):
         name = Trainer_name.split("Trainer", 1)[0]
         config_dict['trainer'] = trainer_settings['trainer_para'][name] 
         config_dict['trainer']['base_para'] = trainer_settings['trainer_para']['base']
+        config_dict['trainer']['name'] = name
         
     except:
         raise ValueError("Wrong Trainer setting")

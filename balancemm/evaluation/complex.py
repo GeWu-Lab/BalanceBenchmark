@@ -27,6 +27,8 @@ def profile_flops(logger=None):
                          profile_memory=True) as prof:
                 with record_function(func.__name__):
                     result = func(self, *args, **kwargs)
+                    torch.cuda.synchronize()
+                    print('end')
             
             max_memory = 0
             for event in prof.key_averages():

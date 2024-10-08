@@ -21,7 +21,6 @@ class OGMTrainer(BaseTrainer):
         self.modulation_ends = method_dict['modulation_ends']
         # self.modality = method_dict['modality']
 
-    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,
@@ -44,7 +43,9 @@ class OGMTrainer(BaseTrainer):
 
         """
         self.fabric.call("on_train_epoch_start")
-
+        all_modalitys = list(model.modalitys)
+        all_modalitys.append('output')
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -71,6 +72,7 @@ class OGMTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -83,8 +85,7 @@ class OGMTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-
-        self.fabric.call("on_train_epoch_end")
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
     
     def training_step(self, model : BaseClassifierModel, batch, batch_idx):
 
@@ -138,7 +139,7 @@ class OGMTrainer(BaseTrainer):
 
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
             for name, parms in model.named_parameters():
-                layer = str(name).split('.')[1]
+                layer = str(name)
                 for modality in modality_list:
 
                     if modality in layer and len(parms.grad.size()) != 1: ##Don't change the grad of bias for layer

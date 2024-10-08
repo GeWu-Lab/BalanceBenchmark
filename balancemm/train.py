@@ -51,10 +51,6 @@ def train_and_test(args: dict):
     train_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
     args.trainer['checkpoint_dir'] = args.checkpoint_dir ##
     model = create_model(args.model)
-    if hasattr(args.trainer, 'name') and args.trainer['name'] == 'GBlending':
-        args.model['type'] = args.model['type'] + '_gb'
-        model = create_model(args.model)
-        temp_model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
     trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger)
@@ -68,7 +64,8 @@ def train_and_test(args: dict):
         
     # 记录开始时间
     start_time = datetime.now()
-    if args.trainer['name'] == 'GBlending':
+    if args.trainer['name'] == 'GBlendingTrainer':
+        temp_model = create_model(args.model)
         temp_model.to(device)
         temp_model.device = device
         trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger)

@@ -6,15 +6,15 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "MMCosineTrainer"
-  device: '2'
-  dataset: Balance
+  trainer: "AGMTrainer"
+  device: '0'
+  dataset: UCF
 
 Train:
-  dataset: Balance
+  dataset: UCF
 
 Test:
-  dataset: Balance
+  dataset: UCF
 
 # dataset:
 #   dataloader:

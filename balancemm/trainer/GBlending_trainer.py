@@ -82,6 +82,7 @@ class GBlendingTrainer(BaseTrainer):
             if self.current_epoch % self.super_epoch == 0:
                 model.train()
                 weights = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, optimizer,logger)
+                logger.info(weights)
             model.train()
             self.train_loop(
                 model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg,
@@ -152,7 +153,6 @@ class GBlendingTrainer(BaseTrainer):
         # reset for next fit call
         self.should_stop = False
         
-    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,
@@ -160,10 +160,7 @@ class GBlendingTrainer(BaseTrainer):
         train_loader: torch.utils.data.DataLoader,
         limit_batches: Union[int, float] = float("inf"),
         scheduler_cfg: Optional[Mapping[str, Union[L.fabric.utilities.types.LRScheduler, bool, str, int]]] = None,
-        weight_a = 1,
-        weight_v = 1,
-        weight_t = 1,
-        weight_avt = 1.
+        weights : dict = None
     ):
         """The training loop running a single training epoch.
 
@@ -179,7 +176,9 @@ class GBlendingTrainer(BaseTrainer):
 
         """
         self.fabric.call("on_train_epoch_start")
-
+        all_modalitys = list(model.modalitys)
+        all_modalitys.append('output')
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -200,10 +199,7 @@ class GBlendingTrainer(BaseTrainer):
                 # optimizer step runs train step internally through closure
                 loss = self.training_step( model=model, batch=batch, 
                                                               batch_idx=batch_idx, 
-                                                              weight_a= weight_a,
-                                                              weight_v= weight_v,
-                                                              weight_t= weight_t,
-                                                              weight_avt= weight_avt
+                                                              weights = weights
                                                               )
                 optimizer.step()
                 self.fabric.call("on_before_zero_grad", optimizer)
@@ -214,6 +210,7 @@ class GBlendingTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -226,6 +223,7 @@ class GBlendingTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
 
         self.fabric.call("on_train_epoch_end")
     
@@ -255,13 +253,9 @@ class GBlendingTrainer(BaseTrainer):
         temp_model.load_state_dict(model.state_dict(),strict=True)
         criterion = nn.CrossEntropyLoss()
         weights = {}
-        train_dataloader = self.progbar_wrapper(
-            train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
-        )
-        test_dataloader = self.progbar_wrapper(
-            test_loader, total=min(len(test_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
-        )
-        for modality in temp_model.Uni_res.keys():
+        modalitys = list(temp_model.modalitys)
+        modalitys.append('output')
+        for modality in modalitys:
             temp_model.load_state_dict(model.state_dict(),strict=True)
             padding = []
             pre_train_loss = 0
@@ -274,7 +268,14 @@ class GBlendingTrainer(BaseTrainer):
             for epoch in range(self.super_epoch):
                 temp_model.train()
                 _loss = 0.0
-                for batch, batch_idx in enumerate(train_dataloader):
+                train_dataloader = self.progbar_wrapper(
+                train_loader, total=min(len(train_loader), limit_batches), desc=f"Super_Epoch {epoch}"
+                )
+                if epoch == 0 or epoch == self.super_epoch - 1 :
+                    test_dataloader = self.progbar_wrapper(
+                        test_loader, total=min(len(test_loader), limit_batches), desc=f"Validation in Super_epoch {epoch}"
+                    )
+                for batch_idx, batch in enumerate(train_dataloader):
                     optimizer.zero_grad()
                     temp_model(batch, padding = padding)
                     out = temp_model.Uni_res['output']
@@ -284,18 +285,19 @@ class GBlendingTrainer(BaseTrainer):
                     _loss += loss.item()
                 if epoch == 0 or epoch == self.super_epoch - 1 :
                     temp_model.eval()
-                    _loss_v = 0
-                    for batch, batch_idx in enumerate(test_dataloader):
-                        temp_model(batch, padding = padding)
-                        out = temp_model.Uni_res['output']
-                        loss = criterion(out, batch['label'].to(temp_model.device))
-                        _loss_v += loss.item()
-                    if epoch == 0:
-                        pre_train_loss = _loss
-                        pre_validation_loss = _loss_v
-                    else:
-                        now_train_loss = _loss
-                        now_validation_loss = _loss_v
+                    with torch.no_grad():
+                        _loss_v = 0
+                        for batch_idx, batch in enumerate(test_dataloader):
+                            temp_model(batch, padding = padding)
+                            out = temp_model.Uni_res['output']
+                            loss = criterion(out, batch['label'].to(temp_model.device))
+                            _loss_v += loss.item()
+                        if epoch == 0:
+                            pre_train_loss = _loss
+                            pre_validation_loss = _loss_v
+                        else:
+                            now_train_loss = _loss
+                            now_validation_loss = _loss_v
             g = now_validation_loss - pre_validation_loss
             o_pre = pre_validation_loss - pre_train_loss
             o_now = now_validation_loss - now_train_loss

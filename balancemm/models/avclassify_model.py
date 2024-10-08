@@ -179,6 +179,7 @@ class BaseClassifier_AMCoModel(BaseClassifierModel):
         return self.encoder_res
     
     def Unimodality_Calculate(self, mask= None, dependent_modality = {}) -> dict[str, torch.Tensor]:
+        softmax = nn.Softmax(dim = 1)
         modality_nums = 0
         all_nums = len(self.encoder_res.keys())-1
         self.Uni_res = {}
@@ -200,6 +201,9 @@ class BaseClassifier_AMCoModel(BaseClassifierModel):
             self.Uni_res['output'] += self.Uni_res[modality]
             modality_nums += 1
         self.encoder_res['output'] = self.Uni_res['output']
+        for modality in self.Uni_res.keys():
+            softmax_res = softmax(self.Uni_res[modality])
+            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
         return self.Uni_res
     
     
