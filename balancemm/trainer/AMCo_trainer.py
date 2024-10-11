@@ -16,7 +16,7 @@ import lightning as L
 import torch
 import numpy as np
 from ..models.avclassify_model import BaseClassifierModel
-
+from ..evaluation.complex import profile_flops
 class AMCoTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(AMCoTrainer,self).__init__(fabric,**para_dict)
@@ -29,6 +29,7 @@ class AMCoTrainer(BaseTrainer):
         self.U = method_dict['U']
         self.eps = method_dict['eps']
         self.modality = method_dict['modality']
+    
     def train_loop(
         self,
         model: BaseClassifierModel,
@@ -185,7 +186,9 @@ class AMCoTrainer_2(BaseTrainer):
 
         """
         self.fabric.call("on_train_epoch_start")
-
+        all_modalitys = list(model.modalitys)
+        all_modalitys.append('output')
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -230,6 +233,7 @@ class AMCoTrainer_2(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -242,8 +246,7 @@ class AMCoTrainer_2(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-
-        self.fabric.call("on_train_epoch_end")
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
     
     def training_step(self, model, batch, batch_idx, dependent_modality, mask ,pt):
 

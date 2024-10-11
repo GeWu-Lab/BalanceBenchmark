@@ -5,7 +5,7 @@ trainer_para:
   baseline:
     alpha: 0.3
     method: 'None'
-    modulation_starts: 10
+    modulation_starts: 0
     modulation_ends: 80
     modality: 2
   OGM:
@@ -16,13 +16,13 @@ trainer_para:
   AGM:
     alpha: 0.1
     method: "None"
-    modulation_starts: 10
+    modulation_starts: 0
     modulation_ends: 80
     modality: 2
   AMCo:
     alpha: 0.1
     method: "None"
-    modulation_starts: 10
+    modulation_starts: 0
     modulation_ends: 80
     sigma: 0.5
     U: 512
@@ -37,8 +37,8 @@ trainer_para:
     modality: 2
   GBlending:
     alpha: 0.1
-    method: "None"
-    modulation_starts: 10
+    method: "online"
+    modulation_starts: 0
     modulation_ends: 80
     super_epoch: 10
     modality: 2

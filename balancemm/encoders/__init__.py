@@ -54,5 +54,7 @@ def create_encoders(encoder_opt: dict[str, dict])->dict[str, nn.Module]:
                 del state['conv1.weight']
             encoders[modality].load_state_dict(state, strict=False)
             print('pretrain load finish')
+        encoder_opt[modality]['if_pretrain'] = pre_train
+        encoder_opt[modality]['pretrain_path'] = path
         print (f'Encoder {name} - {modality} is created.')
     return encoders

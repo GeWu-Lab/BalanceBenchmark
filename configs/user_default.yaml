@@ -11,10 +11,10 @@ Main_config:
   dataset: Balance
 
 Train:
-  dataset: Balance
+  dataset: UCF
 
 Test:
-  dataset: Balance
+  dataset: UCF
 
 # dataset:
 #   dataloader:
