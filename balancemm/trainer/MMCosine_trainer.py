@@ -61,7 +61,7 @@ class MMCosineTrainer(BaseTrainer):
         
         self.scaling = method_dict['scaling']
 
-    @profile_flops()
+    # @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -150,15 +150,15 @@ class MMCosineTrainer(BaseTrainer):
         m['out'] = model.encoder_res['output']
         # nce_loss = NCE(m[key[0]], m[key[1]], label)
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-            size = model.fusion_module.fc_out.weight.size(1)
+            # size = model.fusion_module.fc_out.weight.size(1)
             Uni_res = {}
             if len(key) == 2:
-                Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :size//2], 0, 1), dim=0))
-                Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, size//2:], 0, 1), dim=0))
+                Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :m[key[0]].size(1)], 0, 1), dim=0))
+                Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1):], 0, 1), dim=0))
             if len(key) == 3:
-                Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :size//3], 0, 1), dim=0))
-                Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, size//3:2*size//3], 0, 1), dim=0))
-                Uni_res[key[2]] = torch.mm(F.normalize(m[key[2]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, 2*size//3:], 0, 1), dim=0))
+                Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :m[key[0]].size(1)], 0, 1), dim=0))
+                Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1):m[key[0]].size(1)+m[key[1]].size(1)], 0, 1), dim=0))
+                Uni_res[key[2]] = torch.mm(F.normalize(m[key[2]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1)+m[key[1]].size(1):], 0, 1), dim=0))
             for modality in modality_list:
                 Uni_res[modality] = Uni_res[modality] * self.scaling
             # out_a = torch.mm(F.normalize(a, dim=1),

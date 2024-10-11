@@ -6,8 +6,8 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "MMCosineTrainer"
-  device: '2'
+  trainer: "PMRTrainer"
+  device: '0'
   dataset: Balance
 
 Train:
