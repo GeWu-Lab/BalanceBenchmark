@@ -43,17 +43,18 @@ trainer_para:
     super_epoch: 10
     modality: 2
   PMR:
-    alpha: 0.1
+    alpha: 1
     method: "None"
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
     embed_dim: 512
     momentum_coef: 0.5
+    mu: 0.01
   MBSD:
     alpha: 0.1
     method: "None"
-    modulation_starts: 10
+    modulation_starts: 0
     modulation_ends: 80
     modality: 2
   MMCosine:
@@ -62,4 +63,4 @@ trainer_para:
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
-    scaling: 5
+    scaling: 13

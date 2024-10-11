@@ -6,9 +6,9 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "AGMTrainer"
+  trainer: "PMRTrainer"
   device: '0'
-  dataset: UCF
+  dataset: Balance
 
 Train:
   dataset: UCF
