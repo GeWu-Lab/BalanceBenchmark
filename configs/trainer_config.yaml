@@ -9,7 +9,7 @@ trainer_para:
     modulation_ends: 80
     modality: 2
   OGM:
-    alpha: 0.3
+    alpha: 0.5
     method: 'OGM_GE'
     modulation_starts: 10 #
     modulation_ends: 80
@@ -33,27 +33,28 @@ trainer_para:
     method: "None"
     modulation_starts: 0
     modulation_ends: 80
-    lam: 5
+    lam: 0.2
     modality: 2
   GBlending:
     alpha: 0.1
-    method: "offline"
+    method: "online"
     modulation_starts: 0
     modulation_ends: 80
     super_epoch: 10
     modality: 2
   PMR:
-    alpha: 0.1
+    alpha: 1
     method: "None"
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
     embed_dim: 512
     momentum_coef: 0.5
+    mu: 0.01
   MBSD:
     alpha: 0.1
     method: "None"
-    modulation_starts: 10
+    modulation_starts: 0
     modulation_ends: 80
     modality: 2
   MMCosine:
@@ -62,4 +63,4 @@ trainer_para:
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
-    scaling: 5
+    scaling: 10

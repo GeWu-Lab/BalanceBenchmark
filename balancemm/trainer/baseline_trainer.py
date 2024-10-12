@@ -15,7 +15,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 import lightning as L
 import torch
 from ..models.avclassify_model import BaseClassifierModel
-from ..evaluation.complex import profile_flops
+from ..evaluation.complex import get_flops
 class baselineTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(baselineTrainer,self).__init__(fabric,**para_dict)
@@ -26,7 +26,6 @@ class baselineTrainer(BaseTrainer):
         self.modality = method_dict['modality']
 
         ##new
-    @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -49,11 +48,20 @@ class baselineTrainer(BaseTrainer):
 
         """
         self.fabric.call("on_train_epoch_start")
-
+        all_modalitys = list(model.modalitys)
+        all_modalitys.append('output')
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
-
+        if self.current_epoch == 0:
+            for batch_idx, batch in enumerate(iterable):
+                batch_sample = batch
+                break
+            print(batch_sample.keys())
+            model_flops, _ =get_flops(model = model, input_sample = batch_sample)
+            self.FlopsMonitor.update(model_flops / len(batch_sample['label']) * len(train_loader), 'forward')
+            self.FlopsMonitor.report(logger = self.logger)
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -77,6 +85,7 @@ class baselineTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -89,9 +98,8 @@ class baselineTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
-    
     def training_step(self, model: BaseClassifierModel, batch, batch_idx):
 
         # TODO: make it simpler and easier to extend
@@ -102,7 +110,7 @@ class baselineTrainer(BaseTrainer):
         #     a, v, out = model(batch)
         # else:
         #     a, v, t, out = model(batch)
-        _ = model.validation_step(batch= batch, batch_idx= batch_idx, limit_modality = model.modalitys)
+        _ = model(batch= batch)
         out = model.encoder_res['output']        
         loss = criterion(out, label)
         loss.backward()

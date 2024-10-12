@@ -2,6 +2,7 @@ from .utils.logger import setup_logger
 from .models import create_model
 from .trainer import create_trainer
 from .utils.train_utils import choose_logger
+import subprocess
 from .utils.data_utils import create_train_val_dataloader
 from types import SimpleNamespace
 from .utils.optimizer import create_optimizer
@@ -32,18 +33,19 @@ def train_and_test(args: dict):
     logger.addHandler(file_handler)
     loggers = [logger]
     logger.setLevel(logging.DEBUG)
-    for logger in loggers:
-        if isinstance(logger, L.fabric.loggers.CSVLogger):
-            os.makedirs(os.path.join(log_dir, 'csv'), exist_ok=True)
-        elif isinstance(logger, L.fabric.loggers.TensorBoardLogger):
-            os.makedirs(os.path.join(log_dir, 'tensorboard'), exist_ok=True)
-        elif isinstance(logger, L.pytorch.loggers.wandb.WandbLogger):
-            os.makedirs(os.path.join(log_dir, 'wandb'), exist_ok=True)
     logger.info(dict_args)
+    for tb_logger in loggers_online:
+        if isinstance(tb_logger, L.fabric.loggers.CSVLogger):
+            os.makedirs(os.path.join(log_dir, 'csv'), exist_ok=True)
+        elif isinstance(tb_logger, L.fabric.loggers.TensorBoardLogger):
+            os.makedirs(os.path.join(log_dir, 'tensorboard'), exist_ok=True)
+        elif isinstance(tb_logger, L.pytorch.loggers.wandb.WandbLogger):
+            os.makedirs(os.path.join(log_dir, 'wandb'), exist_ok=True)
+    if tb_logger:
+        tb_logger.log_hyperparams(dict_args)
     fabric = Fabric(**(args.fabric),
                     loggers = loggers,
                     )
-
     if isinstance(fabric.accelerator, L.fabric.accelerators.CUDAAccelerator):
         fabric.print('set float32 matmul precision to high')
         torch.set_float32_matmul_precision('high')
@@ -51,13 +53,9 @@ def train_and_test(args: dict):
     train_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
     args.trainer['checkpoint_dir'] = args.checkpoint_dir ##
     model = create_model(args.model)
-    if hasattr(args.trainer, 'name') and args.trainer['name'] == 'GBlending':
-        args.model['type'] = args.model['type'] + '_gb'
-        model = create_model(args.model)
-        temp_model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
-    trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger)
+    trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger,tb_logger)
     device = args.Main_config['device']
     if device == '':
         device = torch.device('cpu')
@@ -68,12 +66,13 @@ def train_and_test(args: dict):
         
     # 记录开始时间
     start_time = datetime.now()
-    if args.trainer['name'] == 'GBlending':
+    if args.trainer['name'] == 'GBlendingTrainer':
+        temp_model = create_model(args.model)
         temp_model.to(device)
         temp_model.device = device
-        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger)
+        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger)
     else :
-        trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger) 
+        trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger) 
     end_time = datetime.now()
     total_time = end_time - start_time
     total_time = total_time.total_seconds() / 3600

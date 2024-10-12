@@ -8,13 +8,14 @@ Main_config:
   tasks: "Classifier" #
   trainer: "AGMTrainer"
   device: '2'
-  dataset: UMPC_Food
+  dataset: Cremad
 
 Train:
-  dataset: UMPC_Food
+  dataset: Cremad
 
 Test:
-  dataset: UMPC_Food
+  dataset: Cremad
+
 
 # dataset:
 #   dataloader:
