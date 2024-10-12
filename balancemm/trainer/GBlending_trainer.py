@@ -38,6 +38,7 @@ class GBlendingTrainer(BaseTrainer):
         optimizer: torch.optim.Optimizer,
         scheduler_cfg: torch.optim.lr_scheduler,
         logger,
+        tb_logger,
         ckpt_path: Optional[str] = None,
     ):
         """The main entrypoint of the trainer, triggering the actual training.
@@ -78,10 +79,17 @@ class GBlendingTrainer(BaseTrainer):
 
         weights = {}
         while not self.should_stop:
+            if tb_logger:
+                tb_logger.log_hyperparams({"epochs": self.current_epoch})
             if self.current_epoch % self.super_epoch == 0:
                 model.train()
                 weights = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, optimizer,logger)
                 logger.info(weights)
+                if tb_logger:
+                    for modality in weights.keys():
+                        tb_logger.log_metrics({
+                            f"super weights_{modality}": weights[modality]
+                        }, step=self.current_epoch)
             model.train()
             self.train_loop(
                 model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg,
@@ -98,23 +106,45 @@ class GBlendingTrainer(BaseTrainer):
                     for modality in sorted(valid_acc.keys()):
                         if modality == 'output':
                             output_info += f"train_acc: {valid_acc[modality]}"
+                            if tb_logger:
+                                tb_logger.log_metrics({
+                                    "train_acc": valid_acc[modality]
+                                }, step=self.current_epoch)
                         else:
                             info += f", acc_{modality}: {valid_acc[modality]}"
+                            if tb_logger:
+                                tb_logger.log_metrics({
+                                    f"acc_{modality}": valid_acc[modality]
+                                }, step=self.current_epoch)
+                        
                 if metircs == 'f1':
                     valid_f1 = Metrics_res[metircs]
                     for modality in sorted(valid_f1.keys()):
                         if modality == 'output':
                             output_info += f", train_f1: {valid_f1[modality]}"
+                            if tb_logger:
+                                tb_logger.log_metrics({
+                                    "train_f1": valid_f1[modality]
+                                }, step=self.current_epoch)
                         else:
                             info += f", f1_{modality}: {valid_f1[modality]}"
-            info = output_info+ ', ' + info
-            logger.info(info)
-
+                            if tb_logger:
+                                tb_logger.log_metrics({
+                                    f"f1_{modality}": valid_f1[modality]
+                                }, step=self.current_epoch)
+                info = output_info+ ', ' + info
+                    
+                logger.info(info)
+                self.PrecisionCalculator.ClearAll()
             if self.should_validate:
                 model.eval()
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
                 info = f'valid_loss: {valid_loss}'
                 output_info = ''
+                if tb_logger:
+                    tb_logger.log_metrics({
+                        'valid_loss': valid_loss,
+                    }, step=self.current_epoch)
                 ##parse the Metrics
                 for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':
@@ -122,15 +152,32 @@ class GBlendingTrainer(BaseTrainer):
                         for modality in sorted(valid_acc.keys()):
                             if modality == 'output':
                                 output_info += f"valid_acc: {valid_acc[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        "valid_acc": valid_acc[modality]
+                                    }, step=self.current_epoch)
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        f"acc_{modality}": valid_acc[modality]
+                                    }, step=self.current_epoch)
+                                
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
                         for modality in sorted(valid_f1.keys()):
                             if modality == 'output':
                                 output_info += f", valid_f1: {valid_f1[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        "valid_f1": valid_f1[modality]
+                                    }, step=self.current_epoch)
                             else:
                                 info += f", f1_{modality}: {valid_f1[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        f"f1_{modality}": valid_f1[modality]
+                                    }, step=self.current_epoch)
                 info = output_info+ ', ' + info
                     
                 logger.info(info)

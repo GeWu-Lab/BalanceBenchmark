@@ -126,7 +126,8 @@ if __name__ == "__main__":
 
     # get args from cli
     args = sys.argv[1:]
-
+    os.environ['http_proxy'] = ''
+    os.environ['https_proxy'] = ''
     # get yaml config path and load, if not specified, use user_default
     default_config_path = osp.join(root_path, "configs", "user_default.yaml")
     config_path = ensure_and_get_config_path(args, default_config_path)
