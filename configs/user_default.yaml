@@ -6,15 +6,22 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "PMRTrainer"
-  device: '0'
-  dataset: Balance
+  trainer: "AGMTrainer"
+  device: '2'
+  dataset: Cremad
 
 Train:
+<<<<<<< HEAD
   dataset: Balance
 
 Test:
   dataset: Balance
+=======
+  dataset: Cremad
+
+Test:
+  dataset: Cremad
+>>>>>>> 1d19353856f1898be190e174d7aa29bf0fecc284
 
 # dataset:
 #   dataloader:
