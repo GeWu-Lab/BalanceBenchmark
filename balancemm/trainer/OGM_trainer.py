@@ -21,7 +21,6 @@ class OGMTrainer(BaseTrainer):
         self.modulation_ends = method_dict['modulation_ends']
         # self.modality = method_dict['modality']
 
-    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,

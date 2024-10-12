@@ -4,9 +4,9 @@ import torch
 from thop import profile
 from ..models.avclassify_model import BaseClassifierModel
 from typing import Callable, Any, Tuple
-## flops库 
-## 命名规范
 from torch.profiler import profile, record_function, ProfilerActivity
+## thop flops
+from thop import profile
 import functools
 
 def profile_flops(logger=None):

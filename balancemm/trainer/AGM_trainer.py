@@ -20,6 +20,8 @@ from ..evaluation.modalitys import generate_all_combinations
 from copy import deepcopy
 import math
 from collections import defaultdict
+from ..evaluation.complex import profile_flops
+import os
 class Modality_out(nn.Module):
     def __init__(self):
         super().__init__()
@@ -217,48 +219,55 @@ class GradMod_2(nn.Module):
 
 class newGrad(nn.Module):
     def __init__(self, model):
+        super().__init__()
         self.model = model
     def forward(self, batch):
         modalitys = list(self.model.modalitys)
         modality_nums = len(modalitys)
         res = {}
         res_cache = {}
-        for modality in modalitys:
-            temp_modality = deepcopy(modality)
-            temp_modality.remove(modality)
-            combinations = generate_all_combinations(temp_modality, include_empty= False)
-            for combo in combinations:
-                indentifer = tuple(sorted(combo))
-                l = len(combo)
-                weight = math.factorial(l)*math.factorial(modality_nums - l - 1)/ math.factorial(modality_nums)
-                if res_cache.get(indentifer,0) == 0:
-                    padding = []
-                    for another in modalitys:
-                        if another not in combo:
-                            padding.append(another)
-                    self.model(batch, padding = padding)
-                    out = self.model.Uni_res['output']
-                    res_cache[indentifer] = out
-                else:
-                    out = res_cache[indentifer]
-                combo_add = deepcopy(combo).append(modality)
-                indentifer = tuple(sorted(combo_add))
-                if res_cache.get(indentifer,0) == 0:
-                    padding = []
-                    for another in modalitys:
-                        if another not in combo_add:
-                            padding.append(another)
-                    self.model(batch, padding = padding)
-                    out_add = self.model.Uni_res['output']
-                    res_cache[indentifer] = out_add
-                else:
-                    out_add = res_cache[indentifer]
+        with torch.no_grad():
+            self.model.eval()
+            for modality in modalitys:
+                temp_modality = deepcopy(modalitys)
+                temp_modality.remove(modality)
+                combinations = generate_all_combinations(temp_modality, include_empty= False)
+                for combo in combinations:
+                    indentifer = tuple(sorted(combo))
+                    l = len(combo)
+                    weight = math.factorial(l)*math.factorial(modality_nums - l - 1)/ math.factorial(modality_nums)
+                    if indentifer not in res_cache.keys():
+                        padding = []
+                        for another in modalitys:
+                            if another not in combo:
+                                padding.append(another)
+                        self.model(batch, padding = padding)
+                        out = self.model.Uni_res['output']
+                        res_cache[indentifer] = out
+                    else:
+                        out = res_cache[indentifer]
+                    combo_add = deepcopy(combo)
+                    combo_add.append(modality)
+                    indentifer = tuple(sorted(combo_add))
+                    if indentifer not in res_cache.keys():
+                        padding = []
+                        for another in modalitys:
+                            if another not in combo_add:
+                                padding.append(another)
+                        self.model(batch, padding = padding)
+                        out_add = self.model.Uni_res['output']
+                        res_cache[indentifer] = out_add
+                    else:
+                        out_add = res_cache[indentifer]
 
-                if res.get(modality,0) == 0:
-                    res[modality] = weight * (out_add - out)
-                else:
-                    res[modality] += weight * (out_add - out)
-        return res
+                    if modality not in res.keys():
+                        res[modality] = weight * (out_add - out)
+                    else:
+                        res[modality] += weight * (out_add - out)
+        self.model.train()
+        self.model(batch)
+        out = self.model.Uni_res['output']
+        return res, out
                 
             
 class AGMTrainer(BaseTrainer):
@@ -270,6 +279,127 @@ class AGMTrainer(BaseTrainer):
         self.modality = method_dict['modality']
         self.starts = 0
 
+    def fit(
+        self,
+        model,
+        train_loader: torch.utils.data.DataLoader,
+        val_loader: torch.utils.data.DataLoader,
+        optimizer: torch.optim.Optimizer,
+        scheduler_cfg: torch.optim.lr_scheduler,
+        logger ,
+        ckpt_path: Optional[str] = None,
+    ):
+        """The main entrypoint of the trainer, triggering the actual training.
+
+        Args:
+            model: the LightningModule to train.
+                Can have the same hooks as :attr:`callbacks` (see :meth:`MyCustomTrainer.__init__`).
+            train_loader: the training dataloader. Has to be an iterable returning batches.
+            val_loader: the validation dataloader. Has to be an iterable returning batches.
+                If not specified, no validation will run.
+            ckpt_path: Path to previous checkpoints to resume training from.
+                If specified, will always look for the latest checkpoint within the given directory.
+
+        """
+        print(self.max_epochs)
+        # self.fabric.launch()
+        # setup calculator
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
+        # setup dataloaders
+        if self.should_train:
+            train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
+        if val_loader is not None:
+            val_loader = self.fabric.setup_dataloaders(val_loader, use_distributed_sampler=self.use_distributed_sampler)
+        # optimizer, scheduler_cfg = self._parse_optimizers_schedulers(model.configure_optimizers())
+        # assert optimizer is not None
+        # model, optimizer = self.fabric.setup(model, optimizer)
+
+        # assemble state (current epoch and global step will be added in save)
+        state = {"model": model, "optim": optimizer, "scheduler": scheduler_cfg}
+
+        # load last checkpoint if available
+        if ckpt_path is not None and os.path.isdir(ckpt_path):
+            latest_checkpoint_path = self.get_latest_checkpoint(self.checkpoint_dir)
+            if latest_checkpoint_path is not None:
+                self.load(state, latest_checkpoint_path)
+
+                # check if we even need to train here
+                if self.max_epochs is not None and self.current_epoch >= self.max_epochs:
+                    self.should_stop = True
+
+        while not self.should_stop:
+            if self.should_train:
+                model.train()
+                self.train_loop(
+                    model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg
+                )
+                logger.info("epoch: {:0}  ".format(self.current_epoch))
+                logger.info(self.train_scores)
+                output_info = ''
+                info = ''
+                ##parse the Metrics
+                Metrics_res = self._current_metrics
+                for metircs in sorted(Metrics_res.keys()):
+                    if metircs == 'acc':
+                        valid_acc = Metrics_res[metircs]
+                        for modality in sorted(valid_acc.keys()):
+                            if modality == 'output':
+                                output_info += f"train_acc: {valid_acc[modality]}"
+                            else:
+                                info += f", acc_{modality}: {valid_acc[modality]}"
+                    if metircs == 'f1':
+                        valid_f1 = Metrics_res[metircs]
+                        for modality in sorted(valid_f1.keys()):
+                            if modality == 'output':
+                                output_info += f", train_f1: {valid_f1[modality]}"
+                            else:
+                                info += f", f1_{modality}: {valid_f1[modality]}"
+                info = output_info+ ', ' + info
+                    
+                logger.info(info)
+                self.PrecisionCalculator.ClearAll()
+            if self.should_validate:
+                model.eval()
+                valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
+                info = f'valid_loss: {valid_loss}'
+                output_info = ''
+                ##parse the Metrics
+                for metircs in sorted(Metrics_res.keys()):
+                    if metircs == 'acc':
+                        valid_acc = Metrics_res[metircs]
+                        for modality in sorted(valid_acc.keys()):
+                            if modality == 'output':
+                                output_info += f"valid_acc: {valid_acc[modality]}"
+                            else:
+                                info += f", acc_{modality}: {valid_acc[modality]}"
+                    if metircs == 'f1':
+                        valid_f1 = Metrics_res[metircs]
+                        for modality in sorted(valid_f1.keys()):
+                            if modality == 'output':
+                                output_info += f", valid_f1: {valid_f1[modality]}"
+                            else:
+                                info += f", f1_{modality}: {valid_f1[modality]}"
+                info = output_info+ ', ' + info
+                    
+                logger.info(info)
+                for handler in logger.handlers:
+                    handler.flush()
+            # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
+            if scheduler_cfg is not None:
+                scheduler_cfg.step()
+
+            self.current_epoch += 1
+
+            # stopping condition on epoch level
+            if self.max_epochs is not None and self.current_epoch >= self.max_epochs:
+                self.should_stop = True
+            
+            if self.should_save and self.should_train:
+                self.save(state)
+                self.should_save = False
+
+        # reset for next fit call
+        self.should_stop = False
     def train_loop(
         self,
         model: L.LightningModule,
@@ -291,6 +421,9 @@ class AGMTrainer(BaseTrainer):
                 for supported values.
 
         """
+        all_modalitys = list(model.modalitys)
+        all_modalitys.append('output')
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         self.fabric.call("on_train_epoch_start")
         self.starts += 1
         iterable = self.progbar_wrapper(
@@ -301,7 +434,7 @@ class AGMTrainer(BaseTrainer):
         if self.starts == 1:
             train_scores = {}
             for modality in model.modalitys:
-                train_scores[modality] = 0
+                train_scores[modality] = torch.tensor(0)
         else:
             train_scores = self.train_scores
         for batch_idx, batch in enumerate(iterable):
@@ -322,6 +455,7 @@ class AGMTrainer(BaseTrainer):
                                                                              batch_idx=batch_idx, total_batch = total_batch,\
                                                                                 train_scores = train_scores)
                 self.train_scores = train_scores
+                
                 optimizer.step()
                 self.fabric.call("on_before_zero_grad", optimizer)
 
@@ -330,7 +464,7 @@ class AGMTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -343,7 +477,7 @@ class AGMTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model, batch, batch_idx, total_batch, train_scores):
@@ -361,8 +495,7 @@ class AGMTrainer(BaseTrainer):
         #     Mod = GradMod(model)
         label = batch['label']
         label = label.to(model.device)
-        res = Mod(batch)
-        out = sum(res.values())
+        res,out = Mod(batch)
         loss = criterion(out, label)
         loss.backward()
         scores = defaultdict(lambda: float())
@@ -381,11 +514,13 @@ class AGMTrainer(BaseTrainer):
         optimal_ratio = 0
         coeffs ={}
         iteration = (self.current_epoch) * total_batch + step + 1
+        info = ''
         for modality in model.modalitys:
             ratio = math.exp(num/(num-1)*(scores[modality].item() - scores_mean.item()))
-            optimal_ratio = math.exp(num/(num-1)*(train_scores[modality].item() - train_score_mean.item()))
-            coeffs[modality] = math.exp(self.alpha * min(optimal_ratio - ratio, 10))
+            optimal_ratio = math.exp(num/(num-1)*(train_scores[modality].item() - train_score_mean))
+            coeffs[modality] = math.exp(self.alpha * min(optimal_ratio - ratio, 7))
             train_scores[modality] = train_scores[modality] * (iteration - 1) / iteration + scores[modality].item() / iteration
+            info += f'{modality} coeffs = {coeffs[modality]},'
         for name, parms in model.named_parameters():
                 layer = str(name).split('.')[1]
                 for modality in model.modalitys:
@@ -393,8 +528,8 @@ class AGMTrainer(BaseTrainer):
                             parms.grad *= coeffs[modality] 
         grad_max = torch.max(Mod.model.fusion_module.fc_out.weight.grad)
         grad_min = torch.min(Mod.model.fusion_module.fc_out.weight.grad)
-        if grad_max > 1 or grad_min < -1:
-            nn.utils.clip_grad_norm_(Mod.parameters(), max_norm=1.0)
+        if grad_max > 5 or grad_min < -5:
+            nn.utils.clip_grad_norm_(Mod.parameters(), max_norm=5.0)
 
         
         # # print(a.shape, v.shape, model.head.weight.shape)

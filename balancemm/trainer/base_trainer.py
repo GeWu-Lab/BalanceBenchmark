@@ -217,7 +217,6 @@ class BaseTrainer():
         # reset for next fit call
         self.should_stop = False
 
-    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,

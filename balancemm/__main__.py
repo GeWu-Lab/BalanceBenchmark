@@ -28,8 +28,8 @@ root_path = osp.dirname(osp.dirname(__file__))
 
 def create_config(config_dict: dict): 
     """Create configuration from cli and yaml."""
-    with open(osp.join(root_path ,"configs", "global_config.yaml"), 'r') as f:
-        global_settings = yaml.safe_load(f)
+    # with open(osp.join(root_path ,"configs", "global_config.yaml"), 'r') as f:
+    #     global_settings = yaml.safe_load(f)
     with open(osp.join(root_path ,"configs", "dataset_config.yaml"), 'r') as f:
         dataset_settings = yaml.safe_load(f)
     with open(osp.join(root_path ,"configs", "trainer_config.yaml"), 'r') as f:
@@ -38,8 +38,11 @@ def create_config(config_dict: dict):
         model_settings = yaml.safe_load(f)
     with open(osp.join(root_path ,"configs", "encoder_config.yaml"), 'r') as f:
         encoder_settings = yaml.safe_load(f)
-    config_dict = global_settings | config_dict
-    print(dataset_settings)
+    # config_dict = global_settings | config_dict
+    print('==================')
+    print(config_dict)
+    # print('==================')
+    # print(global_settings)
     try:
         #waiting for support iteration
         config_dict['dataset'] = dataset_settings['dataset'][config_dict['Main_config']['dataset']]
@@ -127,10 +130,12 @@ if __name__ == "__main__":
     default_config_path = osp.join(root_path, "configs", "user_default.yaml")
     config_path = ensure_and_get_config_path(args, default_config_path)
     custom_args = load_config_dict(config_path)
-    print(custom_args)
-    
+    with open(osp.join(root_path ,"configs", "global_config.yaml"), 'r') as f:
+        global_settings = yaml.safe_load(f)
+    custom_args = global_settings | custom_args
     # merge cli_args into yaml and create config.
     parse_cli_args_to_dict(args, custom_args)
+    print(custom_args)
     
     # merge custom_args into default global config(balancemm/config.toml)
     args = create_config(custom_args)
