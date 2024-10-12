@@ -14,7 +14,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 
 import lightning as L
 import torch
-from ..evaluation.complex import profile_flops
+
 
 class MBSDTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
@@ -24,7 +24,6 @@ class MBSDTrainer(BaseTrainer):
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
 
-    @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,

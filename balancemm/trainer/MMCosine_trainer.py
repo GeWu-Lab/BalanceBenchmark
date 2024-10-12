@@ -14,7 +14,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 
 import lightning as L
 from lightning_utilities import apply_to_collection
-from ..evaluation.complex import profile_flops
+
 
 # class NCELoss(torch.nn.Module):
 #     def __init__(self, temperature=0.1,EPISILON = 1e-5):

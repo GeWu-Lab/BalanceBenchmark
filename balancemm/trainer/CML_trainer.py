@@ -11,7 +11,6 @@ import os
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
-from ..evaluation.complex import profile_flops
 from lightning_utilities import apply_to_collection
 import lightning as L
 import torch
@@ -36,7 +35,6 @@ class CMLTrainer(BaseTrainer):
         self.lam = method_dict['lam']
         # self.modality = method_dict['modality']
 
-    @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,

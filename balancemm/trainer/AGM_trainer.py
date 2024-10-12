@@ -20,7 +20,6 @@ from ..evaluation.modalitys import generate_all_combinations
 from copy import deepcopy
 import math
 from collections import defaultdict
-from ..evaluation.complex import profile_flops
 import os
 class Modality_out(nn.Module):
     def __init__(self):

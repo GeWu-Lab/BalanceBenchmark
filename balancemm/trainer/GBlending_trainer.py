@@ -15,7 +15,6 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 import lightning as L
 import torch
 import numpy as np
-from ..evaluation.complex import profile_flops
 from ..models.avclassify_model import BaseClassifierModel
 class GBlendingTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
