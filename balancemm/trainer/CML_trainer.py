@@ -36,7 +36,7 @@ class CMLTrainer(BaseTrainer):
         self.lam = method_dict['lam']
         # self.modality = method_dict['modality']
 
-    @profile_flops()
+    # @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -115,6 +115,7 @@ class CMLTrainer(BaseTrainer):
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
         label = batch['label']
+        label = label.to(model.devices)
         
         _loss_c = 0
         modality_num = len(model.modalitys)
@@ -256,10 +257,7 @@ class CMLTrainer(BaseTrainer):
                 # out_a, out_v = model.AVCalculate(a, v, out)
             
                 loss = criterion(m['out'], label)
-        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.encoder_res
-        self.fabric.call("on_before_backward", loss)
-        self.fabric.backward(loss)
-        self.fabric.call("on_after_backward")
+        loss.backward()
 
         # # avoid gradients in stored/accumulated values -> prevents potential OOM
         # self._current_train_return = apply_to_collection(outputs, dtype=torch.Tensor, function=lambda x: x.detach())

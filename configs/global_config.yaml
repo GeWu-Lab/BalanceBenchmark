@@ -22,7 +22,7 @@ fabric:
   strategy: "dp" # "dp", "ddp", "ddp2", "ddp_spawn"
 
 log:
-  logger_name: [] # list of logger name
+  logger_name: ['tensorboard'] # list of logger name
   wandb_name: ''
   log_interval: 100 # how many batches to wait before logging training status
   log_per_epoch: -1 # number of log for each epoch. If set will override log_interval
