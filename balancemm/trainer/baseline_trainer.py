@@ -92,7 +92,7 @@ class baselineTrainer(BaseTrainer):
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
         self._current_metrics = self.PrecisionCalculator.compute_metrics()
-    
+        self.fabric.call("on_train_epoch_end")
     def training_step(self, model: BaseClassifierModel, batch, batch_idx):
 
         # TODO: make it simpler and easier to extend

@@ -1,5 +1,6 @@
 import os, glob
 from typing import Optional
+import subprocess
 
 import torch.nn as nn
 
@@ -21,7 +22,11 @@ def choose_logger(logger_name: str, log_dir, project: Optional[str] = None, comm
     if logger_name == "csv":
         return CSVLogger(root_dir = log_dir, name = 'csv', *args, **kwargs)
     elif logger_name == "tensorboard":
-        return TensorBoardLogger(root_dir = log_dir, name = 'tensorboard', *args, **kwargs)
+        logger = TensorBoardLogger(root_dir=log_dir, name='tensorboard',default_hp_metric=False, *args, **kwargs)
+        tensorboard_log_dir = os.path.join(log_dir, 'tensorboard')
+        subprocess.Popen(['tensorboard', '--logdir', tensorboard_log_dir])
+        
+        return logger
     elif logger_name == "wandb":
         return WandbLogger(project = project, save_dir = log_dir, notes = comment, *args, **kwargs)
     else:
