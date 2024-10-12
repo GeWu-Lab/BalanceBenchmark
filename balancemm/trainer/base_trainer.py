@@ -136,8 +136,6 @@ class BaseTrainer():
 
         # assemble state (current epoch and global step will be added in save)
         state = {"model": model, "optim": optimizer, "scheduler": scheduler_cfg}
-        if tb_logger:
-                    tb_logger.log_hyperparams(state)
 
         # load last checkpoint if available
         if ckpt_path is not None and os.path.isdir(ckpt_path):

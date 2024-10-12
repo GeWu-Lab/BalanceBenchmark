@@ -59,7 +59,9 @@ class CMLTrainer(BaseTrainer):
 
         """
         self.fabric.call("on_train_epoch_start")
-
+        all_modalitys = list(model.modalitys)
+        all_modalitys.append('output')
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -115,7 +117,7 @@ class CMLTrainer(BaseTrainer):
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
         label = batch['label']
-        label = label.to(model.devices)
+        label = label.to(model.device)
         
         _loss_c = 0
         modality_num = len(model.modalitys)

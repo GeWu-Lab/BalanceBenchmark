@@ -6,8 +6,8 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "baselineTrainer"
-  device: '0'
+  trainer: "AGMTrainer"
+  device: '2'
   dataset: Cremad
 
 Train:
