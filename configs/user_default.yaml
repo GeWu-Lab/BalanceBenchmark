@@ -6,7 +6,7 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "PMRTrainer"
+  trainer: "MMCosineTrainer"
   device: '1'
   dataset: Cremad
 
