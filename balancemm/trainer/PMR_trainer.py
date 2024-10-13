@@ -63,6 +63,9 @@ class PMRTrainer(BaseTrainer):
 
         """
         modality_list = model.modalitys
+        all_modalitys = list(model.modalitys)
+        all_modalitys.append('output')
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         
         self.fabric.call("on_train_epoch_start")
         if self.current_epoch == 0: 

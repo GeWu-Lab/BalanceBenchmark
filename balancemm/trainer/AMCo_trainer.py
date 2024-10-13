@@ -98,6 +98,7 @@ class AMCoTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -111,6 +112,7 @@ class AMCoTrainer(BaseTrainer):
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
 
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model: BaseClassifierModel, batch, batch_idx, dependent_modality, mask ,pt):
