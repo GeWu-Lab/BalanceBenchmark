@@ -6,8 +6,8 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "AGMTrainer"
-  device: '2'
+  trainer: "MMCosineTrainer"
+  device: '1'
   dataset: Cremad
 
 Train:
