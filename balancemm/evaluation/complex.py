@@ -6,46 +6,32 @@ from ..models.avclassify_model import BaseClassifierModel
 from typing import Callable, Any, Tuple
 ## flops库 
 ## 命名规范
-from torch.profiler import profile, record_function, ProfilerActivity
+from thop import profile
 import functools
 
-def profile_flops(logger=None):
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
-            # 尝试获取 logger
-            nonlocal logger
-            if logger is None:
-                logger = getattr(self, 'logger', None)
-            
-            if logger is None:
-                # 如果还是没有 logger，可以创建一个默认的或抛出异常
-                raise ValueError("No logger found")
+class FLOPsMonitor:
+    def __init__(self):
+        self.total_flops = 0
+        self.forward_flops = 0
+        self.backward_flops = 0
 
-            with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-                         with_flops=True,
-                         profile_memory=True) as prof:
-                with record_function(func.__name__):
-                    result = func(self, *args, **kwargs)
-                    torch.cuda.synchronize()
-                    print('end')
-            
-            max_memory = 0
-            for event in prof.key_averages():
-                if event.key == "cuda":  # 或使用 "cpu" 如果你想看 CPU 内存
-                    max_memory = max(max_memory, event.cpu_memory_usage, event.cuda_memory_usage) / (1024**3)
-                else :
-                    max_memory = max(max_memory, event.cpu_memory_usage) / (1024**3)
+    def update(self, flops, operation='total'):
+        if operation == 'forward':
+            self.forward_flops += flops
+        elif operation == 'backward':
+            self.backward_flops += flops
+        self.total_flops += flops
 
-            # print(f"Max memory usage in {func.__name__}: {max_memory / (1024 * 1024):.2f} MB")
-
-            # 计算并记录 FLOPs
-            total_flops = sum(event.flops for event in prof.events())
-            logger.info('Total flops is : {:0}, memory usage is {:1} GB'.format(total_flops, max_memory))
-            print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
-
-            # ... 其他日志记录逻辑 ...
-
-            return result
-        return wrapper
-    return decorator
+    def report(self, logger):
+        print(f"Total FLOPs: {self.total_flops}")
+        print(f"Forward FLOPs: {self.forward_flops}")
+        print(f"Backward FLOPs: {self.backward_flops}")
+        logger.info(f"Total FLOPs: {self.total_flops}")
+        logger.info(f"Forward FLOPs: {self.forward_flops}")
+        logger.info(f"Backward FLOPs: {self.backward_flops}")
+        
+        
+def get_flops(model, input_sample):
+    with torch.no_grad():
+        flops, params = profile(model, inputs= input_sample)
+    return flops, params

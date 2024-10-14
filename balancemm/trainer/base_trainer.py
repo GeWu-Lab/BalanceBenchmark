@@ -14,7 +14,7 @@ from lightning_utilities import apply_to_collection
 from tqdm import tqdm
 from ..evaluation.precisions import BatchMetricsCalculator
 from ..models.avclassify_model import BaseClassifierModel
-from ..evaluation.complex import profile_flops
+from ..evaluation.complex import FLOPsMonitor
 from logging import Logger
 class BaseTrainer():
     def __init__(
@@ -94,6 +94,7 @@ class BaseTrainer():
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_frequency = checkpoint_frequency
         self.PrecisionCalculatorType = BatchMetricsCalculator
+        self.FlopsMonitor = FLOPsMonitor()
         self.PrecisionCalculator = None
         self._current_metrics = {}
         self.logger = logger
@@ -260,7 +261,6 @@ class BaseTrainer():
         # reset for next fit call
         self.should_stop = False
 
-    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,

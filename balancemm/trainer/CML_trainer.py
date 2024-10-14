@@ -11,7 +11,6 @@ import os
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
-from ..evaluation.complex import profile_flops
 from lightning_utilities import apply_to_collection
 import lightning as L
 import torch

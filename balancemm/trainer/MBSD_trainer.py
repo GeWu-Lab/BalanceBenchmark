@@ -14,7 +14,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 
 import lightning as L
 import torch
-from ..evaluation.complex import profile_flops
+
 
 class MBSDTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):

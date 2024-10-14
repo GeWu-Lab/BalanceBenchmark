@@ -9,7 +9,7 @@ trainer_para:
     modulation_ends: 80
     modality: 2
   OGM:
-    alpha: 0.5
+    alpha: 0.3
     method: 'OGM_GE'
     modulation_starts: 10 #
     modulation_ends: 80

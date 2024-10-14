@@ -14,7 +14,7 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 from lightning_utilities import apply_to_collection
 import lightning as L
 import torch
-from ..evaluation.complex import profile_flops
+
 
 def clip(a, b, c):
     if b<a:

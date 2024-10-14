@@ -4,17 +4,17 @@ check_point_path: '/home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseCl
 seed: 42
 ### 简洁化 
 Main_config:
-  model: "BaseClassifier" #
+  model: "BaseClassifier_AMCo" #
   tasks: "Classifier" #
-  trainer: "MMCosineTrainer"
-  device: '1'
-  dataset: Cremad
+  trainer: "AMCoTrainer"
+  device: '3'
+  dataset: Balance
 
 Train:
-  dataset: Cremad
+  dataset: Balance
 
 Test:
-  dataset: Cremad
+  dataset: Balance
 
 # dataset:
 #   dataloader:

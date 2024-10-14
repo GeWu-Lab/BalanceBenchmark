@@ -16,7 +16,6 @@ import lightning as L
 import torch
 import numpy as np
 from ..models.avclassify_model import BaseClassifierModel
-from ..evaluation.complex import profile_flops
 class AMCoTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(AMCoTrainer,self).__init__(fabric,**para_dict)
