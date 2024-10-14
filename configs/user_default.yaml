@@ -6,15 +6,15 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "AGMTrainer"
+  trainer: "baselineTrainer"
   device: '2'
-  dataset: Cremad
+  dataset: UMPC_Food
 
 Train:
-  dataset: Cremad
+  dataset: UMPC_Food
 
 Test:
-  dataset: Cremad
+  dataset: UMPC_Food
 
 # dataset:
 #   dataloader:

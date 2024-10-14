@@ -94,7 +94,7 @@ class UMPC_FoodDataset(Dataset):
         txt=sample['text'] 
         txt = self.clean_text(txt)
         text_tokens= self.tokenize(txt)
-        text_tokens['input_ids'] = text_tokens['input_ids'].float()
+        text_tokens['input_ids'] = text_tokens['input_ids'].int()
         class_name  = sample['label'] 
         class_idx = self.class_to_idx[class_name]
         if self.mode =="all":
