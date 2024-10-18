@@ -121,3 +121,12 @@ class MoseiDataset(Dataset):
         #     print(self.vision[indx].shape)
         return {'text' : X[1], 'visual': X[3], 'audio' : X[2], 'label':Y}
         return self.text[index], Y   ##, META        
+
+if __name__ == '__main__':
+    dataset_path = '/home/zequn_yang/MMT/data/'
+    data='mosei_senti'
+    split_type= 'val'
+    if_align = True
+    dataset_path = os.path.join(dataset_path, data+'_data.pkl' if if_align else data+'_data_noalign.pkl' )
+    dataset = pickle.load(open(dataset_path, 'rb'))
+    print(dataset.keys())

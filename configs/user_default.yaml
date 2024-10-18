@@ -8,13 +8,13 @@ Main_config:
   tasks: "Classifier" #
   trainer: "AGMTrainer"
   device: '0'
-  dataset: UCF
+  dataset: Mosei
 
 Train:
-  dataset: UCF
+  dataset: Mosei
 
 Test:
-  dataset: UCF
+  dataset: Mosei
 
 # dataset:
 #   dataloader:
