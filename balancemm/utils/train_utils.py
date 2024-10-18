@@ -1,5 +1,6 @@
 import os, glob
 from typing import Optional
+import subprocess
 
 import torch.nn as nn
 
@@ -21,7 +22,11 @@ def choose_logger(logger_name: str, log_dir, project: Optional[str] = None, comm
     if logger_name == "csv":
         return CSVLogger(root_dir = log_dir, name = 'csv', *args, **kwargs)
     elif logger_name == "tensorboard":
-        return TensorBoardLogger(root_dir = log_dir, name = 'tensorboard', *args, **kwargs)
+        logger = TensorBoardLogger(root_dir=log_dir, name='tensorboard',default_hp_metric=False, *args, **kwargs)
+        tensorboard_log_dir = os.path.join(log_dir, 'tensorboard')
+        subprocess.Popen(['tensorboard', '--logdir', tensorboard_log_dir])
+        
+        return logger
     elif logger_name == "wandb":
         return WandbLogger(project = project, save_dir = log_dir, notes = comment, *args, **kwargs)
     else:
@@ -29,8 +34,17 @@ def choose_logger(logger_name: str, log_dir, project: Optional[str] = None, comm
 
 def get_checkpoint_files(checkpoint_dir):
     checkpoint_files = sorted(glob.glob(os.path.join(checkpoint_dir, "*.ckpt")))
+    print(f'the checkpoint is {checkpoint_files}')
     return checkpoint_files
 
+def get_newest_path(out_dir):
+    folders = [f for f in os.listdir(out_dir) if os.path.isdir(os.path.join(out_dir, f)) and len(os.listdir(os.path.join(out_dir, f + '/checkpoints')))>0 ]
+    folder = max(folders, key=lambda f: os.path.getmtime(os.path.join(out_dir, f)))
+    folder = os.path.join(out_dir, folder + '/checkpoints')
+    if folder:
+        return folder
+    else:
+        raise ValueError('there are no pretrained model')
 def set_seed(seed):
     """
     Set random seed for training

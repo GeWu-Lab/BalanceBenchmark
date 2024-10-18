@@ -3,6 +3,7 @@ import os
 from os import path as osp
 from types import SimpleNamespace
 import lightning as L
+from lightning.fabric.loggers import CSVLogger, TensorBoardLogger
 
 __all__ = ['create_trainer']
 
@@ -20,7 +21,7 @@ _trainer_modules = [
     for file_name in trainer_filenames
 ]
 
-def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args, logger):
+def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args, logger,tb_logger):
     # dynamic instantiation
     for module in _trainer_modules:
         trainer_cls = getattr(module, trainer_opt["trainer"], None)
@@ -29,7 +30,10 @@ def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args, logger):
     if trainer_cls is None:
         raise ValueError(f'trainer {trainer} is not found.')
     para_opt['base_para']['logger'] = logger
-    trainer = trainer_cls(fabric, para_opt, para_opt['base_para'])
+    if args.trainer['name'] != 'UMT':
+        trainer = trainer_cls(fabric, para_opt, para_opt['base_para'])
+    else:
+        trainer = trainer_cls(fabric, para_opt, para_opt['base_para'], args)
     trainer.checkpoint_dir = args.checkpoint_dir
 
     print(
@@ -38,4 +42,7 @@ def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args, logger):
     para_opt['name'] = trainer_opt["trainer"]
     # logger.info("normal Settings: %s", para_opt)
     logger.info("trainer Settings: %s", para_opt)
+    if isinstance(tb_logger, TensorBoardLogger):
+        tb_logger.log_hyperparams(trainer_opt)  
+        tb_logger.experiment.add_text("Trainer Setup", f"Trainer: {trainer_opt['trainer']}")
     return trainer

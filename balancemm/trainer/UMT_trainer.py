@@ -14,16 +14,40 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 
 import lightning as L
 import torch
-
-
-class MBSDTrainer(BaseTrainer):
-    def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
-        super(MBSDTrainer,self).__init__(fabric,**para_dict)
+from ..models.avclassify_model import BaseClassifierModel
+from ..evaluation.complex import get_flops
+from ..models import create_model
+import copy
+from ..utils.train_utils import get_checkpoint_files, get_newest_path
+import os.path as osp
+import yaml
+class UMTTrainer(BaseTrainer):
+    def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}, args = {}):
+        super(UMTTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
 
+        self.loaded_model = []
+        loaded_model = {}
+        temp_args = copy.deepcopy(args)
+        out_dir = '_'.join(temp_args.out_dir.split('/')[:-1])
+        # root_path = osp.dirname(osp.dirname(__file__))
+        # with open(osp.join(root_path ,"configs", "encoder_config.yaml"), 'r') as f:
+        #     encoder_settings = yaml.safe_load(f)
+        for modality in args.model['encoders'].keys():
+            temp_args.model['encoders'] = {modality: args.model['encoders'][modality]}
+            temp_args.model['modality_size'] = {modality: args.model['modality_size'][modality]}
+            loaded_model[modality] = create_model(temp_args.model)
+            loaded_model[modality].to(temp_args.model['device'])
+            out_dir = temp_args.out_dir.replace('UMTTrainer', 'unimodalTrainer_' + modality)
+            out_dir = '/'.join(out_dir.split('/')[:-1])
+            path = get_newest_path(out_dir)
+            loaded_model[modality].load_state_dict(torch.load(get_checkpoint_files(path)[0])['model'])
+        self.loaded_model = nn.ModuleDict(loaded_model)
+
+        ##new
     def train_loop(
         self,
         model: L.LightningModule,
@@ -52,8 +76,14 @@ class MBSDTrainer(BaseTrainer):
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
-        
-
+        # if self.current_epoch == 0:
+            # for batch_idx, batch in enumerate(iterable):
+            #     batch_sample = batch
+            #     break
+            # print(batch_sample.keys())
+            # model_flops, _ =get_flops(model = model, input_sample = batch_sample)
+            # self.FlopsMonitor.update(model_flops / len(batch_sample['label']) * len(train_loader), 'forward')
+            # self.FlopsMonitor.report(logger = self.logger)
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -90,81 +120,28 @@ class MBSDTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-
         self._current_metrics = self.PrecisionCalculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
-    
-    def training_step(self, model, batch, batch_idx , dependent_modality : str = 'none'):
+    def training_step(self, model: BaseClassifierModel, batch, batch_idx):
 
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
-        softmax = nn.Softmax(dim=1)
-        modality_list = model.modalitys
-        key = list(modality_list)
-        m = {}
-        loss = {}
-        prediction = {}
-        y_pred = {}
-        model(batch)
-        for modality in modality_list:
-            m[modality] = model.encoder_res[modality]
-        m['out'] = model.encoder_res['output']
-        model.Unimodality_Calculate()    
-        # out_a, out_v = model.AVCalculate(a, v, out)
+        MSE = nn.MSELoss()
         label = batch['label']
-        device = model.device
-        # print(a.shape, v.shape, model.head.weight.shape)
-
-        ## our modality-wise normalization on weight and feature
-    
-        loss['out'] = criterion(m['out'], label)
-        for modality in modality_list:
-            loss[modality] = criterion(model.Uni_res[modality], label)
-        # loss_v = criterion(Uni_res[], label)
-        # loss_a = criterion(out_a, label)
-
-        for modality in modality_list:
-            prediction[modality] = softmax(model.Uni_res[modality])
-        # prediction_a = softmax(out_a)
-        # prediction_v = softmax(out_v)
+        label = label.to(model.device)
+        # if self.modality == 2:
+        #     a, v, out = model(batch)
+        # else:
+        #     a, v, t, out = model(batch)
+        _ = model(batch= batch)
+        out = model.encoder_res['output']        
+        loss = criterion(out, label)
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-            loss_RS = 1/model.Uni_res[key[0]].shape[1] * torch.sum((model.Uni_res[key[0]] - model.Uni_res[key[1]])**2, dim = 1)
+            for modality in self.loaded_model.keys():
+                with torch.no_grad():
+                    self.loaded_model[modality](batch)
+                out_unimodal = self.loaded_model[modality].encoder_res[modality]
+                loss += self.alpha * MSE(out_unimodal, model.encoder_res[modality])
 
-            w = torch.tensor([0.0 for _ in range(len(m['out']))])
-            w = w.to(device)
-            for modality in modality_list:
-                y_pred[modality] = prediction[modality]
-                y_pred[modality] = y_pred[modality].argmax(dim=-1)
-            # y_pred_a = prediction_a
-            # y_pred_a = y_pred_a.argmax(dim = -1)
-            # y_pred_v = prediction_v
-            # y_pred_v = y_pred_v.argmax(dim = -1)
-            ps = torch.tensor([0.0 for _ in range(len(m['out']))])
-            ps = ps.to(device)
-            pw = torch.tensor([0.0 for _ in range(len(m['out']))])
-            pw = pw.to(device)
-            for i in range(len(m['out'])):
-                if y_pred[key[0]][i] == label[i] or y_pred[key[1]][i] == label[i]:
-                    w[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]]) -  min(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
-                ps[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
-                pw[i] = min(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
-
-            loss_KL = F.kl_div(ps, pw, reduction = 'none')
-            w = w.reshape(1,-1)
-            loss_KL = loss_KL.reshape(-1,1)
-            loss_KL = torch.mm(w, loss_KL) / len(m['out'])
-            loss_RS = loss_RS.reshape(-1,1)
-            loss_RS = torch.mm(w, loss_RS) / len(m['out'])
-            total_loss = loss['out'] + loss[key[0]] + loss[key[1]] + loss_RS.squeeze() + loss_KL.squeeze() ## erase the dim of 1
-            
-        else:
-            # model(batch)
-            # for modality in modality_list:
-            #     m[modality] = model.encoder_res[modality]
-            # m['out'] = model.encoder_res['output']
-            # out_a, out_v = model.AVCalculate(a, v, out)
-        
-            total_loss = loss['out']
-        total_loss.backward()
-
-        return total_loss
+        loss.backward()
+        return loss

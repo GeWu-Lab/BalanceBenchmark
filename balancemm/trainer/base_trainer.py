@@ -2,7 +2,7 @@ import os
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
-from lightning.pytorch.loggers import CSVLogger, WandbLogger, TensorBoardLogger
+from lightning.fabric.loggers import CSVLogger, TensorBoardLogger
 import lightning as L
 import torch
 from lightning.fabric.accelerators import Accelerator
@@ -14,7 +14,7 @@ from lightning_utilities import apply_to_collection
 from tqdm import tqdm
 from ..evaluation.precisions import BatchMetricsCalculator
 from ..models.avclassify_model import BaseClassifierModel
-from ..evaluation.complex import profile_flops
+from ..evaluation.complex import FLOPsMonitor
 from logging import Logger
 class BaseTrainer():
     def __init__(
@@ -29,8 +29,9 @@ class BaseTrainer():
         checkpoint_dir: str = "./experiments/checkpoints",
         checkpoint_frequency: int = 1,
         should_train: bool = True,
-        logger:Logger = None
-    ) -> None:
+        logger:Logger = None,
+        tb_logger: TensorBoardLogger = None 
+        ) -> None:
         """Exemplary Trainer with Fabric. This is a very simple trainer focused on readablity but with reduced
         featureset. As a trainer with more included features, we recommend using the
         :class:`lightning.pytorch.Trainer`.
@@ -93,9 +94,11 @@ class BaseTrainer():
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_frequency = checkpoint_frequency
         self.PrecisionCalculatorType = BatchMetricsCalculator
+        self.FlopsMonitor = FLOPsMonitor()
         self.PrecisionCalculator = None
         self._current_metrics = {}
         self.logger = logger
+        self.tb_logger = tb_logger
     def fit(
         self,
         model,
@@ -104,6 +107,7 @@ class BaseTrainer():
         optimizer: torch.optim.Optimizer,
         scheduler_cfg: torch.optim.lr_scheduler,
         logger: Logger,
+        tb_logger: TensorBoardLogger,
         ckpt_path: Optional[str] = None,
     ):
         """The main entrypoint of the trainer, triggering the actual training.
@@ -151,6 +155,8 @@ class BaseTrainer():
                     model, optimizer, train_loader, limit_batches=self.limit_train_batches, scheduler_cfg=scheduler_cfg
                 )
                 logger.info("epoch: {:0}  ".format(self.current_epoch))
+                if tb_logger:
+                    tb_logger.log_hyperparams({"epochs": self.current_epoch})
                 output_info = ''
                 info = ''
                 ##parse the Metrics
@@ -161,15 +167,32 @@ class BaseTrainer():
                         for modality in sorted(valid_acc.keys()):
                             if modality == 'output':
                                 output_info += f"train_acc: {valid_acc[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        "train_acc": valid_acc[modality]
+                                    }, step=self.current_epoch)
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        f"acc_{modality}": valid_acc[modality]
+                                    }, step=self.current_epoch)
+                            
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
                         for modality in sorted(valid_f1.keys()):
                             if modality == 'output':
                                 output_info += f", train_f1: {valid_f1[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        "train_f1": valid_f1[modality]
+                                    }, step=self.current_epoch)
                             else:
                                 info += f", f1_{modality}: {valid_f1[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        f"f1_{modality}": valid_f1[modality]
+                                    }, step=self.current_epoch)
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
@@ -179,6 +202,10 @@ class BaseTrainer():
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
                 info = f'valid_loss: {valid_loss}'
                 output_info = ''
+                if tb_logger:
+                    tb_logger.log_metrics({
+                        'valid_loss': valid_loss,
+                    }, step=self.current_epoch)
                 ##parse the Metrics
                 for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':
@@ -186,15 +213,32 @@ class BaseTrainer():
                         for modality in sorted(valid_acc.keys()):
                             if modality == 'output':
                                 output_info += f"valid_acc: {valid_acc[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        "valid_acc": valid_acc[modality]
+                                    }, step=self.current_epoch)
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        f"acc_{modality}": valid_acc[modality]
+                                    }, step=self.current_epoch)
+                                
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
                         for modality in sorted(valid_f1.keys()):
                             if modality == 'output':
                                 output_info += f", valid_f1: {valid_f1[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        "valid_f1": valid_f1[modality]
+                                    }, step=self.current_epoch)
                             else:
                                 info += f", f1_{modality}: {valid_f1[modality]}"
+                                if tb_logger:
+                                    tb_logger.log_metrics({
+                                        f"f1_{modality}": valid_f1[modality]
+                                    }, step=self.current_epoch)
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
@@ -217,7 +261,6 @@ class BaseTrainer():
         # reset for next fit call
         self.should_stop = False
 
-    @profile_flops
     def train_loop(
         self,
         model: L.LightningModule,

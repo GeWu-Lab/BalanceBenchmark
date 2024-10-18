@@ -11,9 +11,10 @@ import os
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
-
+from lightning_utilities import apply_to_collection
 import lightning as L
 import torch
+
 
 def clip(a, b, c):
     if b<a:
@@ -23,12 +24,7 @@ def clip(a, b, c):
     return b
 
 def EU_dist(x1, x2):
-    d_matrix = torch.zeros(x1.shape[0], x2.shape[0]).to(x1.device)
-    for i in range(x1.shape[0]):
-        for j in range(x2.shape[0]):
-            d = torch.sqrt(torch.dot((x1[i] - x2[j]), (x1[i] - x2[j])))
-            d_matrix[i, j] = d
-    return d_matrix
+    return torch.cdist(x1, x2, p=2)
 
 
 class PMRTrainer(BaseTrainer):
@@ -41,7 +37,10 @@ class PMRTrainer(BaseTrainer):
 
         self.embed_dim = method_dict['embed_dim']
         self.momentum_coef = method_dict['momentum_coef']
-
+        self.mu = method_dict['mu']
+        self.proto = {}
+        
+    # @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -64,16 +63,16 @@ class PMRTrainer(BaseTrainer):
 
         """
         modality_list = model.modalitys
+        all_modalitys = list(model.modalitys)
+        all_modalitys.append('output')
+        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         
         self.fabric.call("on_train_epoch_start")
+        if self.current_epoch == 0: 
+            for modality in modality_list:
+                self.proto[modality] = 0  
 
-        iterable = self.progbar_wrapper(
-            train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
-        )
-        proto0 = {}
-        for modality in modality_list:
-            proto0[modality] = 0
-        proto = self.calculate_prototype(model, iterable, proto0=proto0)
+        self.proto = self.calculate_prototype(model, train_loader, proto0=self.proto)
         model.train()
         iterable = self.progbar_wrapper(
                     train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
@@ -92,7 +91,7 @@ class PMRTrainer(BaseTrainer):
                 self.fabric.call("on_before_optimizer_step", optimizer, 0)
 
                 # optimizer step runs train step internally through closure
-                optimizer.step(partial(self.training_step, model=model, batch=batch, batch_idx=batch_idx, proto = proto))
+                optimizer.step(partial(self.training_step, model=model, batch=batch, batch_idx=batch_idx, proto = self.proto))
                 self.fabric.call("on_before_zero_grad", optimizer)
 
                 optimizer.zero_grad()
@@ -100,7 +99,7 @@ class PMRTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-
+            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -108,12 +107,11 @@ class PMRTrainer(BaseTrainer):
             #     self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
 
             # add output values to progress bar
-            
             self._format_iterable(iterable, self._current_train_return, "train")
-            
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-
+            
+        self._current_metrics = self.PrecisionCalculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model, batch, batch_idx, proto):
@@ -121,86 +119,79 @@ class PMRTrainer(BaseTrainer):
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
+        log_softmax = nn.LogSoftmax(dim=1)
         modality_list = model.modalitys
         key = list(modality_list)
         m = {}
+        model(batch)
         for modality in modality_list:
-            m[modality] = model(batch)[modality]
+            m[modality] = model.encoder_res[modality]
         # a, v = model(batch)['audio'], model(batch)['visual']
         Uni_res = model.Unimodality_Calculate()
         # out_v,out_a,out = Uni_res['visual'], Uni_res['audio'], Uni_res['output']
         label = batch['label']
         label = label.to(model.device)
 
-        sim = {}
-        for modality in modality_list:
-            sim[modality] = -EU_dist(m[modality],proto[modality])
-        # audio_sim = -EU_dist(a, audio_proto)  # B x n_class
-        # visual_sim = -EU_dist(v, visual_proto)  # B x n_class
-        # print('sim: ', audio_sim[0][0].data, visual_sim[0][0].data, a[0][0].data, v[0][0].data)
-
-        score_p = {}
-        score = {}
-        loss_proto = {}
-        loss_modality = {}
         if  self.modulation_starts <= self.current_epoch <= self.modulation_ends:
+            sim = {}
+            for modality in modality_list:
+                sim[modality] = -EU_dist(m[modality],proto[modality])
+            # audio_sim = -EU_dist(a, audio_proto)  # B x n_class
+            # visual_sim = -EU_dist(v, visual_proto)  # B x n_class
+            # print('sim: ', audio_sim[0][0].data, visual_sim[0][0].data, a[0][0].data, v[0][0].data)
+
+            score_p = {}
+            # score = {}
+            loss_proto = {}
+            loss_modality = {}
             for modality in modality_list:
                 score_p[modality] = sum([softmax(sim[modality])[i][label[i]] for i in range(sim[modality].size(0))])
             # score_a_p = sum([softmax(audio_sim)[i][label[i]] for i in range(audio_sim.size(0))])
             # score_v_p = sum([softmax(visual_sim)[i][label[i]] for i in range(visual_sim.size(0))])
             ratio_a_p = score_p[key[0]] / score_p[key[1]]
 
-            for modality in modality_list:
-                score[modality] = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(Uni_res[modality].size(0))])
-            # score_v = sum([softmax(out_v)[i][label[i]] for i in range(out_v.size(0))])
-            # score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
-            ratio_a = score[key[0]] / score[key[1]]
+            # for modality in modality_list:
+            #     score[modality] = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(Uni_res[modality].size(0))])
+            # # score_v = sum([softmax(out_v)[i][label[i]] for i in range(out_v.size(0))])
+            # # score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
+            # ratio_a = score[key[0]] / score[key[1]]
 
             for modality in modality_list:
                 loss_proto[modality] = criterion(sim[modality],label)
             # loss_proto_a = criterion(audio_sim, label)
             # loss_proto_v = criterion(visual_sim, label)
-
             if ratio_a_p >= 1:
                 beta = 0  # audio coef
                 lam = 1 * clip(0, ratio_a_p - 1, 1)  # visual coef
             else:
                 beta = 1 * clip(0, 1/ratio_a_p - 1, 1)
                 lam = 0
-
-            loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]
+            if self.current_epoch <= self.modulation_starts + 15:
+                PER = {}
+                # if ratio_a_p >= 1:
+                for modality in modality_list:
+                    PER[modality] = -torch.sum(softmax(-EU_dist(m[modality],proto[modality]))*log_softmax(-EU_dist(m[modality],proto[modality])),dim=1).sum()
+                # else:
+                #     for modality in modality_list:
+                #         PER[modality] = torch.sum(F.softmax(-EU_dist(m[key[1]],proto[modality]),dim=1) * F.log_softmax(-EU_dist(m[key[1]],proto[modality]),dim=1),dim=1).sum()
+                loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]] - self.mu * lam * PER[key[0]] - self.mu * beta * PER[key[1]]
+            else:
+                loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]
             for modality in modality_list:
                 loss_modality[modality] = criterion(Uni_res[modality],label)
             # loss_v = criterion(out_v, label)
             # loss_a = criterion(out_a, label)
         else:
             loss = criterion(Uni_res['output'], label)
-            for modality in modality_list:
-                loss_proto[modality] = criterion(sim[modality],label)
-            # loss_proto_v = criterion(visual_sim, label)
-            # loss_proto_a = criterion(audio_sim, label)
-                score_p[modality] = sum([softmax(sim[modality])[i][label[i]] for i in range(sim[modality].size(0))])
-                score[modality] = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(Uni_res[modality].size(0))])
-            # score_a_p = sum([softmax(audio_sim)[i][label[i]] for i in range(audio_sim.size(0))])
-            # score_v_p = sum([softmax(visual_sim)[i][label[i]] for i in range(visual_sim.size(0))])
-            ratio_a_p = score_p[key[0]] / score_p[key[1]]
-            # score_v = sum([softmax()[i][label[i]] for i in range(out_v.size(0))])
-            # score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
-            ratio_a = score[key[0]] / score[key[1]]
+        
+        # loss.backward()
+        self.fabric.call("on_before_backward", loss)
+        self.fabric.backward(loss)
+        self.fabric.call("on_after_backward")
 
-        # writer.add_scalar('loss/step', loss, (epoch - 1) * total_batch + step)
-
-        # prediction = softmax(out)
-        # pred_a = softmax(out_a)
-        # pred_v = softmax(out_v)
-        # audio_sim = -EU_dist(a, audio_proto)  # B x n_class
-        # visual_sim = -EU_dist(v, visual_proto)  # B x n_class
-        # # todo more acc to print
-        # pred_v_p = softmax(visual_sim)
-        # pred_a_p = softmax(audio_sim)
-        loss.backward()
+        # # avoid gradients in stored/accumulated values -> prevents potential OOM
+        # self._current_train_return = apply_to_collection(model.encoder_res, dtype=torch.Tensor, function=lambda x: x.detach())
         return loss
-    
     def calculate_prototype(self, model, dataloader, proto0):
     # todo customed output of prototype
         n_classes = model.n_classes
@@ -212,14 +203,15 @@ class PMRTrainer(BaseTrainer):
         count_class = [0 for _ in range(n_classes)]
 
         # calculate prototype
-        # model.eval()
+        model.eval()
         with torch.no_grad():
             sample_count = 0
             all_num = len(dataloader)
             m = {}
             for batch_idx, batch in enumerate(dataloader):
+                model(batch)
                 for modality in modality_list:
-                    m[modality] = model(batch)[modality]
+                    m[modality] = model.encoder_res[modality]
                 label = batch['label']
                 # TODO: make it simpler and easier to extend
 

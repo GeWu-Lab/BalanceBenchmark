@@ -6,15 +6,22 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
+<<<<<<< HEAD
   trainer: "AGMTrainer"
   device: '0'
   dataset: Mosei
+=======
+  trainer: "UMTTrainer"
+  device: '2'
+  dataset: UCF
+>>>>>>> c2558a3ead7b961da10fdc00ee271fb6ff454dbf
 
 Train:
   dataset: Mosei
 
 Test:
   dataset: Mosei
+
 
 # dataset:
 #   dataloader:
