@@ -52,7 +52,10 @@ def create_config(config_dict: dict):
     try:
         Trainer_name = config_dict['Main_config']['trainer']
         name = Trainer_name.split("Trainer", 1)[0]
-        config_dict['trainer'] = trainer_settings['trainer_para'][name] 
+        if name == 'unimodal':
+            config_dict['trainer'] = trainer_settings['trainer_para']['baseline'] 
+        else:
+            config_dict['trainer'] = trainer_settings['trainer_para'][name] 
         config_dict['trainer']['base_para'] = trainer_settings['trainer_para']['base']
         config_dict['trainer']['name'] = name
         

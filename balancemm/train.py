@@ -19,6 +19,9 @@ def train_and_test(args: dict):
     dict_args = args
     args = SimpleNamespace(**args)
 
+    if args.trainer['name'] == 'unimodal':
+        args.out_dir = args.out_dir.replace('unimodalTrainer','unimodalTrainer_' + list(args.model['encoders'].keys())[0])
+
     log_dir = osp.join(args.out_dir, "logs")
     print("logg:{}".format(log_dir))
     loggers_online = [choose_logger(logger_name, log_dir = log_dir, project = args.name, comment = args.log['comment']) for logger_name in args.log['logger_name']]
@@ -49,18 +52,18 @@ def train_and_test(args: dict):
     if isinstance(fabric.accelerator, L.fabric.accelerators.CUDAAccelerator):
         fabric.print('set float32 matmul precision to high')
         torch.set_float32_matmul_precision('high')
-
+    device = args.Main_config['device']
+    if device == '':
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda:' + args.Main_config['device'])
+    args.model['device'] = device
     train_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
     args.trainer['checkpoint_dir'] = args.checkpoint_dir ##
     model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
     trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger,tb_logger)
-    device = args.Main_config['device']
-    if device == '':
-        device = torch.device('cpu')
-    else:
-        device = torch.device('cuda:' + args.Main_config['device'])
     model.to(device)
     model.device = device
         

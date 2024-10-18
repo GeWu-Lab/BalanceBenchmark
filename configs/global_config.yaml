@@ -17,7 +17,7 @@ dataloader:
 
 fabric:
   accelerator: "gpu" # "cpu", "gpu", "cuda", "mps", "tpu"
-  devices: [0] # number of devices or list of index
+  devices: [2] # number of devices or list of index
   precision: "32-true" # "32-true", "16-mixed", "bf16-mixed", etc.
   strategy: "dp" # "dp", "ddp", "ddp2", "ddp_spawn"
 

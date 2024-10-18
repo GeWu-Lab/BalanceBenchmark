@@ -16,9 +16,9 @@ import lightning as L
 import torch
 from ..models.avclassify_model import BaseClassifierModel
 from ..evaluation.complex import get_flops
-class baselineTrainer(BaseTrainer):
+class unimodalTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
-        super(baselineTrainer,self).__init__(fabric,**para_dict)
+        super(unimodalTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']

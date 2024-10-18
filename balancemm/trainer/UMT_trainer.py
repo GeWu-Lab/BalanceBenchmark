@@ -16,14 +16,36 @@ import lightning as L
 import torch
 from ..models.avclassify_model import BaseClassifierModel
 from ..evaluation.complex import get_flops
-class baselineTrainer(BaseTrainer):
-    def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
-        super(baselineTrainer,self).__init__(fabric,**para_dict)
+from ..models import create_model
+import copy
+from ..utils.train_utils import get_checkpoint_files, get_newest_path
+import os.path as osp
+import yaml
+class UMTTrainer(BaseTrainer):
+    def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}, args = {}):
+        super(UMTTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
-        self.modality = method_dict['modality']
+
+        self.loaded_model = []
+        loaded_model = {}
+        temp_args = copy.deepcopy(args)
+        out_dir = '_'.join(temp_args.out_dir.split('/')[:-1])
+        # root_path = osp.dirname(osp.dirname(__file__))
+        # with open(osp.join(root_path ,"configs", "encoder_config.yaml"), 'r') as f:
+        #     encoder_settings = yaml.safe_load(f)
+        for modality in args.model['encoders'].keys():
+            temp_args.model['encoders'] = {modality: args.model['encoders'][modality]}
+            temp_args.model['modality_size'] = {modality: args.model['modality_size'][modality]}
+            loaded_model[modality] = create_model(temp_args.model)
+            loaded_model[modality].to(temp_args.model['device'])
+            out_dir = temp_args.out_dir.replace('UMTTrainer', 'unimodalTrainer_' + modality)
+            out_dir = '/'.join(out_dir.split('/')[:-1])
+            path = get_newest_path(out_dir)
+            loaded_model[modality].load_state_dict(torch.load(get_checkpoint_files(path)[0])['model'])
+        self.loaded_model = nn.ModuleDict(loaded_model)
 
         ##new
     def train_loop(
@@ -104,6 +126,7 @@ class baselineTrainer(BaseTrainer):
 
         # TODO: make it simpler and easier to extend
         criterion = nn.CrossEntropyLoss()
+        MSE = nn.MSELoss()
         label = batch['label']
         label = label.to(model.device)
         # if self.modality == 2:
@@ -113,5 +136,12 @@ class baselineTrainer(BaseTrainer):
         _ = model(batch= batch)
         out = model.encoder_res['output']        
         loss = criterion(out, label)
+        if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
+            for modality in self.loaded_model.keys():
+                with torch.no_grad():
+                    self.loaded_model[modality](batch)
+                out_unimodal = self.loaded_model[modality].encoder_res[modality]
+                loss += self.alpha * MSE(out_unimodal, model.encoder_res[modality])
+
         loss.backward()
         return loss
