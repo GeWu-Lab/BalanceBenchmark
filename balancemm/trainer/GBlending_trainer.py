@@ -96,6 +96,8 @@ class GBlendingTrainer(BaseTrainer):
                 weights = weights
             )
             logger.info("epoch: {:0}  ".format(self.current_epoch))
+            if tb_logger:
+                tb_logger.log_hyperparams({"epochs": self.current_epoch})
             output_info = ''
             info = ''
             ##parse the Metrics
@@ -156,13 +158,13 @@ class GBlendingTrainer(BaseTrainer):
                                     tb_logger.log_metrics({
                                         "valid_acc": valid_acc[modality]
                                     }, step=self.current_epoch)
+                                self.PrecisionCalculator.ClearAll()
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
                                 if tb_logger:
                                     tb_logger.log_metrics({
                                         f"acc_{modality}": valid_acc[modality]
                                     }, step=self.current_epoch)
-                                
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
                         for modality in sorted(valid_f1.keys()):
