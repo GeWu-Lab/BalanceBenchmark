@@ -131,6 +131,9 @@ class PMRTrainer(BaseTrainer):
         # out_v,out_a,out = Uni_res['visual'], Uni_res['audio'], Uni_res['output']
         label = batch['label']
         label = label.to(model.device)
+        loss_modality = {}
+        for modality in modality_list:
+            loss_modality[modality] = criterion(Uni_res[modality],label)
 
         if  self.modulation_starts <= self.current_epoch <= self.modulation_ends:
             sim = {}
@@ -143,7 +146,6 @@ class PMRTrainer(BaseTrainer):
             score_p = {}
             # score = {}
             loss_proto = {}
-            loss_modality = {}
             for modality in modality_list:
                 score_p[modality] = sum([softmax(sim[modality])[i][label[i]] for i in range(sim[modality].size(0))])
 
@@ -176,12 +178,12 @@ class PMRTrainer(BaseTrainer):
                     lam = 0
                 if self.current_epoch <= self.modulation_starts + 15:
                     PER = {}
-                    # if ratio_a_p >= 1:
-                    for modality in modality_list:
-                        PER[modality] = -torch.sum(softmax(-EU_dist(m[modality],proto[modality]))*log_softmax(-EU_dist(m[modality],proto[modality])),dim=1).sum()
-                # else:
-                #     for modality in modality_list:
-                #         PER[modality] = torch.sum(F.softmax(-EU_dist(m[key[1]],proto[modality]),dim=1) * F.log_softmax(-EU_dist(m[key[1]],proto[modality]),dim=1),dim=1).sum()
+                    if loss_modality[key[0]] < loss_modality[key[1]]:
+                        for modality in modality_list:
+                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[0]],proto[modality]))*log_softmax(-EU_dist(m[key[0]],proto[modality])),dim=1).mean()
+                    else:
+                        for modality in modality_list:
+                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[1]],proto[modality])) * log_softmax(-EU_dist(m[key[1]],proto[modality])),dim=1).mean()
                     loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]] - self.mu * lam * PER[key[0]] - self.mu * beta * PER[key[1]]
                 else:
                     loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]
@@ -200,8 +202,6 @@ class PMRTrainer(BaseTrainer):
                     loss = criterion(Uni_res['output'], label) + self.alpha * k_t[key[0]] * loss_proto[key[0]] + self.alpha * k_t[key[1]] * loss_proto[key[1]] + self.alpha * k_t[key[2]] * loss_proto[key[2]] - self.mu * k_t[key[0]] * PER[key[0]] - self.mu * k_t[key[1]] * PER[key[1]] - - self.mu * k_t[key[2]] * PER[key[2]] 
                 else:
                     loss = criterion(Uni_res['output'], label) + self.alpha * k_t[key[0]] * loss_proto[key[0]] + self.alpha * k_t[key[1]] * loss_proto[key[1]] + self.alpha * k_t[key[2]] * loss_proto[key[2]]
-            for modality in modality_list:
-                loss_modality[modality] = criterion(Uni_res[modality],label)
             # loss_v = criterion(out_v, label)
             # loss_a = criterion(out_a, label)
         else:
