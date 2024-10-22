@@ -6,15 +6,15 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "AMCoTrainer"
-  device: '3'
-  dataset: Balance
+  trainer: "PMRTrainer"
+  device: '1'
+  dataset: KS
 
 Train:
-  dataset: Balance
+  dataset: KS
 
 Test:
-  dataset: Balance
+  dataset: KS
 
 # dataset:
 #   dataloader:

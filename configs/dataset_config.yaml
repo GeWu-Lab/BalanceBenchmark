@@ -79,7 +79,7 @@ dataset:
     visual_path_test: /data/users/yake_wei/KS_2023/val-frames-1fps/test
     audio_path_test: /data/users/yake_wei/KS_2023/test_spec
     validation: false
-    classes: 34  
+    classes: 31  
     audio:
       input_dim: None
     visual:
