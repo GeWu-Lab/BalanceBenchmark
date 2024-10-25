@@ -24,7 +24,7 @@ def choose_logger(logger_name: str, log_dir, project: Optional[str] = None, comm
     elif logger_name == "tensorboard":
         logger = TensorBoardLogger(root_dir=log_dir, name='tensorboard',default_hp_metric=False, *args, **kwargs)
         tensorboard_log_dir = os.path.join(log_dir, 'tensorboard')
-        subprocess.Popen(['tensorboard', '--logdir', tensorboard_log_dir])
+        # subprocess.Popen(['tensorboard', '--logdir', tensorboard_log_dir])
         
         return logger
     elif logger_name == "wandb":

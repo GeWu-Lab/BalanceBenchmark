@@ -51,6 +51,7 @@ trainer_para:
     embed_dim: 512
     momentum_coef: 0.5
     mu: 0.01
+    eta: 0.01
   MBSD:
     alpha: 0.1
     method: "None"
@@ -70,3 +71,10 @@ trainer_para:
     modulation_starts: 0
     modulation_ends: 80
     scaling: 10
+  Greedy:
+    alpha: 0.001
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+    modality: 2
+    window_size: 5

@@ -4,7 +4,7 @@ check_point_path: '/home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseCl
 seed: 42
 ### 简洁化 
 Main_config:
-  model: "BaseClassifier_AMCo" #
+  model: "BaseClassifier" #
   tasks: "Classifier" #
   trainer: "AMCoTrainer"
   device: '0'
