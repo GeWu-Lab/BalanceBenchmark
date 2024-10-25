@@ -5,6 +5,7 @@ from ..utils.parser_utils import find_module
 import torch.nn as nn
 import torch
 __all__ = ['find_encoder', 'create_encoder']
+from .pretrained_encoder import text_encoder
 
 # ----------------------
 # Dynamic instantiation
@@ -49,10 +50,13 @@ def create_encoders(encoder_opt: dict[str, dict])->dict[str, nn.Module]:
         encoders[modality] = encoder(**encoder_opt[modality])
         encoder_opt[modality]['name'] = name
         if pre_train:
-            state = torch.load(path)
-            if modality == 'flow':
-                del state['conv1.weight']
-            encoders[modality].load_state_dict(state, strict=False)
+            if modality == 'text':
+                encoders[modality] = text_encoder()
+            else:
+                state = torch.load(path)
+                if modality == 'flow':
+                    del state['conv1.weight']
+                encoders[modality].load_state_dict(state, strict=False)
             print('pretrain load finish')
         encoder_opt[modality]['if_pretrain'] = pre_train
         encoder_opt[modality]['pretrain_path'] = path
