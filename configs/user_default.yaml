@@ -4,17 +4,11 @@ check_point_path: '/home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseCl
 seed: 42
 ### 简洁化 
 Main_config:
-  model: "BaseClassifier" #
+  model: "BaseClassifier_AMCo" #
   tasks: "Classifier" #
-<<<<<<< HEAD
-  trainer: "AGMTrainer"
+  trainer: "AMCoTrainer"
   device: '0'
   dataset: Mosei
-=======
-  trainer: "UMTTrainer"
-  device: '2'
-  dataset: UCF
->>>>>>> c2558a3ead7b961da10fdc00ee271fb6ff454dbf
 
 Train:
   dataset: Mosei

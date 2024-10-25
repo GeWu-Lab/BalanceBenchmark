@@ -351,7 +351,7 @@ class GBlendingTrainer(BaseTrainer):
             o_now = now_validation_loss - now_train_loss
             o = o_now - o_pre
             weights[modality] = abs(g/(o**2))
-        sums = sum(weights.values())
+        sums = sum(weights.values() ) + 1e-4
         info = ''
         logger.info(f'super_epoch begin in {self.current_epoch}')
         for modality in weights.keys():

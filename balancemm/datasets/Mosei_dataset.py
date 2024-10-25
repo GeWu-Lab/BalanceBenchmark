@@ -16,21 +16,12 @@ from torchvision import transforms
 # datasets, small modifications may be needed (depending on the type of the data, etc.)
 ############################################################################################
 
-def acc7(i):
-        if  -3<=i<-2:
-            return 0 
-        elif -2<=i<-1:
-            return 1
-        elif -1<= i <0:
-            return 2
-        elif i == 0:
-            return 3
-        elif  0<i<=1:
-            return 4
-        elif 1 <i <=2:
-            return 5
-        else : 
-            return 6
+def acc3(i):
+    if i<-0.5:
+        return 0
+    if i>0.5:
+        return 1
+    return 2
 class MoseiDataset(Dataset):
     def __init__(self, args: dict, transforms = None):
         super(MoseiDataset, self).__init__()
@@ -86,22 +77,6 @@ class MoseiDataset(Dataset):
         return self.labels.shape[1], self.labels.shape[2]
     def __len__(self):
         return len(self.labels)
-    
-    def _acc7(self, i):
-        if  -3<=i<-2:
-            return 0 
-        elif -2<=i<-1:
-            return 1
-        elif -1<= i <0:
-            return 2
-        elif i == 0:
-            return 3
-        elif  0<i<=1:
-            return 4
-        elif 1 <i <=2:
-            return 5
-        else : 
-            return 6
         
     def __getitem__(self, index):
         X = [index, self.text[index], self.audio[index], self.vision[index]]
@@ -111,7 +86,7 @@ class MoseiDataset(Dataset):
         # Y = int(Y.item())
         # new_Y = torch.zeros(1, 1)
         # new_Y[0, 0] = acc7(Y[0,0])
-        Y = acc7(Y[0,0])
+        Y = acc3(Y[0,0])
         META = (0,0,0) if self.meta is None else (self.meta[index][0], self.meta[index][1], self.meta[index][2])
         if self.data == 'mosi':
             META = (self.meta[index][0].decode('UTF-8'), self.meta[index][1].decode('UTF-8'), self.meta[index][2].decode('UTF-8'))

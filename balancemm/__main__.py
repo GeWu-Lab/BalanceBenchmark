@@ -39,6 +39,7 @@ def create_config(config_dict: dict):
     with open(osp.join(root_path ,"configs", "encoder_config.yaml"), 'r') as f:
         encoder_settings = yaml.safe_load(f)
     # config_dict = global_settings | config_dict
+    config_dict['fabric']['devices'] = list(map(int,config_dict['Main_config']['device'].split(',')))
     print('==================')
     print(config_dict)
     # print('==================')
