@@ -26,7 +26,18 @@ import datetime
 from .utils.train_utils import set_seed
 root_path = osp.dirname(osp.dirname(__file__))
 
-def create_config(config_dict: dict): 
+def args_split(args: list):
+    arg = {}
+    for i in range(len(args)):
+        if args[i].startswith('--umodel'):
+            name = args[i].split('.')[1]
+            args['model'][name] = args[i+1]
+        if args[i].startswith('--utrainer'):
+            name = args[i].split('.')[1]
+            args['trainer'][name] = args[i+1]
+
+
+def create_config(config_dict: dict, args): 
     """Create configuration from cli and yaml."""
     # with open(osp.join(root_path ,"configs", "global_config.yaml"), 'r') as f:
     #     global_settings = yaml.safe_load(f)
@@ -39,11 +50,35 @@ def create_config(config_dict: dict):
     with open(osp.join(root_path ,"configs", "encoder_config.yaml"), 'r') as f:
         encoder_settings = yaml.safe_load(f)
     # config_dict = global_settings | config_dict
+    if args.device :
+        config_dict['Main_config']['device'] = args.device
     config_dict['fabric']['devices'] = list(map(int,config_dict['Main_config']['device'].split(',')))
+    if isinstance(config_dict['train']['parameter']['base_lr'], str):
+        config_dict['train']['parameter']['base_lr'] = float(config_dict['train']['parameter']['base_lr'])
     print('==================')
     print(config_dict)
     # print('==================')
     # print(global_settings)
+    if args.model :
+        config_dict['Main_config']['model'] = args.model
+    if args.dataset:
+        config_dict['Main_config']['dataset'] = args.dataset
+    if args.trainer:
+        config_dict['Main_config']['trainer'] = args.trainer
+    if args.lr:
+        config_dict['train']['parameter']['base_lr'] = args.lr
+    name = config_dict['Main_config']['trainer'].split("Trainer", 1)[0]
+    if args.mu:
+        trainer_settings['trainer_para'][name]['mu'] = args.mu
+    if args.alpha: 
+        trainer_settings['trainer_para'][name]['alpha'] = args.alpha
+    if args.eta: 
+        trainer_settings['trainer_para'][name]['eta'] = args.eta
+    if args.scaling: 
+        trainer_settings['trainer_para'][name]['scaling'] = args.scaling
+    if args.lam: 
+        trainer_settings['trainer_para'][name]['lam'] = args.lam
+    
     try:
         #waiting for support iteration
         config_dict['dataset'] = dataset_settings['dataset'][config_dict['Main_config']['dataset']]
@@ -129,7 +164,22 @@ if __name__ == "__main__":
     # --------------------------------------------
 
     # get args from cli
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str, default= None)
+    parser.add_argument('--trainer', type=str, default= None)
+    parser.add_argument('--lr', type=float, default= None)
+    parser.add_argument('--alpha', type= float, default= None)
+    parser.add_argument('--eta', type= float, default= None)
+    parser.add_argument('--mu', type= float, default= None)
+    parser.add_argument('--lam', type= float, default= None)
+    parser.add_argument('--scaling', type= float, default= None)
+    parser.add_argument('--dataset', type= str, default= None)
+    parser.add_argument('--device', type= str, default= None)
+    
     args = sys.argv[1:]
+    print(args)
     os.environ['http_proxy'] = ''
     os.environ['https_proxy'] = ''
     # get yaml config path and load, if not specified, use user_default
@@ -140,11 +190,13 @@ if __name__ == "__main__":
         global_settings = yaml.safe_load(f)
     custom_args = global_settings | custom_args
     # merge cli_args into yaml and create config.
-    parse_cli_args_to_dict(args, custom_args)
-    print(custom_args)
+    # temp_args = {}
+    # parse_cli_args_to_dict(args, custom_args)
+    # parse_cli_args_to_dict(args, temp_args)
+    # print(custom_args)
     
     # merge custom_args into default global config(balancemm/config.toml)
-    args = create_config(custom_args)
+    args = create_config(custom_args, parser.parse_args())
     set_seed(args['seed'])
     # print args in yaml format
     print ("BalanceMM")

@@ -87,6 +87,8 @@ def train_and_test(args: dict):
     trainer.val_loop(model, test_dataloader)
     logger.info('Calculate the shapley value of best model')
     Calculate_Shapley(trainer = trainer, model = model, CalcuLoader = test_dataloader, logger= logger)
+    logger.info(f'The best val acc is : {trainer.best_acc}')
+    print(f'The best val acc is : {trainer.best_acc}')
 
     # 多卡（模型名字区别）
 
