@@ -65,6 +65,12 @@ trainer_para:
     modulation_ends: 80
     modality: 2
     scaling: 10
+  UMT:
+    alpha: 50
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+    scaling: 10
   Greedy:
     alpha: 0.001
     method: "None"

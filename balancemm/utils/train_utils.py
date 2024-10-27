@@ -34,8 +34,17 @@ def choose_logger(logger_name: str, log_dir, project: Optional[str] = None, comm
 
 def get_checkpoint_files(checkpoint_dir):
     checkpoint_files = sorted(glob.glob(os.path.join(checkpoint_dir, "*.ckpt")))
+    print(f'the checkpoint is {checkpoint_files}')
     return checkpoint_files
 
+def get_newest_path(out_dir):
+    folders = [f for f in os.listdir(out_dir) if os.path.isdir(os.path.join(out_dir, f)) and len(os.listdir(os.path.join(out_dir, f + '/checkpoints')))>0 ]
+    folder = max(folders, key=lambda f: os.path.getmtime(os.path.join(out_dir, f)))
+    folder = os.path.join(out_dir, folder + '/checkpoints')
+    if folder:
+        return folder
+    else:
+        raise ValueError('there are no pretrained model')
 def set_seed(seed):
     """
     Set random seed for training

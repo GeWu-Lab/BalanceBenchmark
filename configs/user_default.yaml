@@ -6,15 +6,16 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "PMRTrainer"
-  device: '1'
-  dataset: KS
+  trainer: "AMCoTrainer"
+  device: '0'
+  dataset: Mosei
 
 Train:
-  dataset: KS
+  dataset: Mosei
 
 Test:
-  dataset: KS
+  dataset: Mosei
+
 
 # dataset:
 #   dataloader:
