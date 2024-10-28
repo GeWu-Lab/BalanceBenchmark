@@ -51,8 +51,8 @@ run_training() {
     elif [ $method == "GreedyTrainer" ];then
     model_name="BaseClassifier_Greedy"
     fi
-    echo "--model $model_name --trainer $method --lr $lr_train --alpha $alpha_train --mu $mu_train --scaling $scaling_train --lam $lam_train --eta $eta_train --dataset Mosei --device 0"
-    local accuracy=$(python -m balancemm --model $model_name --trainer $method --lr $lr_train --alpha $alpha_train --mu $mu_train --scaling $scaling_train --lam $lam_train --eta $eta_train --dataset Mosei --device $device| tail -n 1| grep -oP "best val acc is : \K[0-9.]+")
+    echo "--model $model_name --trainer $method --lr $lr_train --alpha $alpha_train --mu $mu_train --scaling $scaling_train --lam $lam_train --eta $eta_train --dataset Cremad --device 0"
+    local accuracy=$(python -m balancemm --model $model_name --trainer $method --lr $lr_train --alpha $alpha_train --mu $mu_train --scaling $scaling_train --lam $lam_train --eta $eta_train --dataset Cremad --device $device| tail -n 1| grep -oP "best val acc is : \K[0-9.]+")
     echo "$accuracy" 
 }
 for group in "${groups[@]}"; do

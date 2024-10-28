@@ -38,6 +38,7 @@ class PMRTrainer(BaseTrainer):
         self.momentum_coef = method_dict['momentum_coef']
         self.mu = method_dict['mu']
         self.eta = method_dict['eta']
+        self.norm_epoch = method_dict['norm_epoch']
         self.proto = {}
         
     # @profile_flops()
@@ -176,14 +177,15 @@ class PMRTrainer(BaseTrainer):
                 else:
                     beta = 1 * clip(0, 1/ratio_a_p - 1, 1)
                     lam = 0
-                if self.current_epoch <= self.modulation_starts + 15:
+                if self.current_epoch <= self.modulation_starts + self.norm_epoch:
                     PER = {}
                     if loss_modality[key[0]] < loss_modality[key[1]]:
                         for modality in modality_list:
-                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[0]],proto[modality]))*log_softmax(-EU_dist(m[key[0]],proto[modality])),dim=1).mean()
+                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[0]],proto[modality])) * log_softmax(-EU_dist(m[key[0]],proto[modality])),dim=1).sum()
+                        print(PER)
                     else:
                         for modality in modality_list:
-                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[1]],proto[modality])) * log_softmax(-EU_dist(m[key[1]],proto[modality])),dim=1).mean()
+                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[1]],proto[modality])) * log_softmax(-EU_dist(m[key[1]],proto[modality])),dim=1).sum()
                     loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]] - self.mu * lam * PER[key[0]] - self.mu * beta * PER[key[1]]
                 else:
                     loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]

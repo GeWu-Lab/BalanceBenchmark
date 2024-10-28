@@ -173,8 +173,9 @@ class MMCosineTrainer(BaseTrainer):
             # out_a = out_a * self.scaling #
             # out_v = out_v * self.scaling
             # out = out_a + out_v 
-            out = sum(Uni_res[modality] for modality in key)
-            loss = criterion(out,label)
+            Uni_res['output'] = sum(Uni_res[modality] for modality in key)
+            model.Uni_res = Uni_res
+            loss = criterion(Uni_res['output'],label)
             # loss = criterion(out, label) + self.lam * nce_loss
         else:
             loss = criterion(m['out'],label)

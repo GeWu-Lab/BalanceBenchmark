@@ -165,34 +165,28 @@ class BaseTrainer():
                     if metircs == 'acc':
                         valid_acc = Metrics_res[metircs]
                         for modality in sorted(valid_acc.keys()):
+                            tag = f"train_acc/{modality}" if modality != 'output' else "train_acc"
                             if modality == 'output':
                                 output_info += f"train_acc: {valid_acc[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        "train_acc": valid_acc[modality]
-                                    }, step=self.current_epoch)
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        f"acc_{modality}": valid_acc[modality]
-                                    }, step=self.current_epoch)
+                            if tb_logger:
+                                tb_logger.log_metrics({
+                                    tag: valid_acc[modality]
+                                }, step=self.current_epoch)
                             
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
                         for modality in sorted(valid_f1.keys()):
+                            tag = f"train_f1/{modality}" if modality != 'output' else "train_f1"
                             if modality == 'output':
                                 output_info += f", train_f1: {valid_f1[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        "train_f1": valid_f1[modality]
-                                    }, step=self.current_epoch)
                             else:
                                 info += f", f1_{modality}: {valid_f1[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        f"f1_{modality}": valid_f1[modality]
-                                    }, step=self.current_epoch)
+                            if tb_logger:
+                                tb_logger.log_metrics({
+                                    tag: valid_f1[modality]
+                                }, step=self.current_epoch)
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
@@ -211,34 +205,28 @@ class BaseTrainer():
                     if metircs == 'acc':
                         valid_acc = Metrics_res[metircs]
                         for modality in sorted(valid_acc.keys()):
+                            tag = f"valid_acc/{modality}" if modality != 'output' else "valid_acc"
                             if modality == 'output':
                                 output_info += f"valid_acc: {valid_acc[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        "valid_acc": valid_acc[modality]
-                                    }, step=self.current_epoch)
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        f"acc_{modality}": valid_acc[modality]
-                                    }, step=self.current_epoch)
+                            if tb_logger:
+                                tb_logger.log_metrics({
+                                    tag: valid_acc[modality]
+                                }, step=self.current_epoch)
                                 
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
                         for modality in sorted(valid_f1.keys()):
+                            tag = f"valid_f1/{modality}" if modality != 'output' else "valid_f1"
                             if modality == 'output':
                                 output_info += f", valid_f1: {valid_f1[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        "valid_f1": valid_f1[modality]
-                                    }, step=self.current_epoch)
                             else:
                                 info += f", f1_{modality}: {valid_f1[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        f"f1_{modality}": valid_f1[modality]
-                                    }, step=self.current_epoch)
+                            if tb_logger:
+                                tb_logger.log_metrics({
+                                    tag: valid_f1[modality]
+                                }, step=self.current_epoch)
                 info = output_info+ ', ' + info
                     
                 logger.info(info)

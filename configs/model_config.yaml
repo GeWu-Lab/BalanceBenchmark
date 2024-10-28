@@ -1,10 +1,10 @@
 model:
   BaseClassifier:
-    encoders: {audio: Transformer, visual: Transformer, text: Transformer}
+    encoders: {audio: ResNet18, visual: ResNet18, text: Transformer}
     fusion: "concat"
     modality_size: 512
   BaseClassifier_AMCo:
-    encoders: {audio: Transformer, visual: Transformer, text: Transformer}
+    encoders: {audio: ResNet18, visual: ResNet18, text: Transformer}
     fusion: "concat"
     modality_size: 512
   BaseClassifier_Greedy:
