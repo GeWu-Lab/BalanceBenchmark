@@ -11,6 +11,8 @@ import numpy as np
 from collections.abc import Mapping
 from functools import partial
 from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
+from ..evaluation.precisions import BatchMetricsCalculator
+from ..models.avclassify_model import BaseClassifierModel
 
 import lightning as L
 from lightning_utilities import apply_to_collection
@@ -175,11 +177,132 @@ class MMCosineTrainer(BaseTrainer):
             # out = out_a + out_v 
             Uni_res['output'] = sum(Uni_res[modality] for modality in key)
             model.Uni_res = Uni_res
+            softmax =nn.Softmax(dim= 1)
+            for modality in model.Uni_res.keys():
+                softmax_res = softmax(model.Uni_res[modality])
+                model.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
             loss = criterion(Uni_res['output'],label)
             # loss = criterion(out, label) + self.lam * nce_loss
         else:
             loss = criterion(m['out'],label)
         loss.backward()
 
+        return loss
+    
+    def val_loop(
+        self,
+        model: L.LightningModule,
+        val_loader: Optional[torch.utils.data.DataLoader],
+        limit_batches: Union[int, float] = float("inf"),
+        limit_modalitys: list = ['ALL']
+    ):
+        """The validation loop ruunning a single validation epoch.
+
+        Args:
+            model: the LightningModule to evaluate
+            val_loader: The dataloader yielding the validation batches.
+            limit_batches: Limits the batches during this validation epoch.
+                If greater than the number of batches in the ``val_loader``, this has no effect.
+
+        """
+        # no validation if val_loader wasn't passed
+        if val_loader is None:
+            return
+
+        # # no validation but warning if val_loader was passed, but validation_step not implemented
+        # if val_loader is not None and not is_overridden("validation_step", _unwrap_objects(model)):
+        #     L.fabric.utilities.rank_zero_warn(
+        #         "Your LightningModule does not have a validation_step implemented, "
+        #         "but you passed a validation dataloder. Skipping Validation."
+        #     )
+        #     return
+
+        self.fabric.call("on_validation_model_eval")  # calls `model.eval()`
+        torch.set_grad_enabled(False)
+
+        self.fabric.call("on_validation_epoch_start")
+
+        iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
+        
+        if limit_modalitys == ["ALL"]:
+            limit_modalitys = list(model.modalitys).copy()
+        count = 0
+        _acc = {}
+        valid_loss = 0
+        modalitys = list(model.modalitys)
+        modalitys.append('output')
+        MetricsCalculator = BatchMetricsCalculator(model.n_classes, modalitys)
+        for batch_idx, batch in enumerate(iterable):
+            # end epoch if stopping training completely or max batches for this epoch reached
+            if self.should_stop or batch_idx >= limit_batches:
+                break
+
+            self.fabric.call("on_validation_batch_start", batch, batch_idx)
+
+            out = self.validation_step(model, batch, batch_idx,limit_modalitys)
+            # avoid gradients in stored/accumulated values -> prevents potential OOM
+            out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
+
+            self.fabric.call("on_validation_batch_end", out, batch, batch_idx)
+            self._current_val_return = out
+
+            self._format_iterable(iterable, self._current_val_return, "val")
+            # for modality in acc.keys():
+            #     if modality not in _acc:
+            #         _acc[modality] = 0
+            #     _acc[modality] += sum(acc[modality])
+            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            valid_loss += out
+            # count += len(batch['label'])
+        valid_loss /= MetricsCalculator.total_samples
+        Metrics_res = MetricsCalculator.compute_metrics()
+        self._current_metrics = Metrics_res
+        if Metrics_res['acc']['output'] > self.best_acc:
+            self.should_save = True
+            self.best_acc = Metrics_res['acc']['output']
+
+        self.fabric.call("on_validation_epoch_end")
+
+        self.fabric.call("on_validation_model_train")
+        torch.set_grad_enabled(True)
+        return valid_loss, Metrics_res
+    def validation_step(self, model, batch, batch_idx,limit_modalitys):
+        # ** drop
+        model(batch)
+        softmax  = nn.Softmax(dim = 1)
+        label = batch['label']
+        label = label.to(model.device)
+        key = list(model.modalitys)
+        modality_list = model.modalitys
+        m = {}
+        model(batch)
+        for modality in modality_list:
+            m[modality] = model.encoder_res[modality]
+        m['out'] = model.encoder_res['output']
+        Uni_res = {}
+        if len(key) == 2:
+            Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :m[key[0]].size(1)], 0, 1), dim=0))
+            Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1):], 0, 1), dim=0))
+        if len(key) == 3:
+            Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :m[key[0]].size(1)], 0, 1), dim=0))
+            Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1):m[key[0]].size(1)+m[key[1]].size(1)], 0, 1), dim=0))
+            Uni_res[key[2]] = torch.mm(F.normalize(m[key[2]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1)+m[key[1]].size(1):], 0, 1), dim=0))
+        for modality in modality_list:
+            Uni_res[modality] = Uni_res[modality] * self.scaling
+        Uni_res['output'] = sum(Uni_res[modality] for modality in key)
+        loss = F.cross_entropy(Uni_res['output'], label)
+        for modality in Uni_res.keys():
+            softmax_res = softmax(Uni_res[modality])
+            model.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        # for modality in self.Uni_res.keys():
+        #     acc_res[modality] = [0.0 for _ in range(n_classes)]
+        #     pred_res[modality] = softmax(self.Uni_res[modality])
+        # for i in range(label.shape[0]):
+        #     for modality in self.Uni_res.keys():
+        #         modality_pred = np.argmax(pred_res[modality][i].cpu().data.numpy())
+        #         if np.asarray(label[i].cpu()) == modality_pred:
+        #             acc_res[modality][label[i]] += 1.0
+            
+        #     num[label[i]] += 1.0
         return loss
     
