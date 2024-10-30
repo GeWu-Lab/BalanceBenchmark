@@ -6,15 +6,15 @@ seed: 42
 Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "AMCoTrainer"
-  device: '0'
-  dataset: Mosei
+  trainer: "unimodalTrainer"
+  device: '1'
+  dataset: UMPC_Food
 
 Train:
-  dataset: Mosei
+  dataset: UMPC_Food
 
 Test:
-  dataset: Mosei
+  dataset: UMPC_Food
 
 
 # dataset:
