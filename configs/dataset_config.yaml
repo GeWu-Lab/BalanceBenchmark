@@ -13,7 +13,7 @@ dataset:
     dataset_path: /home/zequn_yang/MMT/data/  #
     data : mosei_senti
     if_align: false
-    classes: 3  #
+    classes: 2  #
     validation: True
     audio:  ###
       input_dim: 74
