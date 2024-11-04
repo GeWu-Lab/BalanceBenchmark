@@ -1,6 +1,7 @@
 from typing import Mapping
 from lightning import LightningModule
 from torch.optim.optimizer import Optimizer as Optimizer
+from lightning.fabric.loggers import TensorBoardLogger
 from .base_trainer import BaseTrainer
 
 import torch
@@ -342,22 +343,26 @@ class AGMTrainer(BaseTrainer):
                 info = ''
                 ##parse the Metrics
                 Metrics_res = self._current_metrics
+                modality_list = model.modalitys
+                tb = {}
+                if tb_logger:
+                    for modality in modality_list:
+                        tb[modality] = TensorBoardLogger(root_dir=tb_logger.root_dir, name=f'tensorboard',default_hp_metric=False,version=0,sub_dir = f'{modality}')
                 for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':
                         valid_acc = Metrics_res[metircs]
                         for modality in sorted(valid_acc.keys()):
+                            tag = 'train_acc'
                             if modality == 'output':
                                 output_info += f"train_acc: {valid_acc[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        "train_acc": valid_acc[modality]
-                                    }, step=self.current_epoch)
+                                tb_logger.log_metrics({
+                                    tag: valid_acc[modality]
+                                }, step=self.current_epoch)
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        f"acc_{modality}": valid_acc[modality]
-                                    }, step=self.current_epoch)
+                                tb[modality].log_metrics({
+                                    tag: valid_acc[modality]
+                                }, step=self.current_epoch)
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
                         for modality in sorted(valid_f1.keys()):
