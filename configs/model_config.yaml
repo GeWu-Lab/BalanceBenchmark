@@ -1,6 +1,6 @@
 model:
   BaseClassifier:
-    encoders: {visual: ResNet18}
+    encoders: {text: Transformer, visual: ResNet18}
     fusion: "concat"
     modality_size: 512
   BaseClassifier_AMCo:

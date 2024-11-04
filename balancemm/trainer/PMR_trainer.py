@@ -41,7 +41,6 @@ class PMRTrainer(BaseTrainer):
         self.norm_epoch = method_dict['norm_epoch']
         self.proto = {}
         
-    # @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -121,6 +120,7 @@ class PMRTrainer(BaseTrainer):
         criterion = nn.CrossEntropyLoss()
         softmax = nn.Softmax(dim=1)
         log_softmax = nn.LogSoftmax(dim=1)
+        tanh = nn.Tanh()
         modality_list = model.modalitys
         key = list(modality_list)
         m = {}
@@ -134,6 +134,8 @@ class PMRTrainer(BaseTrainer):
         label = label.to(model.device)
         loss_modality = {}
         for modality in modality_list:
+            # print(Uni_res[modality])
+            # print(label)
             loss_modality[modality] = criterion(Uni_res[modality],label)
 
         if  self.modulation_starts <= self.current_epoch <= self.modulation_ends:
@@ -189,27 +191,27 @@ class PMRTrainer(BaseTrainer):
                     loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]] - self.mu * lam * PER[key[0]] - self.mu * beta * PER[key[1]]
                 else:
                     loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]
+                loss.backward()
             else:
+                loss = criterion(Uni_res['output'], label)
+                loss.backward()
                 k_t = {}
                 for modality in modality_list:
                     if ratio[modality] > 1:
-                        k_t[modality] = 1-nn.Tanh(self.eta * ratio[modality])
+                        k_t[modality] = 1-tanh(self.eta * ratio[modality])
                     else:
                         k_t[modality] = 1
-                if self.current_epoch <= self.modulation_starts + 15:
-                    PER = {}
-                    # if ratio_a_p >= 1:
+                
+                for name, parms in model.named_parameters():
+                    layer = str(name)
                     for modality in modality_list:
-                        PER[modality] = -torch.sum(softmax(-EU_dist(m[modality],proto[modality]))*log_softmax(-EU_dist(m[modality],proto[modality])),dim=1).sum()
-                    loss = criterion(Uni_res['output'], label) + self.alpha * k_t[key[0]] * loss_proto[key[0]] + self.alpha * k_t[key[1]] * loss_proto[key[1]] + self.alpha * k_t[key[2]] * loss_proto[key[2]] - self.mu * k_t[key[0]] * PER[key[0]] - self.mu * k_t[key[1]] * PER[key[1]] - - self.mu * k_t[key[2]] * PER[key[2]] 
-                else:
-                    loss = criterion(Uni_res['output'], label) + self.alpha * k_t[key[0]] * loss_proto[key[0]] + self.alpha * k_t[key[1]] * loss_proto[key[1]] + self.alpha * k_t[key[2]] * loss_proto[key[2]]
-            # loss_v = criterion(out_v, label)
+                        if modality in layer and len(parms.grad.size()) != 1: ##Don't change the grad of bias for layer
+                            parms.grad = parms.grad * k_t[modality]  - \
+                                        torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
             # loss_a = criterion(out_a, label)
         else:
             loss = criterion(Uni_res['output'], label)
-        
-        loss.backward()
+            loss.backward()
         
 
         # # avoid gradients in stored/accumulated values -> prevents potential OOM
