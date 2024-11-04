@@ -62,13 +62,22 @@ class BaseClassifierModel(nn.Module):
     def Transformer_Process(self, modality_data: torch.Tensor, modality: str)-> torch.Tensor:
         res = self.modality_encoder[modality](modality_data)
         return res
+    
+    def ViT_Process(self, modality_data: torch.Tensor, modality: str)-> torch.Tensor:
+        modality_data = modality_data.unsqueeze(1)
+        res = self.modality_encoder[modality](modality_data)
+        return res
 
     def Encoder_Process(self, modality_data : torch.Tensor, modality_name: str) -> torch.Tensor:
         ## May be it could use getattr
         encoder_name = self.enconders[modality_name]['name']
         if encoder_name == 'ResNet18':
             res = self.Resnet_Process(modality_data = modality_data, modality = modality_name)
-        elif encoder_name == 'Transformer':
+        elif encoder_name == 'Transformer' or encoder_name == 'Transformer_':
+            res = self.Transformer_Process(modality_data = modality_data, modality = modality_name)
+        elif encoder_name == 'ViT_B':
+            res = self.ViT_Process(modality_data = modality_data, modality = modality_name)
+        elif encoder_name == 'Transformer_LA':
             res = self.Transformer_Process(modality_data = modality_data, modality = modality_name)
         return res
     

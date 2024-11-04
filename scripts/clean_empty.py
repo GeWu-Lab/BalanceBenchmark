@@ -11,7 +11,7 @@ def cleanup_directories(root_path):
     """
     # Convert to absolute path to avoid any relative path issues
     root_path = os.path.abspath(root_path)
-    backup_path = "/data/users/shaoxuan_xu/3_OGM/backup"
+    backup_path = "/home/shaoxuan_xu/backup"
     # List to store directories to be removed
     to_remove = []
     dont_remove = []

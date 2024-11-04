@@ -9,25 +9,16 @@ alphas=("AGMTrainer" "OGMTrainer" "UMTTrainer" "GreedyTrainer") #greedy #UMT
 lams=("CMLTrainer")
 scalings=("MMCosineTrainer")
 unique=("PMRTrainer")
-<<<<<<< HEAD
 normals=("AMCoTrainer" "GBlendingTrainer" "MBSDTrainer" "baselineTrainer")
 groups=(alphas lams unique scalings normals)
 # methods=("MMCosineTrainer" "GreedyTrainer")
 # methods=("AGMTrainer" "OGMTrainer" "GreedyTrainer")
-methods=(" GBlendingTrainer" "MBSDTrainer" "AMCoTrainer")
+methods=("GBlendingTrainer" "MBSDTrainer" "AMCoTrainer")
+methods=("AGMTrainer" "GBlendingTrainer" "OGMTrainer")
 # 定义参数范围
 
 alpha_scaler=(0.1 0.5 1.0 1.5)
-target_accuracy=0.9  # 预设目标准确率
-=======
-normals=("AMCoTrainer" "GBlendingTrainer" "MBSDTrainer" "baselinetrainer")
-groups=(alphas lams unique scalings normals)
-methods=("AMCoTrainer" "CMLTrainer")
-# 定义参数范围
-
-alpha_scaler=(0.1 0.5 1.0 1.5)
-target_accuracy=0.8111  # 预设目标准确率
->>>>>>> b5098f758d83c3acc02505f4bce92156f9375eb9
+target_accuracy=0.81  # 预设目标准确率
 
 # # 日志文件
 # log_file="training_log_$normals.txt"
@@ -84,19 +75,7 @@ for method in "${methods[@]}"; do
 
     # 记录日志的函数
     log() {
-<<<<<<< HEAD
-        local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
-        # 检查是否为数字（包括小数）
-        if [[ $1 =~ ^[+-]?[0-9]*\.?[0-9]+$ ]]; then
-            # 如果是数字，使用 printf 格式化输出，保留 3 位小数
-            printf "$timestamp %.3f\n" "$1" | tee -a "$log_file"
-        else
-            # 如果是字符串，直接使用 echo 输出
-            echo "$timestamp $1" | tee -a "$log_file"
-        fi
-=======
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1 " | tee -a "$log_file"
->>>>>>> b5098f758d83c3acc02505f4bce92156f9375eb9
     }
     # 网格搜索参数
     log "===== 开始测试方法: $method ====="
@@ -115,17 +94,15 @@ for method in "${methods[@]}"; do
                     alpha_scaler=(0.1 0.3 0.5 1.0)
                 fi
                 if [ "$method" == "CMLTrainer" ]; then
-                    lam_scaler=(10 15 30 45)
+                    # lam_scaler=(10 15 30 45)
+                    lam_scaler=(0.2 0.3 0.5 1)
                 fi
                 if [ "$method" == "MMCosineTrainer" ]; then
-                    scaling_scaler=(5 10 20 40)
+                    # scaling_scaler=(5 10 20 40)
+                    scaling_scaler=(0.2 0.3 0.5 1)
                 fi
                 if [ "$method" == "GreedyTrainer" ]; then
-<<<<<<< HEAD
                     alpha_scaler=(0.001 0.005 0.01)
-=======
-                    alpha_scaler=(0.001 0.005 0.001)
->>>>>>> b5098f758d83c3acc02505f4bce92156f9375eb9
                 fi 
             fi
         done   
@@ -154,11 +131,7 @@ for method in "${methods[@]}"; do
                 log "方法 $method 的最佳结果:"
                 log "Best Alpha: $best_alpha"
                 log "Best Learning Rate: $best_lr"
-<<<<<<< HEAD
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Best Accuracy: $best_accuracy" | tee -a "$log_file"
-=======
-                log "Best Accuracy: $best_accuracy"
->>>>>>> b5098f758d83c3acc02505f4bce92156f9375eb9
                 log "========================"
                 break 1  # 跳出两层循环
             fi
@@ -186,11 +159,7 @@ for method in "${methods[@]}"; do
                 log "达到目标准确率，提前结束搜索"
                 log "方法 $method 的最佳结果:"
                 log "Best Learning Rate: $best_lr"
-<<<<<<< HEAD
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Best Accuracy: $best_accuracy" | tee -a "$log_file"
-=======
-                log "Best Accuracy: $best_accuracy"
->>>>>>> b5098f758d83c3acc02505f4bce92156f9375eb9
                 log "========================"
                 break 1  # 跳出两层循环
             fi
@@ -219,11 +188,7 @@ for method in "${methods[@]}"; do
                 log "方法 $method 的最佳结果:"
                 log "Best lam: $best_lam"
                 log "Best Learning Rate: $best_lr"
-<<<<<<< HEAD
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Best Accuracy: $best_accuracy" | tee -a "$log_file"
-=======
-                log "Best Accuracy: $best_accuracy"
->>>>>>> b5098f758d83c3acc02505f4bce92156f9375eb9
                 log "========================"
                 break 1  # 跳出两层循环
             fi
@@ -252,11 +217,7 @@ for method in "${methods[@]}"; do
                 log "方法 $method 的最佳结果:"
                 log "Best scaling: $best_scaling"
                 log "Best Learning Rate: $best_lr"
-<<<<<<< HEAD
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Best Accuracy: $best_accuracy" | tee -a "$log_file"
-=======
-                log "Best Accuracy: $best_accuracy"
->>>>>>> b5098f758d83c3acc02505f4bce92156f9375eb9
                 log "========================"
                 break 1  # 跳出两层循环
             fi
@@ -267,11 +228,7 @@ for method in "${methods[@]}"; do
     # log "方法 $method 的最佳结果:"
     # log "Best Alpha: $best_alpha"
     # log "Best Learning Rate: $best_lr"
-<<<<<<< HEAD
     # echo "[$(date '+%Y-%m-%d %H:%M:%S')] Best Accuracy: $best_accuracy" | tee -a "$log_file"
-=======
-    # log "Best Accuracy: $best_accuracy"
->>>>>>> b5098f758d83c3acc02505f4bce92156f9375eb9
     # log "========================"
     
     # 添加一些间隔时间，避免过于频繁的训练

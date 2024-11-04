@@ -2,6 +2,16 @@ import torch
 import math
 import torch.nn as nn
 import torch.nn.functional as F
+class Config():
+    def __init__(self,input_dim, layer, hidden_size, dropout_r, multi_head, ff_size, seq_len):
+        self.input_dim = input_dim
+        self.layer = layer
+        self.hidden_size = hidden_size
+        self.dropout_r = dropout_r
+        self.multi_head = multi_head
+        self.ff_size = ff_size
+        self.seq_len = seq_len
+
 def make_mask(feature):
     return (torch.sum(
         torch.abs(feature),
@@ -237,115 +247,143 @@ class Block(nn.Module):
 
         self.last = (i == args.layer-1)
         if not self.last:
-            self.att_lang = AttFlat(args, args.lang_seq_len, merge=False)
-            self.att_audio = AttFlat(args, args.audio_seq_len, merge=False)
-            self.norm_l = LayerNorm(args.hidden_size)
-            self.norm_i = LayerNorm(args.hidden_size)
+            self.att = AttFlat(args, args.seq_len, merge=False)
+            self.norm = LayerNorm(args.hidden_size)
             self.dropout = nn.Dropout(args.dropout_r)
 
-    def forward(self, x, x_mask, y, y_mask):
+    def forward(self, x, x_mask):
 
         ax = self.sa1(x, x_mask)
-        ay = self.sa3(y, x, y_mask, x_mask)
-
         x = ax + x
-        y = ay + y
-
         if self.last:
-            return x, y
+            return x
+        ax = self.att(x, x_mask)
 
-        ax = self.att_lang(x, x_mask)
-        ay = self.att_audio(y, y_mask)
+        return self.norm(x + self.dropout(ax))
 
-        return self.norm_l(x + self.dropout(ax)), \
-               self.norm_i(y + self.dropout(ay))
 
-class Transformer_LA(nn.Module):
-    def __init__(self, args, vocab_size, pretrained_emb):
-        super(Transformer_LA, self).__init__()
-
-        self.args = args
-        self.mode = "classify"
-        # LSTM
-        self.embedding = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=args.word_embed_size
-        )
-
-        # Loading the GloVe embedding weights
-        self.embedding.weight.data.copy_(torch.from_numpy(pretrained_emb))
-
-        self.lstm_x = nn.LSTM(
-            input_size=args.word_embed_size,
-            hidden_size=args.hidden_size,
-            num_layers=1,
-            batch_first=True
-        )
-
-        # self.lstm_y = nn.LSTM(
-        #     input_size=args.audio_feat_size,
-        #     hidden_size=args.hidden_size,
-        #     num_layers=1,
-        #     batch_first=True
-        # )
-
-        # Feature size to hid size
-        self.adapter = nn.Linear(args.audio_feat_size, args.hidden_size)
-
-        # Encoder blocks
-        self.enc_list = nn.ModuleList([Block(args, i) for i in range(args.layer)])
-
-        # Flattenting features before proj
-        self.attflat_img  = AttFlat(args, 1, merge=True)
-        self.attflat_lang = AttFlat(args, 1, merge=True)
-
-        # Classification layers
-        self.proj_norm = LayerNorm(2 * args.hidden_size)
-        if self.args.task == "sentiment":
-            if self.args.task_binary:
-                self.proj = nn.Linear(2*args.hidden_size,2)
-            else:
-                self.proj = nn.Linear(2*args.hidden_size,7)
-        elif self.args.task == "emotion":
-            self.proj = nn.Linear(2*args.hidden_size,6)
-
-    def forward(self, x, y,pad_x=False,pad_y=False):
-        x_mask = make_mask(x.unsqueeze(2))
-        y_mask = make_mask(y)
-
-        if pad_x:
-            x = torch.zeros_like(x,device=x.device)
-
-        if pad_y:
-            y = torch.zeros_like(y,device=y.device)
-        x = x.long()
-        embedding = self.embedding(x)
-        self.lstm_x.train()
-        x, _ = self.lstm_x(embedding)
-        # y, _ = self.lstm_y(y)
-
-        y = self.adapter(y)
+class Transformer_LAEncoder(nn.Module):
+    def __init__(self, input_dim, layer, hidden_size, dropout_r, multi_head, ff_size, seq_len, modality):
+        super(Transformer_LAEncoder,self).__init__()
+        args = Config(input_dim, layer, hidden_size, dropout_r, multi_head, ff_size, seq_len)
+        self.modality = modality
+        self.enc_list = nn.ModuleList([Block(args, i) for i in range(layer)])
+        # self.enc_list = nn.ModuleList([nn.Transformer(d_model=hidden_size)])
+        self.adapter = nn.Linear(input_dim, hidden_size)
+        if self.modality == "text":
+            self.lstm = nn.LSTM(
+                input_size = input_dim,
+                hidden_size = hidden_size,
+                num_layers=1,
+                batch_first=True
+            )
+        self.attflat = AttFlat(args, 1, merge=True)
+    
+    def forward(self,x):
+        x_mask = make_mask(x)
+        if self.modality == "text":
+            x, _ = self.lstm_x(x)
+        else:
+            x = self.adapter(x)
 
         for i, dec in enumerate(self.enc_list):
-            x_m, x_y = None, None
+            x_m= None
             if i == 0:
-                x_m, x_y = x_mask, y_mask
-            x, y = dec(x, x_m, y, x_y)
+                x_m= x_mask
+            x = dec(x, x_m)
 
-        x = self.attflat_lang(
+        x = self.attflat(
             x,
             None
         )
+        return x
+    
+# class Transformer_LA(nn.Module):
+#     def __init__(self, args, vocab_size, pretrained_emb):
+#         super(Transformer_LA, self).__init__()
 
-        y = self.attflat_img(
-            y,
-            None
-        )
+#         self.args = args
+#         self.mode = "classify"
+#         # LSTM
+#         self.embedding = nn.Embedding(
+#             num_embeddings=vocab_size,
+#             embedding_dim=args.word_embed_size
+#         )
 
-        # Classification layers
-        proj_feat = x + y
-        proj_feat = self.proj_norm(proj_feat)
-        ans = self.proj(proj_feat)
-        if self.mode == "feature":
-            return proj_feat
-        return ans
+#         # Loading the GloVe embedding weights
+#         self.embedding.weight.data.copy_(torch.from_numpy(pretrained_emb))
+
+#         self.lstm_x = nn.LSTM(
+#             input_dim=args.word_embed_size,
+#             hidden_size=args.hidden_size,
+#             num_layers=1,
+#             batch_first=True
+#         )
+
+#         # self.lstm_y = nn.LSTM(
+#         #     input_dim=args.audio_feat_size,
+#         #     hidden_size=args.hidden_size,
+#         #     num_layers=1,
+#         #     batch_first=True
+#         # )
+
+#         # Feature size to hid size
+#         self.adapter = nn.Linear(args.audio_feat_size, args.hidden_size)
+
+#         # Encoder blocks
+#         self.enc_list = nn.ModuleList([Block(args, i) for i in range(args.layer)])
+
+#         # Flattenting features before proj
+#         self.attflat_img  = AttFlat(args, 1, merge=True)
+#         self.attflat_lang = AttFlat(args, 1, merge=True)
+
+#         # Classification layers
+#         self.proj_norm = LayerNorm(2 * args.hidden_size)
+#         if self.args.task == "sentiment":
+#             if self.args.task_binary:
+#                 self.proj = nn.Linear(2*args.hidden_size,2)
+#             else:
+#                 self.proj = nn.Linear(2*args.hidden_size,7)
+#         elif self.args.task == "emotion":
+#             self.proj = nn.Linear(2*args.hidden_size,6)
+
+#     def forward(self, x, y,pad_x=False,pad_y=False):
+#         x_mask = make_mask(x.unsqueeze(2))
+#         y_mask = make_mask(y)
+
+#         if pad_x:
+#             x = torch.zeros_like(x,device=x.device)
+
+#         if pad_y:
+#             y = torch.zeros_like(y,device=y.device)
+#         x = x.long()
+#         embedding = self.embedding(x)
+#         self.lstm_x.train()
+#         x, _ = self.lstm_x(embedding)
+#         # y, _ = self.lstm_y(y)
+
+#         y = self.adapter(y)
+
+#         for i, dec in enumerate(self.enc_list):
+#             x_m, x_y = None, None
+#             if i == 0:
+#                 x_m, x_y = x_mask, y_mask
+#             x, y = dec(x, x_m, y, x_y)
+
+#         x = self.attflat_lang(
+#             x,
+#             None
+#         )
+
+#         y = self.attflat_img(
+#             y,
+#             None
+#         )
+
+#         # Classification layers
+#         proj_feat = x + y
+#         proj_feat = self.proj_norm(proj_feat)
+#         ans = self.proj(proj_feat)
+#         if self.mode == "feature":
+#             return proj_feat
+#         return ans
