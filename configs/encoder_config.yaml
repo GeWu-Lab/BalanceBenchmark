@@ -1,6 +1,6 @@
 
 Transformer:
-  if_pretrain: False
+  if_pretrain: True
   pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
   output_dim: 1024
   audio:
