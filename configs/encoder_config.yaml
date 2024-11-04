@@ -1,4 +1,43 @@
 
+ViT_B:
+  if_pretrain: False
+  pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
+  output_dim: 1000
+  audio:
+    tpye: None
+  visual:
+    tpye: None
+  text:
+    tpye: None
+
+Transformer_LA:
+  if_pretrain: False
+  pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
+  output_dim: 1000
+  audio:
+    layer: 6
+    hidden_size: 512
+    dropout_r: 0.1
+    multi_head: 4
+    ff_size: 1024
+    seq_len: 60
+    modality: "audio"
+  visual:
+    layer: 6
+    hidden_size: 512
+    dropout_r: 0.1
+    multi_head: 4
+    ff_size: 1024
+    seq_len: 60
+    modality: "visual"
+  text:
+    layer: 6
+    hidden_size: 512
+    dropout_r: 0.1
+    multi_head: 4
+    ff_size: 1024
+    seq_len: 60
+    modality: "text"
 Transformer:
   if_pretrain: True
   pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
@@ -18,9 +57,25 @@ Transformer:
     dim: 1024
     n_head: 4
     n_layers: 2
+Transformer_:
+  if_pretrain: False
+  pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
+  output_dim: 1024
+  audio:
+    dim: 1024
+    n_head: 4
+    n_layers: 2
+  visual:
+    dim: 1024
+    n_head: 4
+    n_layers: 2
+  text:
+    dim: 1024
+    n_head: 4
+    n_layers: 2
 ResNet18:
   output_dim: 512
-  if_pretrain: True
+  if_pretrain: False
   pretrain_path: '/data/users/shaoxuan_xu/3_OGM/Pretrained_model/resnet18.pth'
   audio:
     modality: 'audio'

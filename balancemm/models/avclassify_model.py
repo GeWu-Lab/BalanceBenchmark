@@ -62,13 +62,22 @@ class BaseClassifierModel(nn.Module):
     def Transformer_Process(self, modality_data: torch.Tensor, modality: str)-> torch.Tensor:
         res = self.modality_encoder[modality](modality_data)
         return res
+    
+    def ViT_Process(self, modality_data: torch.Tensor, modality: str)-> torch.Tensor:
+        modality_data = modality_data.unsqueeze(1)
+        res = self.modality_encoder[modality](modality_data)
+        return res
 
     def Encoder_Process(self, modality_data : torch.Tensor, modality_name: str) -> torch.Tensor:
         ## May be it could use getattr
         encoder_name = self.enconders[modality_name]['name']
         if encoder_name == 'ResNet18':
             res = self.Resnet_Process(modality_data = modality_data, modality = modality_name)
-        elif encoder_name == 'Transformer':
+        elif encoder_name == 'Transformer' or encoder_name == 'Transformer_':
+            res = self.Transformer_Process(modality_data = modality_data, modality = modality_name)
+        elif encoder_name == 'ViT_B':
+            res = self.ViT_Process(modality_data = modality_data, modality = modality_name)
+        elif encoder_name == 'Transformer_LA':
             res = self.Transformer_Process(modality_data = modality_data, modality = modality_name)
         return res
     
@@ -366,7 +375,7 @@ class MMTM(nn.Module):
         i = 0
         for modality in model.modalitys:
             # self.fc_excites[modality] = nn.Linear(dim_out, modalities_dims[i]).to(f"cuda:{model.device}")
-            self.running_avg_weight[modality] = torch.zeros(modalities_dims[i]).to(f"cuda:{model.device}")
+            self.running_avg_weight[modality] = torch.zeros(modalities_dims[i]).to(f"{model.device}")
             i+=1
         # self.fc_excites = nn.ModuleList([nn.Linear(dim_out, dim) for dim in modalities_dims])
         # self.running_avg_weights = torch.zeros(total_dim).to(self.device)

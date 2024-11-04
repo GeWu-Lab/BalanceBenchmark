@@ -22,6 +22,30 @@ def acc3(i):
     if i>0.5:
         return 1
     return 2
+
+def acc7(i):
+    if i < -2:
+        res = 0
+    if -2 <= i and i < -1:
+        res = 1
+    if -1 <= i and i < 0:
+        res = 2
+    if 0 <= i and i <= 0:
+        res = 3
+    if 0 < i and i <= 1:
+        res = 4
+    if 1 < i and i <= 2:
+        res = 5
+    if i > 2:
+        res = 6
+    return res
+
+def acc2(i):
+    if i<0:
+        return 0
+    else :
+        return 1
+
 class MoseiDataset(Dataset):
     def __init__(self, args: dict, transforms = None):
         super(MoseiDataset, self).__init__()
@@ -86,7 +110,7 @@ class MoseiDataset(Dataset):
         # Y = int(Y.item())
         # new_Y = torch.zeros(1, 1)
         # new_Y[0, 0] = acc7(Y[0,0])
-        Y = acc3(Y[0,0])
+        Y = acc2(Y[0,0])
         META = (0,0,0) if self.meta is None else (self.meta[index][0], self.meta[index][1], self.meta[index][2])
         if self.data == 'mosi':
             META = (self.meta[index][0].decode('UTF-8'), self.meta[index][1].decode('UTF-8'), self.meta[index][2].decode('UTF-8'))
@@ -100,8 +124,11 @@ class MoseiDataset(Dataset):
 if __name__ == '__main__':
     dataset_path = '/home/zequn_yang/MMT/data/'
     data='mosei_senti'
-    split_type= 'val'
-    if_align = True
+    split_type= 'test'
+    #train = 16326 test = 4659
+    if_align = False
     dataset_path = os.path.join(dataset_path, data+'_data.pkl' if if_align else data+'_data_noalign.pkl' )
     dataset = pickle.load(open(dataset_path, 'rb'))
-    print(dataset.keys())
+    count = 0
+    # for split_type in dataset.keys():
+    print(dataset[split_type]['vision'][0].shape)

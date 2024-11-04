@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch
 __all__ = ['find_encoder', 'create_encoder']
 from .pretrained_encoder import text_encoder
-
+from torchvision.models import vit_b_16, vit_h_14
 # ----------------------
 # Dynamic instantiation
 # ----------------------
@@ -43,6 +43,12 @@ def create_encoders(encoder_opt: dict[str, dict])->dict[str, nn.Module]:
         pre_train = encoder_opt[modality]['if_pretrain']
         path = encoder_opt[modality]['pretrain_path']
         name = encoder_opt[modality]['name']
+        if name == "ViT_B":
+            if pre_train:
+                encoders[modality] = vit_b_16(path)
+            else:
+                encoders[modality] = vit_b_16()
+            continue
         del encoder_opt[modality]['pretrain_path']
         del encoder_opt[modality]['if_pretrain']
         encoder = find_encoder(encoder_opt[modality]['name'])

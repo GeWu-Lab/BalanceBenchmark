@@ -68,6 +68,10 @@ def create_config(config_dict: dict, args):
     if args.lr:
         config_dict['train']['parameter']['base_lr'] = args.lr
     name = config_dict['Main_config']['trainer'].split("Trainer", 1)[0]
+    config_dict['Train']['dataset'] = config_dict['Main_config']['dataset']
+    config_dict['Test']['dataset'] = config_dict['Main_config']['dataset']
+    if name == "unimodal":
+        name = 'baseline'
     if args.mu:
         trainer_settings['trainer_para'][name]['mu'] = args.mu
     if args.alpha: 
