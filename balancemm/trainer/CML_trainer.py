@@ -132,7 +132,7 @@ class CMLTrainer(BaseTrainer):
                 model(batch)
                 for modality in modality_list:
                     m[modality] = model.encoder_res[modality]
-                m['out'] = model.encodr_res['output']
+                m['out'] = model.encoder_res['output']
                 # a, v, t, out = model(batch)
                 Uni_res = model.Unimodality_Calculate()
                 out_s = Uni_res['output']
@@ -167,8 +167,8 @@ class CMLTrainer(BaseTrainer):
                     
                     loss_p = criterion(out_p, label)
                     loss_pc ,_ = conf_loss(conf_s, pred_s, conf_p, pred_p, label)
-                    loss += loss_p
-                    _loss_c += loss_pc
+                    loss = loss_p + loss
+                    _loss_c = loss_pc + _loss_c
 
                     out_s = out_p
                     # if random_dict['audio']:

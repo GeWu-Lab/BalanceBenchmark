@@ -111,7 +111,13 @@ class MoseiDataset(Dataset):
         # Y = int(Y.item())
         # new_Y = torch.zeros(1, 1)
         # new_Y[0, 0] = acc7(Y[0,0])
-        Y = acc7(Y[0,0])
+        # Y = acc7(Y[0,0])
+        
+        if Y[0,0] >= 0:
+            Y = 1
+        else:
+            Y = 0
+        
         META = (0,0,0) if self.meta is None else (self.meta[index][0], self.meta[index][1], self.meta[index][2])
         if self.data == 'mosi':
             META = (self.meta[index][0].decode('UTF-8'), self.meta[index][1].decode('UTF-8'), self.meta[index][2].decode('UTF-8'))

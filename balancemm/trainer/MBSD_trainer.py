@@ -103,6 +103,7 @@ class MBSDTrainer(BaseTrainer):
         key = list(modality_list)
         m = {}
         loss = {}
+        loss_modality = {}
         prediction = {}
         y_pred = {}
         model(batch)
@@ -119,7 +120,7 @@ class MBSDTrainer(BaseTrainer):
     
         loss['out'] = criterion(m['out'], label)
         for modality in modality_list:
-            loss[modality] = criterion(model.Uni_res[modality], label)
+            loss_modality[modality] = criterion(model.Uni_res[modality], label)
         # loss_v = criterion(Uni_res[], label)
         # loss_a = criterion(out_a, label)
 
@@ -128,34 +129,95 @@ class MBSDTrainer(BaseTrainer):
         # prediction_a = softmax(out_a)
         # prediction_v = softmax(out_v)
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-            loss_RS = 1/model.Uni_res[key[0]].shape[1] * torch.sum((model.Uni_res[key[0]] - model.Uni_res[key[1]])**2, dim = 1)
+            if len(modality_list) == 2:
+                
+                loss_RS = 1/model.Uni_res[key[0]].shape[1] * torch.sum((model.Uni_res[key[0]] - model.Uni_res[key[1]])**2, dim = 1)
 
-            w = torch.tensor([0.0 for _ in range(len(m['out']))])
-            w = w.to(device)
-            for modality in modality_list:
-                y_pred[modality] = prediction[modality]
-                y_pred[modality] = y_pred[modality].argmax(dim=-1)
-            # y_pred_a = prediction_a
-            # y_pred_a = y_pred_a.argmax(dim = -1)
-            # y_pred_v = prediction_v
-            # y_pred_v = y_pred_v.argmax(dim = -1)
-            ps = torch.tensor([0.0 for _ in range(len(m['out']))])
-            ps = ps.to(device)
-            pw = torch.tensor([0.0 for _ in range(len(m['out']))])
-            pw = pw.to(device)
-            for i in range(len(m['out'])):
-                if y_pred[key[0]][i] == label[i] or y_pred[key[1]][i] == label[i]:
-                    w[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]]) -  min(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
-                ps[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
-                pw[i] = min(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
+                w = torch.tensor([0.0 for _ in range(len(m['out']))])
+                w = w.to(device)
+                for modality in modality_list:
+                    y_pred[modality] = prediction[modality]
+                    y_pred[modality] = y_pred[modality].argmax(dim=-1)
+                # y_pred_a = prediction_a
+                # y_pred_a = y_pred_a.argmax(dim = -1)
+                # y_pred_v = prediction_v
+                # y_pred_v = y_pred_v.argmax(dim = -1)
+                ps = torch.tensor([0.0 for _ in range(len(m['out']))])
+                ps = ps.to(device)
+                pw = torch.tensor([0.0 for _ in range(len(m['out']))])
+                pw = pw.to(device)
+                for i in range(len(m['out'])):
+                    if y_pred[key[0]][i] == label[i] or y_pred[key[1]][i] == label[i]:
+                        w[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]]) -  min(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
+                    ps[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
+                    pw[i] = min(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
 
-            loss_KL = F.kl_div(ps, pw, reduction = 'none')
-            w = w.reshape(1,-1)
-            loss_KL = loss_KL.reshape(-1,1)
-            loss_KL = torch.mm(w, loss_KL) / len(m['out'])
-            loss_RS = loss_RS.reshape(-1,1)
-            loss_RS = torch.mm(w, loss_RS) / len(m['out'])
-            total_loss = loss['out'] + loss[key[0]] + loss[key[1]] + loss_RS.squeeze() + loss_KL.squeeze() ## erase the dim of 1
+                loss_KL = F.kl_div(ps, pw, reduction = 'none')
+                w = w.reshape(1,-1)
+                loss_KL = loss_KL.reshape(-1,1)
+                loss_KL = torch.mm(w, loss_KL) / len(m['out'])
+                loss_RS = loss_RS.reshape(-1,1)
+                loss_RS = torch.mm(w, loss_RS) / len(m['out'])
+                total_loss = loss['out'] + loss_modality[key[0]] + loss_modality[key[1]] + loss_RS.squeeze() + loss_KL.squeeze() ## erase the dim of 1
+            else:
+
+                w1 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                w1 = w1.to(device)
+                w2 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                w2 = w2.to(device)
+                for modality in modality_list:
+                    y_pred[modality] = prediction[modality]
+                    y_pred[modality] = y_pred[modality].argmax(dim=-1)
+                # y_pred_a = prediction_a
+                # y_pred_a = y_pred_a.argmax(dim = -1)
+                # y_pred_v = prediction_v
+                # y_pred_v = y_pred_v.argmax(dim = -1)
+                ps = torch.tensor([0.0 for _ in range(len(m['out']))])
+                ps = ps.to(device)
+                pw1 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                pw1 = pw1.to(device)
+                pw2 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                pw2 = pw2.to(device)
+                loss_RS1 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                loss_RS2 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                loss_RS1 = loss_RS1.to(device)
+                loss_RS2 = loss_RS2.to(device)
+                
+                for i in range(len(m['out'])):
+                    ps[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]], prediction[key[2]][i][label[i]])
+                    for k, value in prediction.items():
+                        if value[i][label[i]] == ps[i]:
+                            strong_modality = k 
+                    temp_key = key.copy()
+                    temp_key.remove(strong_modality)
+                    pw1[i] = prediction[temp_key[0]][i][label[i]]
+                    pw2[i] = prediction[temp_key[1]][i][label[i]]
+                    if y_pred[strong_modality][i] == label[i]:
+                        w1[i] = ps[i] - pw1[i]
+                        w2[i] = ps[i] - pw2[i]
+                    loss_RS1[i] = torch.sum((model.Uni_res[strong_modality][i] - model.Uni_res[temp_key[0]][i])**2)
+                    loss_RS2[i] = torch.sum((model.Uni_res[strong_modality][i] - model.Uni_res[temp_key[1]][i])**2)
+                    
+
+                loss_KL1 = F.kl_div(ps, pw1, reduction = 'none')
+                loss_KL2 = F.kl_div(ps, pw2, reduction = 'none')
+                w1 = w1.reshape(1,-1)
+                w2 = w2.reshape(1,-1)
+                loss_KL1 = loss_KL1.reshape(-1,1)
+                loss_KL1 = torch.mm(w1, loss_KL1) / len(m['out'])
+                loss_KL2 = loss_KL2.reshape(-1,1)
+                loss_KL2 = torch.mm(w2, loss_KL2) / len(m['out'])
+                
+                print(loss_modality)
+                print(loss_RS1)
+                print(loss_RS2)
+                loss_RS1 = 1/model.Uni_res[key[0]].shape[1] * loss_RS1
+                loss_RS2 = 1/model.Uni_res[key[0]].shape[1] * loss_RS2
+                loss_RS1 = loss_RS1.reshape(-1,1)
+                loss_RS2 = loss_RS2.reshape(-1,1)
+                loss_RS1 = torch.mm(w1, loss_RS1) / len(m['out'])
+                loss_RS2 = torch.mm(w2, loss_RS2) / len(m['out'])
+                total_loss = loss['out'] + loss_modality[key[0]] + loss_modality[key[1]] + loss_modality[key[2]] + loss_RS1.squeeze() + loss_RS2.squeeze() + loss_KL1.squeeze() + loss_KL2.squeeze() ## erase the dim of 1
             
         else:
             # model(batch)

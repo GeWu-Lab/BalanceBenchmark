@@ -33,8 +33,8 @@ trainer_para:
     method: "None"
     modulation_starts: 0
     modulation_ends: 80
-    lam: 0.2
-    modality: 2
+    lam: 0.1
+    modality: 3
   GBlending:
     alpha: 0.1
     method: "online"
@@ -43,14 +43,16 @@ trainer_para:
     super_epoch: 10
     modality: 2
   PMR:
-    alpha: 1
+    alpha: 0.6
     method: "None"
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
     embed_dim: 512
-    momentum_coef: 0.5
+    momentum_coef: 0.2
     mu: 0.01
+    eta: 0.3
+    norm_epoch: 10
   MBSD:
     alpha: 0.1
     method: "None"
@@ -62,5 +64,5 @@ trainer_para:
     method: "None"
     modulation_starts: 0
     modulation_ends: 80
-    modality: 2
+    modality: 3
     scaling: 10
