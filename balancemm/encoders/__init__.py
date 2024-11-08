@@ -6,11 +6,7 @@ import torch.nn as nn
 import torch
 __all__ = ['find_encoder', 'create_encoder']
 from .pretrained_encoder import text_encoder
-<<<<<<< HEAD
 from torchvision.models import vit_b_16, vit_h_14
-=======
-
->>>>>>> 460681febcacc800b3d8f40e6de85fa1ed5b56fe
 # ----------------------
 # Dynamic instantiation
 # ----------------------

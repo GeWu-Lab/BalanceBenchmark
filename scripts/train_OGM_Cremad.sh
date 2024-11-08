@@ -5,7 +5,12 @@ python -m balancemm --model BaseClassifier --trainer OGMTrainer --lr 0.003 --alp
 python -m balancemm --model BaseClassifier --trainer GBlendingTrainer --lr 0.003 --alpha 1.0 --dataset Mosei --device 0
 python -m balancemm --model BaseClassifier_AMCo --trainer AMCoTrainer --lr 0.003 --alpha 1.0 --dataset Mosei --device 1
 <<<<<<< HEAD
+<<<<<<< HEAD
 python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 1
 python -m balancemm --model BaseClassifier --trainer GBlendingTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 0
 =======
 >>>>>>> 460681febcacc800b3d8f40e6de85fa1ed5b56fe
+=======
+python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 1
+python -m balancemm --model BaseClassifier --trainer GBlendingTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 0
+>>>>>>> origin

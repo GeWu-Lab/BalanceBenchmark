@@ -505,7 +505,7 @@ class MMTM(nn.Module):
         i = 0
         for modality in model.modalitys:
             # self.fc_excites[modality] = nn.Linear(dim_out, modalities_dims[i]).to(f"cuda:{model.device}")
-            self.running_avg_weight[modality] = torch.zeros(modalities_dims[i]).to(f"cuda:{model.device}")
+            self.running_avg_weight[modality] = torch.zeros(modalities_dims[i]).to(f"{model.device}")
             i+=1
         # self.fc_excites = nn.ModuleList([nn.Linear(dim_out, dim) for dim in modalities_dims])
         # self.running_avg_weights = torch.zeros(total_dim).to(self.device)
