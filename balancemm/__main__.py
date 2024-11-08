@@ -38,6 +38,18 @@ def args_split(args: list):
 
 
 def create_config(config_dict: dict, args): 
+def args_split(args: list):
+    arg = {}
+    for i in range(len(args)):
+        if args[i].startswith('--umodel'):
+            name = args[i].split('.')[1]
+            args['model'][name] = args[i+1]
+        if args[i].startswith('--utrainer'):
+            name = args[i].split('.')[1]
+            args['trainer'][name] = args[i+1]
+
+
+def create_config(config_dict: dict, args): 
     """Create configuration from cli and yaml."""
     # with open(osp.join(root_path ,"configs", "global_config.yaml"), 'r') as f:
     #     global_settings = yaml.safe_load(f)
@@ -92,6 +104,10 @@ def create_config(config_dict: dict, args):
     try:
         Trainer_name = config_dict['Main_config']['trainer']
         name = Trainer_name.split("Trainer", 1)[0]
+        if name == 'unimodal':
+            config_dict['trainer'] = trainer_settings['trainer_para']['baseline'] 
+        else:
+            config_dict['trainer'] = trainer_settings['trainer_para'][name] 
         if name == 'unimodal':
             config_dict['trainer'] = trainer_settings['trainer_para']['baseline'] 
         else:
@@ -182,6 +198,20 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type= str, default= None)
     parser.add_argument('--device', type= str, default= None)
     
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str, default= None)
+    parser.add_argument('--trainer', type=str, default= None)
+    parser.add_argument('--lr', type=float, default= None)
+    parser.add_argument('--alpha', type= float, default= None)
+    parser.add_argument('--eta', type= float, default= None)
+    parser.add_argument('--mu', type= float, default= None)
+    parser.add_argument('--lam', type= float, default= None)
+    parser.add_argument('--scaling', type= float, default= None)
+    parser.add_argument('--dataset', type= str, default= None)
+    parser.add_argument('--device', type= str, default= None)
+    
     args = sys.argv[1:]
     print(args)
     os.environ['http_proxy'] = ''
@@ -193,13 +223,21 @@ if __name__ == "__main__":
     with open(osp.join(root_path ,"configs", "global_config.yaml"), 'r') as f:
         global_settings = yaml.safe_load(f)
     custom_args = global_settings | custom_args
+    with open(osp.join(root_path ,"configs", "global_config.yaml"), 'r') as f:
+        global_settings = yaml.safe_load(f)
+    custom_args = global_settings | custom_args
     # merge cli_args into yaml and create config.
+    # temp_args = {}
+    # parse_cli_args_to_dict(args, custom_args)
+    # parse_cli_args_to_dict(args, temp_args)
+    # print(custom_args)
     # temp_args = {}
     # parse_cli_args_to_dict(args, custom_args)
     # parse_cli_args_to_dict(args, temp_args)
     # print(custom_args)
     
     # merge custom_args into default global config(balancemm/config.toml)
+    args = create_config(custom_args, parser.parse_args())
     args = create_config(custom_args, parser.parse_args())
     set_seed(args['seed'])
     # print args in yaml format

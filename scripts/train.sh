@@ -16,7 +16,11 @@ groups=(normals)
 # 定义参数范围
 
 learning_rates=(0.001 0.01 0.1)
+<<<<<<< HEAD
 target_accuracy=0.9  # 预设目标准确率
+=======
+target_accuracy=0.627  # 预设目标准确率
+>>>>>>> 460681febcacc800b3d8f40e6de85fa1ed5b56fe
 
 # 日志文件
 log_file="training_log_$normals.txt"
@@ -65,8 +69,13 @@ for group in "${groups[@]}"; do
         # 网格搜索参数
         if [ "$group" == "alphas" ]; then
             gap_alpha=0.1
+<<<<<<< HEAD
             for i in {0..5}; do
                 for j in {0..5}; do
+=======
+            for i in {1..5}; do
+                for j in {1..5}; do
+>>>>>>> 460681febcacc800b3d8f40e6de85fa1ed5b56fe
                     # 运行训练并获取结果
                     alpha_now=$(echo "$alpha + $i * $gap_alpha" | bc)
                     alpha_now=$(printf "%.3f" "$alpha_now")
