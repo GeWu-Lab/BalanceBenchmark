@@ -167,8 +167,8 @@ class CMLTrainer(BaseTrainer):
                     
                     loss_p = criterion(out_p, label)
                     loss_pc ,_ = conf_loss(conf_s, pred_s, conf_p, pred_p, label)
-                    loss = loss_p + loss
-                    _loss_c = loss_pc + _loss_c
+                    loss = loss + loss_p
+                    _loss_c = _loss_c + loss_pc
 
                     out_s = out_p
                     # if random_dict['audio']:

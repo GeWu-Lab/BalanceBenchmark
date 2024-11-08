@@ -16,21 +16,36 @@ from torchvision import transforms
 # datasets, small modifications may be needed (depending on the type of the data, etc.)
 ############################################################################################
 
+def acc3(i):
+    if i<-0.5:
+        return 0
+    if i>0.5:
+        return 1
+    return 2
+
 def acc7(i):
-        if  -3<=i<-2:
-            return 0 
-        elif -2<=i<-1:
-            return 1
-        elif -1<= i <0:
-            return 2
-        elif i == 0:
-            return 3
-        elif  0<i<=1:
-            return 4
-        elif 1 <i <=2:
-            return 5
-        else : 
-            return 6
+    if i < -2:
+        res = 0
+    if -2 <= i and i < -1:
+        res = 1
+    if -1 <= i and i < 0:
+        res = 2
+    if 0 <= i and i <= 0:
+        res = 3
+    if 0 < i and i <= 1:
+        res = 4
+    if 1 < i and i <= 2:
+        res = 5
+    if i > 2:
+        res = 6
+    return res
+
+def acc2(i):
+    if i<0:
+        return 0
+    else :
+        return 1
+
 class MoseiDataset(Dataset):
     def __init__(self, args: dict, transforms = None):
         super(MoseiDataset, self).__init__()
@@ -86,22 +101,6 @@ class MoseiDataset(Dataset):
         return self.labels.shape[1], self.labels.shape[2]
     def __len__(self):
         return len(self.labels)
-    
-    def _acc7(self, i):
-        if  -3<=i<-2:
-            return 0 
-        elif -2<=i<-1:
-            return 1
-        elif -1<= i <0:
-            return 2
-        elif i == 0:
-            return 3
-        elif  0<i<=1:
-            return 4
-        elif 1 <i <=2:
-            return 5
-        else : 
-            return 6
         
     def __getitem__(self, index):
         X = [index, self.text[index], self.audio[index], self.vision[index]]
@@ -111,13 +110,7 @@ class MoseiDataset(Dataset):
         # Y = int(Y.item())
         # new_Y = torch.zeros(1, 1)
         # new_Y[0, 0] = acc7(Y[0,0])
-        # Y = acc7(Y[0,0])
-        
-        if Y[0,0] >= 0:
-            Y = 1
-        else:
-            Y = 0
-        
+        Y = acc2(Y[0,0])
         META = (0,0,0) if self.meta is None else (self.meta[index][0], self.meta[index][1], self.meta[index][2])
         if self.data == 'mosi':
             META = (self.meta[index][0].decode('UTF-8'), self.meta[index][1].decode('UTF-8'), self.meta[index][2].decode('UTF-8'))
@@ -127,3 +120,15 @@ class MoseiDataset(Dataset):
         #     print(self.vision[indx].shape)
         return {'text' : X[1], 'visual': X[3], 'audio' : X[2], 'label':Y}
         return self.text[index], Y   ##, META        
+
+if __name__ == '__main__':
+    dataset_path = '/home/zequn_yang/MMT/data/'
+    data='mosei_senti'
+    split_type= 'test'
+    #train = 16326 test = 4659
+    if_align = False
+    dataset_path = os.path.join(dataset_path, data+'_data.pkl' if if_align else data+'_data_noalign.pkl' )
+    dataset = pickle.load(open(dataset_path, 'rb'))
+    count = 0
+    # for split_type in dataset.keys():
+    print(dataset[split_type]['vision'][0].shape)

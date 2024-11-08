@@ -310,9 +310,12 @@ class GBlendingTrainer(BaseTrainer):
             now_train_loss = 0
             pre_validation_loss = 0
             now_validation_loss = 0
+            print(temp_model.modalitys)
+            print(modality)
             for other_modality in temp_model.modalitys:
                 if other_modality != modality and modality !='output':
-                    padding.append(modality)
+                    padding.append(other_modality)
+            print(padding)
             for epoch in range(self.super_epoch):
                 temp_model.train()
                 _loss = 0.0
@@ -350,8 +353,8 @@ class GBlendingTrainer(BaseTrainer):
             o_pre = pre_validation_loss - pre_train_loss
             o_now = now_validation_loss - now_train_loss
             o = o_now - o_pre
-            weights[modality] = abs(g/(o**2))
-        sums = sum(weights.values())
+            weights[modality] = abs((g + 1e-7)/(o**2 + 1e-7))
+        sums = sum(weights.values() ) + 1e-3
         info = ''
         logger.info(f'super_epoch begin in {self.current_epoch}')
         for modality in weights.keys():

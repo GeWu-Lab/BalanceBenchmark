@@ -165,60 +165,66 @@ class MBSDTrainer(BaseTrainer):
                 w1 = w1.to(device)
                 w2 = torch.tensor([0.0 for _ in range(len(m['out']))])
                 w2 = w2.to(device)
+                w3 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                w3 = w3.to(device)
+                ps1 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                ps2 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                ps3 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                ps1 = ps1.to(device)
+                ps2 = ps2.to(device)
+                ps3 = ps3.to(device)
+                pw1 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                pw2 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                pw3 = torch.tensor([0.0 for _ in range(len(m['out']))])
+                pw1 = pw1.to(device)
+                pw2 = pw2.to(device)
+                pw3 = pw3.to(device)
                 for modality in modality_list:
                     y_pred[modality] = prediction[modality]
                     y_pred[modality] = y_pred[modality].argmax(dim=-1)
-                # y_pred_a = prediction_a
-                # y_pred_a = y_pred_a.argmax(dim = -1)
-                # y_pred_v = prediction_v
-                # y_pred_v = y_pred_v.argmax(dim = -1)
-                ps = torch.tensor([0.0 for _ in range(len(m['out']))])
-                ps = ps.to(device)
-                pw1 = torch.tensor([0.0 for _ in range(len(m['out']))])
-                pw1 = pw1.to(device)
-                pw2 = torch.tensor([0.0 for _ in range(len(m['out']))])
-                pw2 = pw2.to(device)
-                loss_RS1 = torch.tensor([0.0 for _ in range(len(m['out']))])
-                loss_RS2 = torch.tensor([0.0 for _ in range(len(m['out']))])
-                loss_RS1 = loss_RS1.to(device)
-                loss_RS2 = loss_RS2.to(device)
-                
-                for i in range(len(m['out'])):
-                    ps[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]], prediction[key[2]][i][label[i]])
-                    for k, value in prediction.items():
-                        if value[i][label[i]] == ps[i]:
-                            strong_modality = k 
-                    temp_key = key.copy()
-                    temp_key.remove(strong_modality)
-                    pw1[i] = prediction[temp_key[0]][i][label[i]]
-                    pw2[i] = prediction[temp_key[1]][i][label[i]]
-                    if y_pred[strong_modality][i] == label[i]:
-                        w1[i] = ps[i] - pw1[i]
-                        w2[i] = ps[i] - pw2[i]
-                    loss_RS1[i] = torch.sum((model.Uni_res[strong_modality][i] - model.Uni_res[temp_key[0]][i])**2)
-                    loss_RS2[i] = torch.sum((model.Uni_res[strong_modality][i] - model.Uni_res[temp_key[1]][i])**2)
                     
-
-                loss_KL1 = F.kl_div(ps, pw1, reduction = 'none')
-                loss_KL2 = F.kl_div(ps, pw2, reduction = 'none')
+                for i in range(len(m['out'])):
+                    if y_pred[key[0]][i] == label[i] or y_pred[key[1]][i] == label[i]:
+                        w1[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]]) -  min(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
+                    if y_pred[key[0]][i] == label[i] or y_pred[key[2]][i] == label[i]:
+                        w2[i] = max(prediction[key[0]][i][label[i]], prediction[key[2]][i][label[i]]) -  min(prediction[key[0]][i][label[i]], prediction[key[2]][i][label[i]])
+                    if y_pred[key[1]][i] == label[i] or y_pred[key[2]][i] == label[i]:
+                        w3[i] = max(prediction[key[1]][i][label[i]], prediction[key[2]][i][label[i]]) -  min(prediction[key[1]][i][label[i]], prediction[key[2]][i][label[i]])
+                    ps1[i] = max(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
+                    pw1[i] = min(prediction[key[0]][i][label[i]], prediction[key[1]][i][label[i]])
+                    ps2[i] = max(prediction[key[0]][i][label[i]], prediction[key[2]][i][label[i]])
+                    pw2[i] = min(prediction[key[0]][i][label[i]], prediction[key[2]][i][label[i]])
+                    ps3[i] = max(prediction[key[1]][i][label[i]], prediction[key[2]][i][label[i]])
+                    pw3[i] = min(prediction[key[1]][i][label[i]], prediction[key[2]][i][label[i]])
+                loss_RS1 = 1/model.Uni_res[key[0]].shape[1] * torch.sum((prediction[key[0]]-prediction[key[1]])**2,dim=1)
+                loss_RS2 = 1/model.Uni_res[key[0]].shape[1] * torch.sum((prediction[key[0]]-prediction[key[2]])**2,dim=1)
+                loss_RS3 = 1/model.Uni_res[key[0]].shape[1] * torch.sum((prediction[key[1]]-prediction[key[2]])**2,dim=1)
+            
+                loss_KL1 = F.kl_div(ps1, pw1, reduction = 'none')
+                loss_KL2 = F.kl_div(ps2, pw2, reduction = 'none')
+                loss_KL3 = F.kl_div(ps3, pw3, reduction = 'none')
+                
                 w1 = w1.reshape(1,-1)
                 w2 = w2.reshape(1,-1)
+                w3 = w3.reshape(1,-1)
                 loss_KL1 = loss_KL1.reshape(-1,1)
                 loss_KL1 = torch.mm(w1, loss_KL1) / len(m['out'])
                 loss_KL2 = loss_KL2.reshape(-1,1)
                 loss_KL2 = torch.mm(w2, loss_KL2) / len(m['out'])
+                loss_KL3 = loss_KL3.reshape(-1,1)
+                loss_KL3 = torch.mm(w3, loss_KL3) / len(m['out'])
+                loss_KL = (loss_KL1 + loss_KL2 + loss_KL3) / 3
                 
-                print(loss_modality)
-                print(loss_RS1)
-                print(loss_RS2)
-                loss_RS1 = 1/model.Uni_res[key[0]].shape[1] * loss_RS1
-                loss_RS2 = 1/model.Uni_res[key[0]].shape[1] * loss_RS2
                 loss_RS1 = loss_RS1.reshape(-1,1)
                 loss_RS2 = loss_RS2.reshape(-1,1)
+                loss_RS3 = loss_RS3.reshape(-1,1)
                 loss_RS1 = torch.mm(w1, loss_RS1) / len(m['out'])
                 loss_RS2 = torch.mm(w2, loss_RS2) / len(m['out'])
-                total_loss = loss['out'] + loss_modality[key[0]] + loss_modality[key[1]] + loss_modality[key[2]] + loss_RS1.squeeze() + loss_RS2.squeeze() + loss_KL1.squeeze() + loss_KL2.squeeze() ## erase the dim of 1
-            
+                loss_RS3 = torch.mm(w3, loss_RS3) / len(m['out'])
+                loss_RS = (loss_RS1 + loss_RS2 + loss_RS3) / 3
+                
+                total_loss = loss['out'] + loss_modality[key[0]] + loss_modality[key[1]] + loss_modality[key[2]] + loss_KL.squeeze() + loss_RS.squeeze()## erase the dim of 1
+                
         else:
             # model(batch)
             # for modality in modality_list:

@@ -30,7 +30,10 @@ def create_trainer(fabric: L.Fabric ,trainer_opt:dict, para_opt, args, logger,tb
     if trainer_cls is None:
         raise ValueError(f'trainer {trainer} is not found.')
     para_opt['base_para']['logger'] = logger
-    trainer = trainer_cls(fabric, para_opt, para_opt['base_para'])
+    if args.trainer['name'] != 'UMT':
+        trainer = trainer_cls(fabric, para_opt, para_opt['base_para'])
+    else:
+        trainer = trainer_cls(fabric, para_opt, para_opt['base_para'], args)
     trainer.checkpoint_dir = args.checkpoint_dir
 
     print(

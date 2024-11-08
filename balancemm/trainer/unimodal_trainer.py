@@ -15,9 +15,10 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 import lightning as L
 import torch
 from ..models.avclassify_model import BaseClassifierModel
-class baselineTrainer(BaseTrainer):
+from ..evaluation.complex import get_flops
+class unimodalTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
-        super(baselineTrainer,self).__init__(fabric,**para_dict)
+        super(unimodalTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
         self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
@@ -53,6 +54,14 @@ class baselineTrainer(BaseTrainer):
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
+        # if self.current_epoch == 0:
+            # for batch_idx, batch in enumerate(iterable):
+            #     batch_sample = batch
+            #     break
+            # print(batch_sample.keys())
+            # model_flops, _ =get_flops(model = model, input_sample = batch_sample)
+            # self.FlopsMonitor.update(model_flops / len(batch_sample['label']) * len(train_loader), 'forward')
+            # self.FlopsMonitor.report(logger = self.logger)
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -101,7 +110,7 @@ class baselineTrainer(BaseTrainer):
         #     a, v, out = model(batch)
         # else:
         #     a, v, t, out = model(batch)
-        _ = model.validation_step(batch= batch, batch_idx= batch_idx, limit_modality = model.modalitys)
+        _ = model(batch= batch)
         out = model.encoder_res['output']        
         loss = criterion(out, label)
         loss.backward()

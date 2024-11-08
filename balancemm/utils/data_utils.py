@@ -14,7 +14,7 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
     # config = SimpleNamespace(**config)
     train_dataset = create_dataset(config.dataset, 'train')
     if config.dataset.get('validation', False):
-        val_dataset = create_dataset(config.dataset, 'val')
+        val_dataset = create_dataset(config.dataset, 'valid')
         test_dataset = create_dataset(config.dataset, 'test')
     else:
         val_dataset = create_dataset(config.dataset, 'test')

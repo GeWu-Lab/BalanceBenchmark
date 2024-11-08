@@ -116,7 +116,10 @@ class OGMTrainer(BaseTrainer):
                 score_modality = sum([softmax(torch.cos(Uni_res[modality]))[i][label[i]] if label[i] == torch.argmax(Uni_res[modality][i]) else 0 for i in range(Uni_res['output'].size(0))])
             else:
                 raise("Wrong number of modalitys for OGM, it should be 2 or 3, but given {:0}".format(modality_nums))
-            scores[modality] = score_modality.detach().clone()
+            try:
+                scores[modality] = score_modality.detach().clone()
+            except:
+                continue
             minscore = min(score_modality, minscore)
         ##Calculate the ratios
         for modality in modality_list:

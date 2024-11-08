@@ -7,7 +7,7 @@ Main_config:
   model: "BaseClassifier" #
   tasks: "Classifier" #
   trainer: "MBSDTrainer"
-  device: '1'
+  device: '0'
   dataset: Mosei
 
 Train:

@@ -17,10 +17,14 @@ class KSDataset(Dataset):
         self.data = []
         self.label = []
         self.mode = args['mode']
-        
-        self.csv_path = args['csv_file']
-        self.audio_path = args['audio_path']
-        self.visual_path = args['visual_path']
+        if self.mode == "train":
+            self.csv_path = args['csv_path_train']
+            self.audio_path = args['audio_path_train']
+            self.visual_path = args['visual_path_train']
+        else:
+            self.csv_path = args['csv_path_test']
+            self.audio_path = args['audio_path_test']
+            self.visual_path = args['visual_path_test']
 
 
         with open(self.csv_path) as f:
@@ -52,9 +56,8 @@ class KSDataset(Dataset):
         av_file = self.data[idx]
 
         spectrogram = np.load(self.audio_path + '/' + av_file + '.npy')
-        # spectrogram = np.expand_dims(spectrogram, axis=0)
+        spectrogram = np.expand_dims(spectrogram, axis=0)
         # spectrogram = torch.Tensor(spectrogram)
-        # print(spectrogram.size())
         
         # Visual
         path = self.visual_path + '/' + av_file
@@ -103,7 +106,7 @@ class KSDataset(Dataset):
 
         label = self.label[idx]
 
-        return image_n, spectrogram, label
+        return {'visual':image_n, 'audio':spectrogram, 'label': label}
     
 
 

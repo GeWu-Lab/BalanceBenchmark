@@ -14,7 +14,7 @@ dataset:
     data : mosei_senti
     if_align: false
     classes: 2  #
-    validation: false
+    validation: True
     audio:  ###
       input_dim: 74
     visual:
@@ -71,7 +71,19 @@ dataset:
     visual:
       input_dim: None
 
-
+  KS:
+    csv_path_train: /data/users/yake_wei/KS_2023/ks_train_overlap.txt
+    visual_path_train: /data/users/yake_wei/KS_2023/train-frames-1fps/train
+    audio_path_train: /data/users/yake_wei/KS_2023/train_spec
+    csv_path_test: /data/users/yake_wei/KS_2023/ks_test_overlap.txt
+    visual_path_test: /data/users/yake_wei/KS_2023/val-frames-1fps/test
+    audio_path_test: /data/users/yake_wei/KS_2023/test_spec
+    validation: false
+    classes: 31  
+    audio:
+      input_dim: None
+    visual:
+      input_dim: None
 # train:
 #     name: UMPC_Food
 #     mode: train

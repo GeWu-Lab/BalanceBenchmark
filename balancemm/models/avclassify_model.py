@@ -62,13 +62,22 @@ class BaseClassifierModel(nn.Module):
     def Transformer_Process(self, modality_data: torch.Tensor, modality: str)-> torch.Tensor:
         res = self.modality_encoder[modality](modality_data)
         return res
+    
+    def ViT_Process(self, modality_data: torch.Tensor, modality: str)-> torch.Tensor:
+        modality_data = modality_data.unsqueeze(1)
+        res = self.modality_encoder[modality](modality_data)
+        return res
 
     def Encoder_Process(self, modality_data : torch.Tensor, modality_name: str) -> torch.Tensor:
         ## May be it could use getattr
         encoder_name = self.enconders[modality_name]['name']
         if encoder_name == 'ResNet18':
             res = self.Resnet_Process(modality_data = modality_data, modality = modality_name)
-        elif encoder_name == 'Transformer':
+        elif encoder_name == 'Transformer' or encoder_name == 'Transformer_':
+            res = self.Transformer_Process(modality_data = modality_data, modality = modality_name)
+        elif encoder_name == 'ViT_B':
+            res = self.ViT_Process(modality_data = modality_data, modality = modality_name)
+        elif encoder_name == 'Transformer_LA':
             res = self.Transformer_Process(modality_data = modality_data, modality = modality_name)
         return res
     
@@ -205,8 +214,256 @@ class BaseClassifier_AMCoModel(BaseClassifierModel):
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
         return self.Uni_res
+
+
+class BaseClassifier_GreedyModel(BaseClassifierModel):
+    def __init__(self, args):
+        super(BaseClassifier_GreedyModel, self).__init__(args)
+        if 'text' in self.modalitys:
+            self.mmtm_layers = nn.ModuleDict({
+            "mmtm1": MMTM([40, 64], 4, self),
+            "mmtm2": MMTM([40, 128], 4,self),
+            "mmtm3": MMTM([40, 256], 4,self),
+            "mmtm4": MMTM([40, 512], 4,self)
+        })
+        else:
+            self.mmtm_layers = nn.ModuleDict({
+                "mmtm1": MMTM([64, 64], 4, self),
+                "mmtm2": MMTM([128, 128], 4, self),
+                "mmtm3": MMTM([256, 256], 4, self),
+                "mmtm4": MMTM([512, 512], 4, self)
+            })
+    def Resnet_Process(self, modality_data : torch.Tensor, modality : str) -> torch.Tensor:
+        encoder = self.modality_encoder[modality]
+        if modality == 'visual' or modality == 'flow': 
+            if modality == 'visual':
+                modality_data = modality_data.permute(0, 2, 1, 3, 4).contiguous().float()
+            else:
+                modality_data = modality_data.contiguous().float()
+            (B, T, C, H, W) = modality_data.size()
+            x = modality_data.view(B * T, C, H, W)
+            x = encoder.conv1(x)
+            x = encoder.bn1(x)
+            x = encoder.relu(x)
+            x = encoder.maxpool(x)
+            x = encoder.layer1(x)
+            
+        elif modality == 'audio':
+            x = modality_data
+            x = encoder.conv1(x)
+            x = encoder.bn1(x)
+            x = encoder.relu(x)
+            x = encoder.maxpool(x)
+            x = encoder.layer1(x)
+        
+        return x
     
+    def Transformer_Process(self, modality_data: torch.Tensor, modality: str)-> torch.Tensor:
+        encoder = self.modality_encoder[modality]
+        x = modality_data
+        if self.enconders[modality]['if_pretrain'] == True:
+            x = x.squeeze(1).int()
+            outputs = encoder.textEncoder(x)
+            hidden_states = outputs.hidden_states
+            res = hidden_states[9]
+        # else:
+        # hidden_states = encoder(**text)
+        return res # 需要修改
+
+    def Encoder_Process(self, modality_data : torch.Tensor, modality_name: str) -> torch.Tensor:
+        ## May be it could use getattr
+        encoder_name = self.enconders[modality_name]['name']
+        if encoder_name == 'ResNet18':
+            res = self.Resnet_Process(modality_data = modality_data, modality = modality_name)
+        elif encoder_name == 'Transformer':
+            res = self.Transformer_Process(modality_data = modality_data, modality = modality_name)
+        return res
     
+        
+    def forward(self,
+                batch,
+                curation_mode = False,
+                caring_modality = 0,
+                padding = [],
+                mask = None, 
+                dependent_modality = {}, 
+                pt = 0,
+                types= 0) -> dict[str, torch.Tensor]:
+        self.encoder_res = {}
+        for modality in self.modalitys:
+            modality_data = batch[modality].to(self.device)
+            modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
+            self.encoder_res[modality] = modality_res 
+        
+        key = list(self.modalitys)
+        self.encoder_res = self.mmtm_layers["mmtm1"](
+                self.encoder_res, self, curation_mode, caring_modality
+            )
+        modality_list = self.modalitys
+        for i in [2,3,4]:
+            for modality in modality_list:
+                if modality == 'text':
+                    self.encoder_res[modality] = self.modality_encoder[modality].textEncoder.encoder.layer[i+7](self.encoder_res[modality])[0]
+                else:    
+                    self.encoder_res[modality] = getattr(self.modality_encoder[modality],f'layer{i}')(self.encoder_res[modality])
+            self.encoder_res = self.mmtm_layers[f"mmtm{i}"](
+                self.encoder_res, self, curation_mode, caring_modality
+            )
+        for modality in modality_list:
+            B = len(batch[modality])
+            if self.enconders[modality]['name'] == 'ResNet18':
+                if modality == 'visual' or modality == 'flow': 
+                    res = self.encoder_res[modality]
+                    (_, C, H, W) = res.size()
+                    res = res.view(B, -1, C, H, W)
+                    res = res.permute(0, 2, 1, 3, 4)
+                    res = F.adaptive_avg_pool3d(res, 1)
+                    res = torch.flatten(res, 1)
+                    self.encoder_res[modality] = res
+                elif modality == 'audio':
+                    res = self.encoder_res[modality]
+                    res = F.adaptive_avg_pool2d(res, 1)
+                    res = torch.flatten(res, 1)
+                    self.encoder_res[modality] = res
+            else:
+                res = self.encoder_res[modality]
+                res = self.modality_encoder[modality].textEncoder.pooler(res)
+                res = self.modality_encoder[modality].linear(res)
+                self.encoder_res[modality] = res
+        self.encoder_res['output'] = self.fusion_module(self.encoder_res)
+        self.Unimodality_Calculate()
+        return self.encoder_res
+    
+    def Unimodality_Calculate(self) -> dict[str, torch.Tensor]:
+        modality_nums = 0
+        all_nums = len(self.encoder_res.keys())-1
+        self.Uni_res = {}
+        now_size = 0
+        for modality in self.encoder_res.keys():
+            if modality == 'output':
+                self.Uni_res[modality] = self.encoder_res[modality]
+                continue
+            if self.fusion == 'concat':
+                weight_size = self.fusion_module.fc_out.weight.size(1)
+                self.Uni_res[modality] = (torch.mm(self.encoder_res[modality],\
+                                               torch.transpose(self.fusion_module.fc_out.weight[:,\
+                                                                                                now_size :\
+                                                                                                now_size + self.modality_size[modality]], 0, 1))
+                                    + self.fusion_module.fc_out.bias / all_nums)
+                now_size += self.modality_size[modality]
+            modality_nums += 1
+            ##new
+        softmax =nn.Softmax(dim= 1)
+        for modality in self.Uni_res.keys():
+            softmax_res = softmax(self.Uni_res[modality])
+            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        return self.Uni_res
+        
+ 
+class MMTM(nn.Module):
+    def __init__(self, modalities_dims, ratio,model:BaseClassifier_GreedyModel):
+        super(MMTM,self).__init__()
+        self.modalities_dims = modalities_dims
+        total_dim = sum(modalities_dims)
+        dim_out = int(2*total_dim/ratio)
+        
+        self.fc_squeeze = nn.Linear(total_dim, dim_out)
+        key = list(model.modalitys)
+        self.fc_excites = nn.ModuleDict({key[0]:nn.Linear(dim_out,modalities_dims[0]),
+                                         key[1]:nn.Linear(dim_out,modalities_dims[1])})
+        self.running_avg_weight = {}
+        i = 0
+        for modality in model.modalitys:
+            # self.fc_excites[modality] = nn.Linear(dim_out, modalities_dims[i]).to(f"cuda:{model.device}")
+            self.running_avg_weight[modality] = torch.zeros(modalities_dims[i]).to(f"{model.device}")
+            i+=1
+        # self.fc_excites = nn.ModuleList([nn.Linear(dim_out, dim) for dim in modalities_dims])
+        # self.running_avg_weights = torch.zeros(total_dim).to(self.device)
+        # self.running_avg_weight_visual = torch.zeros(dim_visual).to("cuda:{}".format(device))
+        # self.running_avg_weight_skeleton = torch.zeros(dim_visual).to("cuda:{}".format(device))
+        self.step = 0
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+    
+    def forward(self
+                ,data
+                ,model:BaseClassifier_GreedyModel
+                ,curation_mode = False
+                ,caring_modality = 0):
+        squeeze_array = []
+        modality_list = model.modalitys
+        for modality in modality_list:
+            if modality == 'visual' or modality == 'flow':
+                (_, C, H, W) = data[modality].size()
+                # B = data['audio'].size()[0]
+                B = 64
+                data[modality] = data[modality].view(B,-1,C,H,W)
+                data[modality] = data[modality].permute(0,2,1,3,4)
+        
+        for modality in modality_list:
+            B,C = data[modality].shape[0],data[modality].shape[1]
+            tview = data[modality].reshape(B,C,-1)
+            squeeze_array.append(torch.mean(tview,dim=-1))
+        # for tensor in [x,y]:
+        #     tview = tensor.view(tensor.shape[:2] + (-1,))
+        #     print(torch.mean(tview,dim=-1).shape)
+        #     squeeze_array.append(torch.mean(tview,dim=-1))
+        
+        squeeze = torch.cat(squeeze_array, 1)
+        excitation = self.fc_squeeze(squeeze)
+        excitation = self.relu(excitation)
+        out = {}
+        for modality in modality_list:
+            out[modality] = self.fc_excites[modality](excitation)
+            out[modality] = self.sigmoid(out[modality])
+            self.running_avg_weight[modality] = (out[modality].mean(0) + self.running_avg_weight[modality]*self.step).detach()/(self.step+1)        
+        self.step +=1
+        # out_x = self.fc_excites[0](excitation)
+        # out_y = self.fc_excites[1](excitation)
+        
+        # out_x = self.sigmoid(out_x)
+        # out_y = self.sigmoid(out_y)
+        dim_diff = {}
+        key= list(modality_list)
+        if not curation_mode:
+            for modality in modality_list:
+                dim_diff = len(data[modality].shape) - len(out[modality].shape)
+                out[modality] = out[modality].view(out[modality].shape + (1,) * dim_diff)
+        else:
+            if caring_modality==0:
+                dim_diff = len(data[key[0]].shape) - len(out[key[0]].shape)
+                out[key[0]] = torch.stack(out[key[0]].shape[0]*[
+                        self.running_avg_weight[key[0]]
+                    ]).view(out[key[0]].shape + (1,) * dim_diff)
+                dim_diff = len(data[key[1]].shape) - len(out[key[1]].shape)
+                out[key[1]] = out[key[1]].view(out[key[1]].shape + (1,) * dim_diff)
+                # dim_diff = len(skeleton.shape) - len(sk_out.shape)
+                # sk_out = sk_out.view(sk_out.shape + (1,) * dim_diff)
+
+                # dim_diff = len(visual.shape) - len(vis_out.shape)
+                # vis_out = torch.stack(vis_out.shape[0]*[
+                #         self.running_avg_weight_visual
+                #     ]).view(vis_out.shape + (1,) * dim_diff)
+                
+            elif caring_modality==1:
+                dim_diff = len(data[key[1]].shape) - len(out[key[1]].shape)
+                out[key[1]] = torch.stack(out[key[1]].shape[0] * [
+                        self.running_avg_weight[key[1]]
+                    ]).view(out[key[1]].shape + (1,) * dim_diff)
+                dim_diff = len(data[key[0]].shape) - len(out[key[0]].shape)
+                out[key[0]] = out[key[0]].view(out[key[0]].shape + (1,) * dim_diff)
+        # dim_diff = len(x.shape) - len(out_x.shape)
+        # out_x = out_x.view(out_x.shape + (1,) * dim_diff)
+        # dim_diff = len(y.shape) - len(out_y.shape)
+        # out_y = out_y.view(out_y.shape + (1,) * dim_diff)
+        for modality in modality_list:
+            data[modality] = data[modality] * out[modality]
+            if modality == "visual" or modality == 'flow':
+                data[modality] = data[modality].permute(0,2,1,3,4).view(-1,C,H,W)
+            if modality == 'text':
+                data[modality] = data[modality].squeeze(2)
+        return data
+           
 class AVClassifierModel(nn.Module):
     def __init__(self, args):
         super(AVClassifierModel, self).__init__()
