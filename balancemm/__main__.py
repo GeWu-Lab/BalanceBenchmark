@@ -20,7 +20,7 @@ def add_to_pythonpath(path):
 add_to_pythonpath(os.getcwd())
 from balancemm.utils.parser_utils import parse_cli_args_to_dict, load_config_dict, ensure_and_get_config_path
 from balancemm.train import train_and_test
-from balancemm.test import only_test
+from balancemm.test import only_test, all_test
 from lightning import fabric
 import datetime
 from .utils.train_utils import set_seed
@@ -67,6 +67,8 @@ def create_config(config_dict: dict, args):
         config_dict['Main_config']['trainer'] = args.trainer
     if args.lr:
         config_dict['train']['parameter']['base_lr'] = args.lr
+    if args.mode:
+        config_dict['mode'] = args.mode
     name = config_dict['Main_config']['trainer'].split("Trainer", 1)[0]
     config_dict['Train']['dataset'] = config_dict['Main_config']['dataset']
     config_dict['Test']['dataset'] = config_dict['Main_config']['dataset']
@@ -82,7 +84,8 @@ def create_config(config_dict: dict, args):
         trainer_settings['trainer_para'][name]['scaling'] = args.scaling
     if args.lam: 
         trainer_settings['trainer_para'][name]['lam'] = args.lam
-    
+    if args.momentum: 
+        trainer_settings['trainer_para'][name]['momentum_coef'] = args.momentum
     try:
         #waiting for support iteration
         config_dict['dataset'] = dataset_settings['dataset'][config_dict['Main_config']['dataset']]
@@ -144,7 +147,7 @@ def create_config(config_dict: dict, args):
             config_dict['name'] = config_dict['Main_config']['model'] + '_' +config_dict['Main_config']['trainer'] \
                 + '_' +config_dict['Train']['dataset']
             config_dict["out_dir"] = osp.join(root_path, 'experiments', config_dict["name"], mode, exp_name)
-    elif mode == "test":
+    elif mode == "test" or mode == 'all_test':
         # config_dict.pop('train', None)
         # config_dict.pop('trainer', None)
         # config_dict.pop('Train', None)
@@ -173,12 +176,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default= None)
     parser.add_argument('--trainer', type=str, default= None)
+    parser.add_argument('--mode', type= str, default= None)
     parser.add_argument('--lr', type=float, default= None)
     parser.add_argument('--alpha', type= float, default= None)
     parser.add_argument('--eta', type= float, default= None)
     parser.add_argument('--mu', type= float, default= None)
     parser.add_argument('--lam', type= float, default= None)
     parser.add_argument('--scaling', type= float, default= None)
+    parser.add_argument('--momentum', type= float, default= None)
     parser.add_argument('--dataset', type= str, default= None)
     parser.add_argument('--device', type= str, default= None)
     
@@ -213,3 +218,5 @@ if __name__ == "__main__":
         train_and_test(args)
     elif args['mode'] == "test":
         only_test(args)
+    elif args['mode'] == 'all_test':
+        all_test(args)
