@@ -33,8 +33,8 @@ trainer_para:
     method: "None"
     modulation_starts: 0
     modulation_ends: 80
-    lam: 0.2
-    modality: 2
+    lam: 0.1
+    modality: 3
   GBlending:
     alpha: 0.1
     method: "online"

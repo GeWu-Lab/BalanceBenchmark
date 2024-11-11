@@ -5,17 +5,18 @@ seed: 42
 ### 简洁化 
 Main_config:
   model: "BaseClassifier" #
+  model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "AMCoTrainer"
+  trainer: "MBSDTrainer"
   device: '0'
   dataset: Mosei
 
 Train:
   dataset: Mosei
+  dataset: Mosei
 
 Test:
   dataset: Mosei
-
 
 # dataset:
 #   dataloader:
