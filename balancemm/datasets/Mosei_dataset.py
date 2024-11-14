@@ -129,8 +129,10 @@ if __name__ == '__main__':
     if_align = False
     dataset_path = os.path.join(dataset_path, data+'_data.pkl' if if_align else data+'_data_noalign.pkl' )
     dataset = pickle.load(open(dataset_path, 'rb'))
-    count = 0
+    count = {0:0, 1:0}
     for split_type in dataset.keys():
-        print(len(dataset[split_type]['vision']))
-        count += len(dataset[split_type]['vision'])
-    print(count)
+        count = {0:0, 1:0}
+        for i in range(len(dataset[split_type]['labels'])):
+            Y = acc2(dataset[split_type]['labels'][i][0][0])
+            count[Y]+=1
+        print(split_type, count)

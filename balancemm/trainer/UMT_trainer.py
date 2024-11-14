@@ -32,20 +32,21 @@ class UMTTrainer(BaseTrainer):
         self.loaded_model = []
         loaded_model = {}
         temp_args = copy.deepcopy(args)
-        out_dir = '_'.join(temp_args.out_dir.split('/')[:-1])
         # root_path = osp.dirname(osp.dirname(__file__))
         # with open(osp.join(root_path ,"configs", "encoder_config.yaml"), 'r') as f:
         #     encoder_settings = yaml.safe_load(f)
-        for modality in args.model['encoders'].keys():
-            temp_args.model['encoders'] = {modality: args.model['encoders'][modality]}
-            temp_args.model['modality_size'] = {modality: args.model['modality_size'][modality]}
-            loaded_model[modality] = create_model(temp_args.model)
-            loaded_model[modality].to(temp_args.model['device'])
-            out_dir = temp_args.out_dir.replace('UMTTrainer', 'unimodalTrainer_' + modality)
-            out_dir = '/'.join(out_dir.split('/')[:-1])
-            path = get_newest_path(out_dir)
-            loaded_model[modality].load_state_dict(torch.load(get_checkpoint_files(path)[0])['model'])
-        self.loaded_model = nn.ModuleDict(loaded_model)
+        if args.mode == "train_and_test":
+            out_dir = '_'.join(temp_args.out_dir.split('/')[:-1])
+            for modality in args.model['encoders'].keys():
+                temp_args.model['encoders'] = {modality: args.model['encoders'][modality]}
+                temp_args.model['modality_size'] = {modality: args.model['modality_size'][modality]}
+                loaded_model[modality] = create_model(temp_args.model)
+                loaded_model[modality].to(temp_args.model['device'])
+                out_dir = temp_args.out_dir.replace('UMTTrainer', 'unimodalTrainer_' + modality)
+                out_dir = '/'.join(out_dir.split('/')[:-1])
+                path = get_newest_path(out_dir)
+                loaded_model[modality].load_state_dict(torch.load(get_checkpoint_files(path)[0])['model'])
+            self.loaded_model = nn.ModuleDict(loaded_model)
 
         ##new
     def train_loop(

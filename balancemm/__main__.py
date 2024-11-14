@@ -20,7 +20,7 @@ def add_to_pythonpath(path):
 add_to_pythonpath(os.getcwd())
 from balancemm.utils.parser_utils import parse_cli_args_to_dict, load_config_dict, ensure_and_get_config_path
 from balancemm.train import train_and_test
-from balancemm.test import only_test, all_test
+from balancemm.test import only_test, all_test, t_sne
 from lightning import fabric
 import datetime
 from .utils.train_utils import set_seed
@@ -147,7 +147,7 @@ def create_config(config_dict: dict, args):
             config_dict['name'] = config_dict['Main_config']['model'] + '_' +config_dict['Main_config']['trainer'] \
                 + '_' +config_dict['Train']['dataset']
             config_dict["out_dir"] = osp.join(root_path, 'experiments', config_dict["name"], mode, exp_name)
-    elif mode == "test" or mode == 'all_test':
+    elif mode == "test" or mode == 'all_test' or mode == 'tsne':
         # config_dict.pop('train', None)
         # config_dict.pop('trainer', None)
         # config_dict.pop('Train', None)
@@ -218,5 +218,7 @@ if __name__ == "__main__":
         train_and_test(args)
     elif args['mode'] == "test":
         only_test(args)
-    elif args['mode'] == 'all_test':
+    elif args['mode'] == "all_test":
         all_test(args)
+    elif args['mode'] == "tsne":
+        t_sne(args)

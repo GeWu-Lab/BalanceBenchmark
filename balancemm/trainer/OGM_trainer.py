@@ -1,7 +1,7 @@
 from typing import Mapping
 from torch.optim.optimizer import Optimizer as Optimizer
 from .base_trainer import BaseTrainer
-
+import copy
 import torch
 import torch.nn as nn
 from balancemm.models.avclassify_model import BaseClassifierModel
@@ -110,7 +110,7 @@ class OGMTrainer(BaseTrainer):
         #Calculate the scores
 
         for modality in modality_list:
-            if modality_nums == 2:
+            if modality_nums == 2 or self.method == 'OGM_GE3':
                 score_modality = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(Uni_res['output'].size(0))])
             elif modality_nums == 3:
                 score_modality = sum([softmax(torch.cos(Uni_res[modality]))[i][label[i]] if label[i] == torch.argmax(Uni_res[modality][i]) else 0 for i in range(Uni_res['output'].size(0))])
@@ -122,16 +122,27 @@ class OGMTrainer(BaseTrainer):
                 continue
             minscore = min(score_modality, minscore)
         ##Calculate the ratios
-        for modality in modality_list:
-            ratios[modality] = scores[modality].detach().clone()
-            if modality_nums == 2:
+        if self.method == 'OGM_GE3':
+            for modality in modality_list:
+                count = 0
+                ratios[modality] = 0
                 for modality_another in modality_list:
                     if modality_another == modality: 
                         continue
-                    ## 如果没有1e-3会显存爆炸
-                    ratios[modality] /= (scores[modality_another]+ 1e-5)
-            if modality_nums == 3:
-                ratios[modality] /= (minscore + 1e-5)
+                    ratios[modality] += scores[modality].detach().clone()/(scores[modality_another]+ 1e-5)
+                    count += 1
+            ratios[modality]/= count
+        elif self.method == "OGM_GE":
+            for modality in modality_list:
+                ratios[modality] = scores[modality].detach().clone()
+                if modality_nums == 2:
+                    for modality_another in modality_list:
+                        if modality_another == modality: 
+                            continue
+                        ## 如果没有1e-3会显存爆炸
+                        ratios[modality] /= (scores[modality_another]+ 1e-5)
+                if modality_nums == 3:
+                    ratios[modality] /= (minscore + 1e-5)
         #Calculate the coeffects
         for modality in modality_list:
             if ratios[modality] > 1 :
@@ -145,7 +156,7 @@ class OGMTrainer(BaseTrainer):
                 for modality in modality_list:
 
                     if modality in layer and len(parms.grad.size()) != 1: ##Don't change the grad of bias for layer
-                        if self.method == 'OGM_GE':  # bug fixed
+                        if self.method == 'OGM_GE' or self.method == 'OGM_GE3':  # bug fixed
                             parms.grad = parms.grad * coeffs[modality] + \
                                         torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
                         elif self.method == 'OGM':

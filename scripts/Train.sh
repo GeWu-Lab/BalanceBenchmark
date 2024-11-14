@@ -13,7 +13,7 @@ normals=("AMCoTrainer" "GBlendingTrainer" "MBSDTrainer" "baselineTrainer")
 groups=(alphas lams unique scalings normals)
 # methods=("MMCosineTrainer" "GreedyTrainer")
 # methods=("AGMTrainer" "OGMTrainer" "GreedyTrainer")
-methods=("PMRTrainer")
+methods=("OGMTrainer")
 # methods=("AGMTrainer" "GBlendingTrainer" "OGMTrainer")
 # 定义参数范围
 
@@ -146,7 +146,7 @@ for method in "${methods[@]}"; do
         for j in {0}; do
             # 运行训练并获取结果
             lr_now=$lr
-            setup "0" "$lr_now" "0" "0" "0" "0"
+            setup "0" "$lr_now" "0" "0" "0" "0" "0"
             accuracy=$(run_training "$method")
             # 记录结果
             echo "$method,"0",$lr_now,$accuracy" >> "$results_file"
