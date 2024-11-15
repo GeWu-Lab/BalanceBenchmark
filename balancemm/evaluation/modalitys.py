@@ -1,5 +1,3 @@
-from ..trainer.base_trainer import BaseTrainer
-from ..models.avclassify_model import BaseClassifierModel
 from itertools import combinations
 from collections import defaultdict
 from torch.utils.data.dataset import Dataset
@@ -22,39 +20,42 @@ def generate_all_combinations(input_list: list[str], include_empty: bool = True)
     # 将组合转换为列表
     return [list(combo) for combo in all_combinations]
 
-def Calculate_Shapley(trainer: BaseTrainer, model: BaseClassifierModel, CalcuLoader: Dataset, logger: logging.Logger, include_empty: bool = False) -> dict[str: float]:
-    modalitys = model.modalitys
-    Shapley = defaultdict(int) ##default is 0
-    res_cahce = defaultdict(lambda:float('inf')) ## store the middle results
-    for modality in modalitys:
-        temp_modalitys = list(modalitys)
-        # if include_empty:
-        #     temp_modalitys.append([]) wrong
-        temp_modalitys.remove(modality)
-        combinations = generate_all_combinations(temp_modalitys, include_empty = True)
-        if include_empty:
-            combinations.append([])
-        for combo in combinations:
-            indentifer = tuple(sorted(combo))
-            if res_cahce[indentifer] == float('inf'):
-                _, v_combo = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= combo.copy())
-                res_cahce[indentifer] = v_combo
-            else:
-                v_combo = res_cahce[indentifer]
-            if modality not in combo:
-                add_combo = combo.copy()
-                add_combo.append(modality)
-                add_combo = sorted(add_combo)
-                indentifer = tuple(add_combo)
+def Calculate_Shapley(trainer, model, CalcuLoader: Dataset, logger: logging.Logger, include_empty: bool = False, conduct: bool = True) -> dict[str: float]:
+    if conduct:  
+        modalitys = model.modalitys
+        Shapley = defaultdict(int) ##default is 0
+        res_cahce = defaultdict(lambda:float('inf')) ## store the middle results
+        for modality in modalitys:
+            temp_modalitys = list(modalitys)
+            # if include_empty:
+            #     temp_modalitys.append([]) wrong
+            temp_modalitys.remove(modality)
+            combinations = generate_all_combinations(temp_modalitys, include_empty = True)
+            if include_empty:
+                combinations.append([])
+            for combo in combinations:
+                indentifer = tuple(sorted(combo))
                 if res_cahce[indentifer] == float('inf'):
-                    _, v_add = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= add_combo)
-                    res_cahce[indentifer] = v_add
+                    _, v_combo = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= combo.copy())
+                    res_cahce[indentifer] = v_combo
                 else:
-                    v_add = res_cahce[indentifer]
-            else:
-                v_add = v_combo
-            res = (v_add['acc']['output'] - v_combo['acc']['output'])
-            print(f'{modality} acc: {res}')
-            Shapley[modality] += (v_add['acc']['output'] - v_combo['acc']['output'])
-    logger.info(Shapley)
-    return Shapley
+                    v_combo = res_cahce[indentifer]
+                if modality not in combo:
+                    add_combo = combo.copy()
+                    add_combo.append(modality)
+                    add_combo = sorted(add_combo)
+                    indentifer = tuple(add_combo)
+                    if res_cahce[indentifer] == float('inf'):
+                        _, v_add = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= add_combo)
+                        res_cahce[indentifer] = v_add
+                    else:
+                        v_add = res_cahce[indentifer]
+                else:
+                    v_add = v_combo
+                res = (v_add['acc']['output'] - v_combo['acc']['output'])
+                print(f'{modality} acc: {res}')
+                Shapley[modality] += (v_add['acc']['output'] - v_combo['acc']['output'])
+        logger.info(Shapley)
+        return Shapley
+    else:
+        return 

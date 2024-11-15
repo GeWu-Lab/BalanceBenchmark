@@ -15,6 +15,7 @@ from tqdm import tqdm
 from ..evaluation.precisions import BatchMetricsCalculator
 from ..models.avclassify_model import BaseClassifierModel
 from ..evaluation.complex import FLOPsMonitor
+from ..evaluation.modalitys import Calculate_Shapley
 from logging import Logger
 class BaseTrainer():
     def __init__(
@@ -152,7 +153,7 @@ class BaseTrainer():
         if tb_logger:
             for modality in modality_list:
                 tb[modality] = TensorBoardLogger(root_dir=tb_logger.root_dir, name=f'tensorboard',default_hp_metric=False,version=0,sub_dir = f'{modality}')
-                
+        Shapley = {}
         while not self.should_stop:
             if self.should_train:
                 model.train()
@@ -210,6 +211,12 @@ class BaseTrainer():
                     tb_logger.log_metrics({
                         'valid_loss': valid_loss,
                     }, step=self.current_epoch)
+                Shapley = Calculate_Shapley(self, model,val_loader,logger,False)
+                for modality in modality_list:
+                    tag = "Shapley_value"
+                    tb[modality].log_metrics({
+                                    tag: Shapley[modality]
+                                }, step=self.current_epoch)
                 ##parse the Metrics
                 for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':

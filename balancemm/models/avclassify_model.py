@@ -292,6 +292,9 @@ class BaseClassifier_GreedyModel(BaseClassifierModel):
         self.encoder_res = {}
         for modality in self.modalitys:
             modality_data = batch[modality].to(self.device)
+            if modality in padding:
+                if mask is None:
+                    modality_data = torch.zeros_like(modality_data, device=modality_data.device)
             modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
             self.encoder_res[modality] = modality_res 
         
