@@ -73,7 +73,8 @@ def train_and_test(args: dict):
         temp_model = create_model(args.model)
         temp_model.to(device)
         temp_model.device = device
-        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger)
+        temp_optimizer = create_optimizer(temp_model, args.train['optimizer'], args.train['parameter'])
+        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, temp_optimizer,logger,tb_logger)
     else :
         trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger) 
     end_time = datetime.now()

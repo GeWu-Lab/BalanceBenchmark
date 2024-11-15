@@ -37,6 +37,7 @@ class GBlendingTrainer(BaseTrainer):
         val_loader: torch.utils.data.DataLoader,
         optimizer: torch.optim.Optimizer,
         scheduler_cfg: torch.optim.lr_scheduler,
+        temp_optimizer: torch.optim.Optimizer,
         logger,
         tb_logger,
         ckpt_path: Optional[str] = None,
@@ -83,7 +84,7 @@ class GBlendingTrainer(BaseTrainer):
                 tb_logger.log_hyperparams({"epochs": self.current_epoch})
             if self.current_epoch % self.super_epoch == 0:
                 model.train()
-                weights = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, optimizer,logger)
+                weights = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, temp_optimizer,logger)
                 logger.info(weights)
                 if tb_logger:
                     for modality in weights.keys():
@@ -310,12 +311,10 @@ class GBlendingTrainer(BaseTrainer):
             now_train_loss = 0
             pre_validation_loss = 0
             now_validation_loss = 0
-            print(temp_model.modalitys)
             print(modality)
             for other_modality in temp_model.modalitys:
                 if other_modality != modality and modality !='output':
                     padding.append(other_modality)
-            print(padding)
             for epoch in range(self.super_epoch):
                 temp_model.train()
                 _loss = 0.0
@@ -346,15 +345,19 @@ class GBlendingTrainer(BaseTrainer):
                         if epoch == 0:
                             pre_train_loss = _loss
                             pre_validation_loss = _loss_v
+                            print(f"valid_loss is {_loss_v} on super epoch {epoch}")
+                            logger.info(f"valid_loss is {_loss_v} on super epoch {epoch}")
                         else:
                             now_train_loss = _loss
                             now_validation_loss = _loss_v
+                            print(f"valid_loss is {_loss_v} on super epoch {epoch}")
+                            logger.info(f"valid_loss is {_loss_v} on super epoch {epoch}")
             g = now_validation_loss - pre_validation_loss
             o_pre = pre_validation_loss - pre_train_loss
             o_now = now_validation_loss - now_train_loss
             o = o_now - o_pre
-            weights[modality] = abs((g + 1e-7)/(o**2 + 1e-7))
-        sums = sum(weights.values() ) + 1e-3
+            weights[modality] = abs((g )/(o**2))
+        sums = sum(weights.values() ) 
         info = ''
         logger.info(f'super_epoch begin in {self.current_epoch}')
         for modality in weights.keys():
