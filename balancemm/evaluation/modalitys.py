@@ -3,6 +3,7 @@ from collections import defaultdict
 from torch.utils.data.dataset import Dataset
 import logging
 from copy import deepcopy
+from math import factorial
 def generate_all_combinations(input_list: list[str], include_empty: bool = True):
     """
     生成输入列表的所有可能组合。
@@ -13,17 +14,18 @@ def generate_all_combinations(input_list: list[str], include_empty: bool = True)
     all_combinations = []
     
     # 生成长度从 0 到 len(input_list) 的所有组合
-    start_range = 1 if include_empty else 0
+    start_range = 0 if include_empty else 1
     for r in range(start_range, len(input_list) + 1):
         all_combinations.extend(combinations(input_list, r))
-    
     # 将组合转换为列表
     return [list(combo) for combo in all_combinations]
 
-def Calculate_Shapley(trainer, model, CalcuLoader: Dataset, logger: logging.Logger, include_empty: bool = False, conduct: bool = True) -> dict[str: float]:
+def Calculate_Shapley(trainer, model, CalcuLoader: Dataset, logger: logging.Logger, conduct: bool = True) -> dict[str: float]:
+    
     if conduct:  
         modalitys = model.modalitys
-        Shapley = defaultdict(int) ##default is 0
+        n = len(modalitys)
+        Shapley = defaultdict(float) ##default is 0
         res_cahce = defaultdict(lambda:float('inf')) ## store the middle results
         for modality in modalitys:
             temp_modalitys = list(modalitys)
@@ -31,9 +33,8 @@ def Calculate_Shapley(trainer, model, CalcuLoader: Dataset, logger: logging.Logg
             #     temp_modalitys.append([]) wrong
             temp_modalitys.remove(modality)
             combinations = generate_all_combinations(temp_modalitys, include_empty = True)
-            if include_empty:
-                combinations.append([])
             for combo in combinations:
+                S_size = len(combo)
                 indentifer = tuple(sorted(combo))
                 if res_cahce[indentifer] == float('inf'):
                     _, v_combo = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= combo.copy())
@@ -52,10 +53,12 @@ def Calculate_Shapley(trainer, model, CalcuLoader: Dataset, logger: logging.Logg
                         v_add = res_cahce[indentifer]
                 else:
                     v_add = v_combo
-                res = (v_add['acc']['output'] - v_combo['acc']['output'])
-                print(f'{modality} acc: {res}')
-                Shapley[modality] += (v_add['acc']['output'] - v_combo['acc']['output'])
+                Shapley[modality] += (factorial(S_size) * factorial(n - S_size - 1)) / factorial(n)*(v_add['acc']['output'] - v_combo['acc']['output'])
+                
         logger.info(Shapley)
         return Shapley
     else:
         return 
+    
+
+

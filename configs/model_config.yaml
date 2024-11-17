@@ -1,6 +1,6 @@
 model:
   BaseClassifier:
-    encoders: {audio: ResNet18,visual: ResNet18}
+    encoders: {audio: ResNet18}
     fusion: "concat"
     modality_size: 512
   BaseClassifier_AMCo:
