@@ -40,7 +40,7 @@ trainer_para:
     method: "online"
     modulation_starts: 0
     modulation_ends: 80
-    super_epoch: 10
+    super_epoch: 20
     modality: 2
   PMR:
     alpha: 0.6
