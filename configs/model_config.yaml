@@ -1,14 +1,14 @@
 model:
   BaseClassifier:
-    encoders: {audio: Transformer_, visual: Transformer_, text: Transformer_}
+    encoders: {visual: ResNet18, flow: ResNet18}
     fusion: "concat"
     modality_size: 512
   BaseClassifier_AMCo:
-    encoders: {audio: Transformer_, visual: Transformer_, text: Transformer_}
+    encoders: {visual: ResNet18, flow: ResNet18}
     fusion: "concat"
     modality_size: 512
   BaseClassifier_Greedy:
-    encoders: {audio: Transformer_, visual: Transformer_, text: Transformer_}
+    encoders: {visual: ResNet18, flow: ResNet18}
     fusion: "concat"
     modality_size: 512
   # encoder名字的规范化 更多的encoder official的encoder
