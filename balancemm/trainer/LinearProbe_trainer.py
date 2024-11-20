@@ -26,6 +26,7 @@ from lightning.fabric.loggers import TensorBoardLogger
 from ..evaluation.modalitys import Calculate_Shapley
 from logging import Logger
 class NewLinearHead(nn.Module):
+    '''New Linear-Classifier-Head'''
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.fc_out = nn.Linear(input_dim, output_dim)
@@ -66,6 +67,8 @@ class LinearProbeTrainer(BaseTrainer):
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
         self.trainer_probed = method_dict['trainer_probed']
+        
+        # finding the newest trained model
         temp_args = copy.deepcopy(args)
         out_dir = '_'.join(temp_args.out_dir.split('/')[:-1])
         out_dir = temp_args.out_dir.replace('LinearProbeTrainer', self.trainer_probed)
@@ -101,8 +104,7 @@ class LinearProbeTrainer(BaseTrainer):
 
         """
         print(self.max_epochs)
-        # self.fabric.launch()
-        # setup calculator
+       
         self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
         # setup dataloaders
         if self.should_train:
@@ -110,6 +112,7 @@ class LinearProbeTrainer(BaseTrainer):
         if val_loader is not None:
             val_loader = self.fabric.setup_dataloaders(val_loader, use_distributed_sampler=self.use_distributed_sampler)
 
+        # Loading the newest trained model
         model.load_state_dict(torch.load(get_checkpoint_files(self.checkpoint_path)[0])['model'])
         # assemble state (current epoch and global step will be added in save)
         state = {"model": model,"new_head": new_head, "optim": optimizer, "scheduler": scheduler_cfg}
@@ -130,7 +133,7 @@ class LinearProbeTrainer(BaseTrainer):
                 tb[modality] = TensorBoardLogger(root_dir=tb_logger.root_dir, name=f'tensorboard',default_hp_metric=False,version=0,sub_dir = f'{modality}')
         for param in model.parameters():
             param.requires_grad = False
-        Shapley = {}
+        
         while not self.should_stop:
             if self.should_train:
                 model.eval()
@@ -191,12 +194,7 @@ class LinearProbeTrainer(BaseTrainer):
                         'valid_loss': valid_loss,
                     }, step=self.current_epoch)
                 
-                # for modality in modality_list:
-                #     tag = "Shapley_value"
-                #     tb[modality].log_metrics({
-                #                     tag: Shapley[modality]
-                #                 }, step=self.current_epoch)
-                ##parse the Metrics
+               
                 for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':
                         valid_acc = Metrics_res[metircs]
@@ -234,7 +232,7 @@ class LinearProbeTrainer(BaseTrainer):
                 logger.info(info)
                 for handler in logger.handlers:
                     handler.flush()
-            # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
+            
             if scheduler_cfg is not None:
                 scheduler_cfg.step()
 
@@ -280,14 +278,7 @@ class LinearProbeTrainer(BaseTrainer):
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
-        # if self.current_epoch == 0:
-            # for batch_idx, batch in enumerate(iterable):
-            #     batch_sample = batch
-            #     break
-            # print(batch_sample.keys())
-            # model_flops, _ =get_flops(model = model, input_sample = batch_sample)
-            # self.FlopsMonitor.update(model_flops / len(batch_sample['label']) * len(train_loader), 'forward')
-            # self.FlopsMonitor.report(logger = self.logger)
+        
         for batch_idx, batch in enumerate(iterable):
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
@@ -315,9 +306,7 @@ class LinearProbeTrainer(BaseTrainer):
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
-            # if should_optim_step:
-            #     self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
-
+           
             # add output values to progress bar
             
             self._format_iterable(iterable, self._current_train_return, "train")
@@ -333,10 +322,7 @@ class LinearProbeTrainer(BaseTrainer):
         
         label = batch['label']
         label = label.to(model.device)
-        # if self.modality == 2:
-        #     a, v, out = model(batch)
-        # else:
-        #     a, v, t, out = model(batch)
+       
         with torch.no_grad():
             model(batch= batch)
         encoder_features = {k: v for k, v in model.encoder_res.items() if k != 'output'}
@@ -370,11 +356,7 @@ class LinearProbeTrainer(BaseTrainer):
             return
 
         # # no validation but warning if val_loader was passed, but validation_step not implemented
-        # if val_loader is not None and not is_overridden("validation_step", _unwrap_objects(model)):
-        #     L.fabric.utilities.rank_zero_warn(
-        #         "Your LightningModule does not have a validation_step implemented, "
-        #         "but you passed a validation dataloder. Skipping Validation."
-        #     )
+       
         #     return
 
         self.fabric.call("on_validation_model_eval")  # calls `model.eval()`
@@ -407,13 +389,10 @@ class LinearProbeTrainer(BaseTrainer):
             self._current_val_return = out
 
             self._format_iterable(iterable, self._current_val_return, "val")
-            # for modality in acc.keys():
-            #     if modality not in _acc:
-            #         _acc[modality] = 0
-            #     _acc[modality] += sum(acc[modality])
+            
             MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = new_head.pridiction)
             valid_loss += out
-            # count += len(batch['label'])
+         
         valid_loss /= MetricsCalculator.total_samples
         Metrics_res = MetricsCalculator.compute_metrics()
         self._current_metrics = Metrics_res
@@ -432,7 +411,7 @@ class LinearProbeTrainer(BaseTrainer):
         return valid_loss, Metrics_res
     
     def validation_step(self, model, new_head,batch, batch_idx,limit_modalitys):
-        # ** drop
+    
         padding = []
         for modality in model.modalitys:
             if modality not in limit_modalitys:
@@ -445,10 +424,10 @@ class LinearProbeTrainer(BaseTrainer):
         label = label.to(model.device)
         key = list(model.modalitys)
         modality_list = model.modalitys
-        m = {}
+        encoder_features = {}
         for modality in modality_list:
-            m[modality] = model.encoder_res[modality]
-        m['output'] = new_head(m)
-        new_head.Uni_res = new_head.Unimodalitiy_Calaulate(m,model.modality_size)
-        loss = criterion(m['output'], label)
+            encoder_features[modality] = model.encoder_res[modality]
+        encoder_features['output'] = new_head(encoder_features)
+        new_head.Uni_res = new_head.Unimodalitiy_Calaulate(encoder_features,model.modality_size)
+        loss = criterion(encoder_features['output'], label)
         return loss

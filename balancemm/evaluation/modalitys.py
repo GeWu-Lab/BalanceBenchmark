@@ -4,6 +4,7 @@ from torch.utils.data.dataset import Dataset
 import logging
 from copy import deepcopy
 from math import factorial
+import torch
 def generate_all_combinations(input_list: list[str], include_empty: bool = True):
     """
     生成输入列表的所有可能组合。
@@ -37,7 +38,8 @@ def Calculate_Shapley(trainer, model, CalcuLoader: Dataset, logger: logging.Logg
                 S_size = len(combo)
                 indentifer = tuple(sorted(combo))
                 if res_cahce[indentifer] == float('inf'):
-                    _, v_combo = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= combo.copy())
+                    with torch.no_grad():
+                        _, v_combo = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= combo.copy())
                     res_cahce[indentifer] = v_combo
                 else:
                     v_combo = res_cahce[indentifer]
@@ -47,14 +49,14 @@ def Calculate_Shapley(trainer, model, CalcuLoader: Dataset, logger: logging.Logg
                     add_combo = sorted(add_combo)
                     indentifer = tuple(add_combo)
                     if res_cahce[indentifer] == float('inf'):
-                        _, v_add = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= add_combo)
+                        with torch.no_grad():
+                            _, v_add = trainer.val_loop(model = model, val_loader= CalcuLoader, limit_modalitys= add_combo)
                         res_cahce[indentifer] = v_add
                     else:
                         v_add = res_cahce[indentifer]
                 else:
                     v_add = v_combo
                 Shapley[modality] += (factorial(S_size) * factorial(n - S_size - 1)) / factorial(n)*(v_add['acc']['output'] - v_combo['acc']['output'])
-                
         logger.info(Shapley)
         return Shapley
     else:

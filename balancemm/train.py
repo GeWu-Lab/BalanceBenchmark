@@ -74,7 +74,8 @@ def train_and_test(args: dict):
         temp_model = create_model(args.model)
         temp_model.to(device)
         temp_model.device = device
-        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger)
+        temp_optimizer = create_optimizer(temp_model, args.train['optimizer'], args.train['parameter'])
+        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, temp_optimizer,logger,tb_logger)
     else :
         trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger) 
     end_time = datetime.now()
@@ -140,6 +141,7 @@ def linear_probe_eval(args: dict):
     model.to(device)
     model.device = device
     input_dim = sum(model.modality_size.values()) 
+    # Create a linear-classifier-head
     new_head = NewLinearHead(input_dim, model.n_classes).to(model.device)
     optimizer = create_optimizer(new_head, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
@@ -151,7 +153,8 @@ def linear_probe_eval(args: dict):
         temp_model = create_model(args.model)
         temp_model.to(device)
         temp_model.device = device
-        trainer.fit(model,new_head, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger)
+        temp_optimizer = create_optimizer(temp_model, args.train['optimizer'], args.train['parameter'])
+        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, temp_optimizer,logger,tb_logger)
     else :
         trainer.fit(model,new_head, train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger) 
     end_time = datetime.now()

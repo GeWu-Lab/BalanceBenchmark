@@ -211,7 +211,8 @@ class BaseTrainer():
                     tb_logger.log_metrics({
                         'valid_loss': valid_loss,
                     }, step=self.current_epoch)
-                Shapley = Calculate_Shapley(self, model,val_loader,logger)
+                with torch.no_grad():
+                    Shapley = Calculate_Shapley(self, model,val_loader,logger)
                 for modality in modality_list:
                     tag = "Shapley_value"
                     tb[modality].log_metrics({
@@ -407,9 +408,13 @@ class BaseTrainer():
         valid_loss /= MetricsCalculator.total_samples
         Metrics_res = MetricsCalculator.compute_metrics()
         self._current_metrics = Metrics_res
-        if Metrics_res['acc']['output'] > self.best_acc:
+        self.best_acc={}
+        self.best_acc['output'] = 0
+        if Metrics_res['acc']['output'] > self.best_acc['output']:
             self.should_save = True
-            self.best_acc = Metrics_res['acc']['output']
+            self.best_acc['output'] = Metrics_res['acc']['output']
+            for modality in model.modalitys:
+                self.best_acc[modality] = Metrics_res['acc'][modality]
 
         self.fabric.call("on_validation_epoch_end")
 
