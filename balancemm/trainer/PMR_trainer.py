@@ -173,24 +173,16 @@ class PMRTrainer(BaseTrainer):
             # loss_proto_a = criterion(audio_sim, label)
             # loss_proto_v = criterion(visual_sim, label)
             if len(modality_list) == 2: 
-                if ratio_a_p >= 1:
+                if ratio_a_p > 1:
                     beta = 0  # audio coef
-                    lam = 1 * clip(0, ratio_a_p - 1, 1)  # visual coef
-                else:
-                    beta = 1 * clip(0, 1/ratio_a_p - 1, 1)
+                    lam = 1 * self.alpha  # visual coef
+                elif ratio_a_p < 1:
+                    beta = 1 * self.alpha
                     lam = 0
-                if self.current_epoch <= self.modulation_starts + self.norm_epoch:
-                    PER = {}
-                    if loss_modality[key[0]] < loss_modality[key[1]]:
-                        for modality in modality_list:
-                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[0]],proto[modality])) * log_softmax(-EU_dist(m[key[0]],proto[modality])),dim=1).sum()
-                        print(PER)
-                    else:
-                        for modality in modality_list:
-                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[1]],proto[modality])) * log_softmax(-EU_dist(m[key[1]],proto[modality])),dim=1).sum()
-                    loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]] - self.mu * lam * PER[key[0]] - self.mu * beta * PER[key[1]]
                 else:
-                    loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]
+                    beta = 0
+                    lam = 0
+                loss = criterion(Uni_res['output'], label) + beta * loss_proto[key[0]] + lam * loss_proto[key[1]]
                 loss.backward()
             else:
                 loss = criterion(Uni_res['output'], label)
