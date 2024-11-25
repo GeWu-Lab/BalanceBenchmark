@@ -263,12 +263,11 @@ class BaseClassifier_GreedyModel(BaseClassifierModel):
         x = modality_data
         if self.enconders[modality]['if_pretrain'] == True:
             x = x.squeeze(1).int()
-            outputs = encoder.textEncoder(x)
+            outputs = encoder.textEncoder(x,output_hidden_states=True)
             hidden_states = outputs.hidden_states
             res = hidden_states[9]
-        # else:
-        # hidden_states = encoder(**text)
-        return res # 需要修改
+
+        return res 
 
     def Encoder_Process(self, modality_data : torch.Tensor, modality_name: str) -> torch.Tensor:
         ## May be it could use getattr
