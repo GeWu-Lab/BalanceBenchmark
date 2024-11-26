@@ -15,6 +15,7 @@ from tqdm import tqdm
 from ..evaluation.precisions import BatchMetricsCalculator
 from ..models.avclassify_model import BaseClassifierModel
 from ..evaluation.complex import FLOPsMonitor
+from ..evaluation.modalitys import Calculate_Shapley
 from logging import Logger
 class BaseTrainer():
     def __init__(
@@ -152,7 +153,7 @@ class BaseTrainer():
         if tb_logger:
             for modality in modality_list:
                 tb[modality] = TensorBoardLogger(root_dir=tb_logger.root_dir, name=f'tensorboard',default_hp_metric=False,version=0,sub_dir = f'{modality}')
-                
+        Shapley = {}
         while not self.should_stop:
             if self.should_train:
                 model.train()
@@ -210,6 +211,13 @@ class BaseTrainer():
                     tb_logger.log_metrics({
                         'valid_loss': valid_loss,
                     }, step=self.current_epoch)
+                with torch.no_grad():
+                    Shapley = Calculate_Shapley(self, model,val_loader,logger)
+                for modality in modality_list:
+                    tag = "Shapley_value"
+                    tb[modality].log_metrics({
+                                    tag: Shapley[modality]
+                                }, step=self.current_epoch)
                 ##parse the Metrics
                 for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':
@@ -400,9 +408,13 @@ class BaseTrainer():
         valid_loss /= MetricsCalculator.total_samples
         Metrics_res = MetricsCalculator.compute_metrics()
         self._current_metrics = Metrics_res
-        if Metrics_res['acc']['output'] > self.best_acc:
+        self.best_acc={}
+        self.best_acc['output'] = 0
+        if Metrics_res['acc']['output'] > self.best_acc['output']:
             self.should_save = True
-            self.best_acc = Metrics_res['acc']['output']
+            self.best_acc['output'] = Metrics_res['acc']['output']
+            for modality in model.modalitys:
+                self.best_acc[modality] = Metrics_res['acc'][modality]
 
         self.fabric.call("on_validation_epoch_end")
 
@@ -438,6 +450,7 @@ class BaseTrainer():
 
         return loss
 
+    
     def step_scheduler(
         self,
         model: L.LightningModule,

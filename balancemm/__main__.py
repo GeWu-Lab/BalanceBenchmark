@@ -19,7 +19,7 @@ def add_to_pythonpath(path):
     os.environ['PYTHONPATH'] = pythonpath
 add_to_pythonpath(os.getcwd())
 from balancemm.utils.parser_utils import parse_cli_args_to_dict, load_config_dict, ensure_and_get_config_path
-from balancemm.train import train_and_test
+from balancemm.train import train_and_test, linear_probe_eval
 from balancemm.test import only_test
 from lightning import fabric
 import datetime
@@ -131,7 +131,7 @@ def create_config(config_dict: dict, args):
     if config_dict.get("Test") is None:
         raise ValueError("Test set not specified.")
 
-    if mode == "train_and_test":
+    if mode == "train_and_test" or mode == "linear_probe":
         if config_dict.get("Train") is None:
             raise ValueError("Train set not specified.")
         if config_dict.get("Val") is None:
@@ -213,3 +213,5 @@ if __name__ == "__main__":
         train_and_test(args)
     elif args['mode'] == "test":
         only_test(args)
+    elif args['mode'] == "linear_probe":
+        linear_probe_eval(args)

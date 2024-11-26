@@ -16,6 +16,11 @@ from ..models.avclassify_model import BaseClassifierModel
 
 import lightning as L
 from lightning_utilities import apply_to_collection
+from itertools import combinations
+from collections import defaultdict
+from torch.utils.data.dataset import Dataset
+import logging
+from copy import deepcopy
 
 
 # class NCELoss(torch.nn.Module):
@@ -267,32 +272,34 @@ class MMCosineTrainer(BaseTrainer):
         torch.set_grad_enabled(True)
         return valid_loss, Metrics_res
     def validation_step(self, model, batch, batch_idx,limit_modalitys):
-        # ** drop
-        model(batch)
+        
+        padding = []
+        for modality in model.modalitys:
+            if modality not in limit_modalitys:
+                padding.append(modality)
+        model(batch, padding = padding)
         softmax  = nn.Softmax(dim = 1)
         label = batch['label']
         label = label.to(model.device)
         key = list(model.modalitys)
         modality_list = model.modalitys
         m = {}
-        model(batch)
         for modality in modality_list:
             m[modality] = model.encoder_res[modality]
         m['out'] = model.encoder_res['output']
-        Uni_res = {}
         if len(key) == 2:
-            Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :m[key[0]].size(1)], 0, 1), dim=0))
-            Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1):], 0, 1), dim=0))
+            model.Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :m[key[0]].size(1)], 0, 1), dim=0))
+            model.Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1):], 0, 1), dim=0))
         if len(key) == 3:
-            Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :m[key[0]].size(1)], 0, 1), dim=0))
-            Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1):m[key[0]].size(1)+m[key[1]].size(1)], 0, 1), dim=0))
-            Uni_res[key[2]] = torch.mm(F.normalize(m[key[2]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1)+m[key[1]].size(1):], 0, 1), dim=0))
+            model.Uni_res[key[0]] = torch.mm(F.normalize(m[key[0]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, :m[key[0]].size(1)], 0, 1), dim=0))
+            model.Uni_res[key[1]] = torch.mm(F.normalize(m[key[1]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1):m[key[0]].size(1)+m[key[1]].size(1)], 0, 1), dim=0))
+            model.Uni_res[key[2]] = torch.mm(F.normalize(m[key[2]], dim=1), F.normalize(torch.transpose(model.fusion_module.fc_out.weight[:, m[key[0]].size(1)+m[key[1]].size(1):], 0, 1), dim=0))
         for modality in modality_list:
-            Uni_res[modality] = Uni_res[modality] * self.scaling
-        Uni_res['output'] = sum(Uni_res[modality] for modality in key)
-        loss = F.cross_entropy(Uni_res['output'], label)
-        for modality in Uni_res.keys():
-            softmax_res = softmax(Uni_res[modality])
+            model.Uni_res[modality] = model.Uni_res[modality] * self.scaling
+        model.Uni_res['output'] = sum(model.Uni_res[modality] for modality in key)
+        loss = F.cross_entropy(model.Uni_res['output'], label)
+        for modality in model.Uni_res.keys():
+            softmax_res = softmax(model.Uni_res[modality])
             model.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
         # for modality in self.Uni_res.keys():
         #     acc_res[modality] = [0.0 for _ in range(n_classes)]
@@ -306,3 +313,4 @@ class MMCosineTrainer(BaseTrainer):
         #     num[label[i]] += 1.0
         return loss
     
+   

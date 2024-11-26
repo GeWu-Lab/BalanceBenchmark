@@ -17,7 +17,7 @@ dataloader:
 
 fabric:
   accelerator: "gpu" # "cpu", "gpu", "cuda", "mps", "tpu"
-  devices: [0] # number of devices or list of indexs
+  devices: [1] # number of devices or list of indexs
   precision: "32-true" # "32-true", "16-mixed", "bf16-mixed", etc.
   strategy: "dp" # "dp", "ddp", "ddp2", "ddp_spawn"
 
@@ -37,7 +37,7 @@ train:
   parameter:
     total_epoch: 70 # number of epochs to train
     warmup: 10 # warmup beta and lr
-    base_lr: 0.005 # base learning rate. Using linear law, lr = eff_batch_size/base_bs*base_lr
+    base_lr: 0.001 # base learning rate. Using linear law, lr = eff_batch_size/base_bs*base_lr
     lr: -1 # learning rate. If set, override base_lr, set to -1 to use base_lr
     base_batch_size: 2 # base batch_size
     lr_scaling_rule: "linear" # "sqrt", "linear" learning rate should scale with batch size
