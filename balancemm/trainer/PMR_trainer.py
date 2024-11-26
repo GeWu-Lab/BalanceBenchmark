@@ -179,12 +179,12 @@ class PMRTrainer(BaseTrainer):
                 else:
                     beta = 1 * clip(0, 1/ratio_a_p - 1, 1)
                     lam = 0
-                if self.current_epoch <= self.modulation_starts + self.norm_epoch:
+                if self.method == 'PMR_PER' and self.current_epoch <= self.modulation_starts + self.norm_epoch:
                     PER = {}
                     if loss_modality[key[0]] < loss_modality[key[1]]:
                         for modality in modality_list:
                             PER[modality] = -torch.sum(softmax(-EU_dist(m[key[0]],proto[modality])) * log_softmax(-EU_dist(m[key[0]],proto[modality])),dim=1).sum()
-                        print(PER)
+                            print(PER[modality])
                     else:
                         for modality in modality_list:
                             PER[modality] = -torch.sum(softmax(-EU_dist(m[key[1]],proto[modality])) * log_softmax(-EU_dist(m[key[1]],proto[modality])),dim=1).sum()
@@ -192,6 +192,7 @@ class PMRTrainer(BaseTrainer):
                 else:
                     loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]
                 loss.backward()
+                print(loss_proto[key[0]], loss_proto[key[1]])
             else:
                 loss = criterion(Uni_res['output'], label)
                 loss.backward()
