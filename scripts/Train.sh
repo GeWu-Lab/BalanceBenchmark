@@ -4,7 +4,7 @@ device=$2
 dataset=$3
 # methods=("OGMTrainer" "AGMTrainer" "AMCoTrainer" "CMLTrainer" "GBlendingTrainer" "PMRTrainer" "MBSDTrainer" "MMCosineTrainer" "UMTTrainer" "GreedyTrainer")
 
-alphas=("AGMTrainer" "OGMTrainer" "UMTTrainer" "GreedyTrainer") #greedy #UMT
+alphas=("AGMTrainer" "OGMTrainer" "UMTTrainer" "GreedyTrainer" "PMRTrainer") #greedy #UMT
 # alphas=("OGMTrainer")
 lams=("CMLTrainer")
 scalings=("MMCosineTrainer")
@@ -106,9 +106,10 @@ for method in "${methods[@]}"; do
                     alpha_scaler=(0.001 0.005 0.01)
                 fi 
                 if [ "$method" == "PMRTrainer" ]; then
-                    eta_scaler=(0.01 0.03 0.05)
-                    mu_scaler=(0.01 0.05 0.1)
-                    momentum_scaler=(0.3 0.5 0.8)
+                    # eta_scaler=(0.01 0.03 0.05)
+                    # mu_scaler=(0.01 0.05 0.1)
+                    # momentum_scaler=(0.3 0.5 0.8)
+                    alpha_scaler=(0.1 0.3 0.6 1.5 3.0) ###here
                 fi
             fi
         done   

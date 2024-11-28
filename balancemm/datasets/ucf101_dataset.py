@@ -48,7 +48,6 @@ class UCFDataset(Dataset):
             for line in f:
                 item = line.split("\n")[0].split(" ")[1]
                 classes.append(item)
-
         with open(csv_file) as f:
             for line in f:
                 class_name = line.split('/')[0]
@@ -293,4 +292,3 @@ if __name__ == '__main__':
     for i in range(10):
         res_a = a.__getitem__(i)
         res_b = b.__getitem__(i)
-        print

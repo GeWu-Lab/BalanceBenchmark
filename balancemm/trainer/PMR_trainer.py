@@ -22,9 +22,15 @@ def clip(a, b, c):
         return c
     return b
 
+# def EU_dist(x1, x2):
+#     return torch.cdist(x1, x2, p=2)
 def EU_dist(x1, x2):
-    return torch.cdist(x1, x2, p=2)
-
+    d_matrix = torch.zeros(x1.shape[0], x2.shape[0]).to(x1.device)
+    for i in range(x1.shape[0]):
+        for j in range(x2.shape[0]):
+            d = torch.sqrt(torch.dot((x1[i] - x2[j]), (x1[i] - x2[j])))
+            d_matrix[i, j] = d
+    return d_matrix
 
 class PMRTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
@@ -173,26 +179,17 @@ class PMRTrainer(BaseTrainer):
             # loss_proto_a = criterion(audio_sim, label)
             # loss_proto_v = criterion(visual_sim, label)
             if len(modality_list) == 2: 
-                if ratio_a_p >= 1:
+                if ratio_a_p > 1:
                     beta = 0  # audio coef
-                    lam = 1 * clip(0, ratio_a_p - 1, 1)  # visual coef
-                else:
-                    beta = 1 * clip(0, 1/ratio_a_p - 1, 1)
+                    lam = 1 * self.alpha  # visual coef
+                elif ratio_a_p < 1:
+                    beta = 1 * self.alpha
                     lam = 0
-                if self.method == 'PMR_PER' and self.current_epoch <= self.modulation_starts + self.norm_epoch:
-                    PER = {}
-                    if loss_modality[key[0]] < loss_modality[key[1]]:
-                        for modality in modality_list:
-                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[0]],proto[modality])) * log_softmax(-EU_dist(m[key[0]],proto[modality])),dim=1).sum()
-                            print(PER[modality])
-                    else:
-                        for modality in modality_list:
-                            PER[modality] = -torch.sum(softmax(-EU_dist(m[key[1]],proto[modality])) * log_softmax(-EU_dist(m[key[1]],proto[modality])),dim=1).sum()
-                    loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]] - self.mu * lam * PER[key[0]] - self.mu * beta * PER[key[1]]
                 else:
-                    loss = criterion(Uni_res['output'], label) + self.alpha * beta * loss_proto[key[0]] + self.alpha * lam * loss_proto[key[1]]
+                    beta = 0
+                    lam = 0
+                loss = criterion(Uni_res['output'], label) + beta * loss_proto[key[0]] + lam * loss_proto[key[1]]
                 loss.backward()
-                print(loss_proto[key[0]], loss_proto[key[1]])
             else:
                 loss = criterion(Uni_res['output'], label)
                 loss.backward()
@@ -213,8 +210,6 @@ class PMRTrainer(BaseTrainer):
         else:
             loss = criterion(Uni_res['output'], label)
             loss.backward()
-        
-
         # # avoid gradients in stored/accumulated values -> prevents potential OOM
         # self._current_train_return = apply_to_collection(model.encoder_res, dtype=torch.Tensor, function=lambda x: x.detach())
         return loss
