@@ -79,6 +79,19 @@ trainer_para:
     modulation_starts: 0
     modulation_ends: 80
     scaling: 10
+  MLA:
+    alpha: 1
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+  ReconBoost:
+    alpha: 0.5
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+    T_epochs: 1
+    weight1: 5
+    weight2: 1
   LinearProbe:
     alpha: 0.3
     method: 'None'

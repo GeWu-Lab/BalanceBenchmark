@@ -11,7 +11,17 @@ model:
     encoders: {audio: ResNet18,visual: ResNet18}
     fusion: "concat"
     modality_size: 512
+  BaseClassifier_MLA:
+    encoders: {audio: ResNet18,visual: ResNet18}
+    fusion: "shared"
+    modality_size: 512
+  BaseClassifier_ReconBoost:
+    encoders: {audio: ResNet18,visual: ResNet18}
+    fusion: "shared"
+    modality_size: 512
   # encoder名字的规范化 更多的encoder official的encoder
 fusion:
   concat:
+    out_put_dim: 100
+  shared:
     out_put_dim: 100

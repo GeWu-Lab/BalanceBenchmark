@@ -82,6 +82,8 @@ def create_config(config_dict: dict, args):
         trainer_settings['trainer_para'][name]['scaling'] = args.scaling
     if args.lam: 
         trainer_settings['trainer_para'][name]['lam'] = args.lam
+    if args.super_epoch: 
+        trainer_settings['trainer_para'][name]['super_epoch'] = args.super_epoch
     
     try:
         #waiting for support iteration
@@ -179,6 +181,9 @@ if __name__ == "__main__":
     parser.add_argument('--mu', type= float, default= None)
     parser.add_argument('--lam', type= float, default= None)
     parser.add_argument('--scaling', type= float, default= None)
+    parser.add_argument('--super_epoch', type= int, default= None)
+    parser.add_argument('--eps', type= float, default= None)
+    parser.add_argument('--sigma', type= float, default= None)
     parser.add_argument('--dataset', type= str, default= None)
     parser.add_argument('--device', type= str, default= None)
     
