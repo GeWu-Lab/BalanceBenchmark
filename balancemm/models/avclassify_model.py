@@ -37,7 +37,7 @@ class BaseClassifierModel(nn.Module):
         elif self.fusion == 'gated':
             self.fusion_module = GatedFusion(output_dim = self.n_classes, x_gate=True)
         elif self.fusion == 'shared':
-            self.fusion_module = SharedHead(input_dim = 512,output_dim = self.n_classes)
+            self.fusion_module = SharedHead(input_dim = max(self.modality_size.values()),output_dim = self.n_classes)
         else:
             raise NotImplementedError('Incorrect fusion method: {}!'.format(self.fusion))
         
@@ -500,7 +500,7 @@ class BaseClassifier_MLAModel(BaseClassifierModel):
                 self.Uni_res[modality] = self.fusion_module.fc_out(self.encoder_res[modality])
         key = list(self.modalitys)
         conf = self.calculate_gating_weights(self.Uni_res)
-    
+        
         if len(self.modalitys) == 3:
             self.Uni_res['output'] = self.Uni_res[key[0]] * conf[key[0]] + self.Uni_res[key[1]] * conf[key[1]] + self.Uni_res[key[2]] * conf[key[2]]
         else:
@@ -529,17 +529,16 @@ class BaseClassifier_MLAModel(BaseClassifierModel):
         gating_weight = {}
         for modality in self.modalitys:
             entropy[modality] = self.calculate_entropy(output[modality])
-        if len(key) == 2:
-            max_entropy = torch.max(entropy[key[0]],entropy[key[1]])
-            for modality in self.modalitys:
-                gating_weight[modality] = torch.exp(max_entropy - entropy[modality])
-            sum_weights = gating_weight[key[0]] + gating_weight[key[1]]
+        max_entropy = torch.max(entropy[key[0]],entropy[key[1]])
+        for modality in self.modalitys:
+            gating_weight[modality] = torch.exp(max_entropy - entropy[modality])
+        sum_weights = sum(gating_weight.values())
         # gating_weight_1 = torch.exp(max_entropy - entropy_1)
         # gating_weight_2 = torch.exp(max_entropy - entropy_2)
         
         # sum_weights = gating_weight + gating_weight_2
-            for modality in self.modalitys:
-                gating_weight[modality] /= sum_weights
+        for modality in self.modalitys:
+            gating_weight[modality] /= sum_weights
         # gating_weight_1 /= sum_weights
         # gating_weight_2 /= sum_weights
         
