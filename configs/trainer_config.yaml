@@ -92,6 +92,11 @@ trainer_para:
     T_epochs: 1
     weight1: 5
     weight2: 1
+  MMPareto:
+    alpha: 1.5
+    method: 'None'
+    modulation_starts: 0
+    modulation_ends: 80
   LinearProbe:
     alpha: 0.3
     method: 'None'
