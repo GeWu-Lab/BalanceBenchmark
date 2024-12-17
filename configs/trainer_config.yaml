@@ -104,6 +104,13 @@ trainer_para:
     method: 'None'
     modulation_starts: 0
     modulation_ends: 80
+  Sample:
+    alpha: 0.5
+    # method: 'Sample-level'  
+    method: 'Modality-level'
+    modulation_starts: 1
+    modulation_ends: 80
+    part_ratio: 0.2
   LinearProbe:
     alpha: 0.3
     method: 'None'

@@ -90,7 +90,7 @@ class CremadDataset(Dataset):
 
         label = self.label[idx]
         images = images.permute(1,0,2,3)
-        return {'audio': fbank, 'visual': images, 'label': label}
+        return {'audio': fbank, 'visual': images, 'label': label, 'idx': idx}
 
 if __name__ == '__main__':   
     print('start')
