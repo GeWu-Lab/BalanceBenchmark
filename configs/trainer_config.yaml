@@ -111,6 +111,13 @@ trainer_para:
     modulation_starts: 1
     modulation_ends: 80
     part_ratio: 0.2
+  ReLearning:
+    move_lambda: 3
+    method: None
+    modulation_starts: 0
+    modulation_ends: 80
+    reinit_epoch: 20
+    reinit_num: 4
   LinearProbe:
     alpha: 0.3
     method: 'None'
