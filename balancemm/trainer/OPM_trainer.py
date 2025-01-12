@@ -12,28 +12,7 @@ import lightning as L
 import torch
 import numpy as np
 
-class custom_autograd(torch.autograd.Function):
 
-    @staticmethod
-    def forward(ctx,input,theta):
-        ctx.save_for_backward(input,theta)
-        return input/(1-theta.item())
-
-    @staticmethod
-    def backward(ctx,grad_output):
-        input,theta=ctx.saved_tensors
-        input_grad=1/(1-theta.item())*grad_output.clone()
-
-        return input_grad,theta
-    
-class Modality_drop():
-
-    def __init__(self,dim_list,p_exe = 0.7,device='cuda'):
-        self.dim_list=dim_list
-        self.p_exe=p_exe
-        self.device=device
-
-    
 class Modality_drop():
     def __init__(self, dim_list, p_exe=0.7, device='cuda'):
         self.dim_list = dim_list
@@ -45,30 +24,28 @@ class Modality_drop():
         B = feat_list[modality_list[0]].shape[0]  # batch size
         exe_drop = torch.tensor(np.random.rand(1)).to(device=self.device) >= 1-self.p_exe
         if not exe_drop:
-            return feat_list, torch.ones([B], dtype=torch.int32, device=self.device)
+            return feat_list, torch.ones([B], dtype=torch.float32, device=self.device)
 
         d_sum = sum(self.dim_list.values())
         q_sum = sum(self.dim_list[m] * q[m] for m in modality_list)
         theta = q_sum/d_sum
         num_mod = len(modality_list)
-        q_temp = torch.zeros(num_mod, device=self.device)
-        for idx, modality in enumerate(modality_list):
-            q_temp[idx] = q[modality]
-        mask = torch.distributions.Bernoulli(1-q_temp).sample([B,1]).permute(2,1,0).contiguous().reshape(num_mod,B,1).to(device=self.device)
+        q_temp = torch.tensor([q[m] for m in modality_list], device=self.device)
+        mask = torch.distributions.Bernoulli(1 - q_temp).sample([B, 1]).permute(2, 1, 0).contiguous().reshape(num_mod, B, -1).to(self.device)
+        
         cleaned = {}
         for idx, modality in enumerate(modality_list):
             D = feat_list[modality].shape[1]  
             current_mask = mask[idx].expand(-1,D)
-            
             cleaned_fea = torch.mul(feat_list[modality], current_mask)
-            cleaned_fea = custom_autograd.apply(cleaned_fea, theta)
+            cleaned_fea = cleaned_fea / (1 - theta + 1e-5)
             cleaned[modality] = cleaned_fea
                 
         mask = mask.squeeze(-1).transpose(0,1) # [B,num_mod]
+
         update_flag = torch.sum(mask,dim=1) > 0
         for modality in modality_list:
-            cleaned[modality] = cleaned[modality][update_flag]
-            
+            cleaned[modality] = cleaned[modality][update_flag]   
         return cleaned,update_flag
     
     
@@ -183,17 +160,17 @@ class OPMTrainer(BaseTrainer):
         
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
             for modality in modality_list:
-                scores[modality] = sum([softmax(model.Uni_res[modality])[i][label[i]] for i in range(model.Uni_res['output'].size(0))])
+                scores[modality] = sum([softmax(model.Uni_res[modality])[i][label[i]] for i in range(model.Uni_res['output'].shape[0])])
             ##Calculate the ratios
             for modality in modality_list:
-                ratios[modality] = scores[modality].detach().clone()
+                ratios[modality] = scores[modality]
                 if modality_nums == 2:
                     for modality_another in modality_list:
                         if modality_another == modality: 
                             continue
                         ## 如果没有1e-5会显存爆炸
                         ratios[modality] /= (scores[modality_another]+ 1e-5)
-                        ratios[modality] = tanh(ratios[modality]-1)
+                        ratios[modality] = tanh(relu(ratios[modality]-1))
                 if modality_nums == 3:
                     temp_score = 0.0
                     for modality_another in modality_list:
@@ -201,26 +178,30 @@ class OPMTrainer(BaseTrainer):
                             continue
                         temp_score += scores[modality_another]
                     ratios[modality] /= (temp_score + 1e-5)
-                    ratios[modality] = tanh(ratios[modality]-1)
-            #Calculate the coeffects
+                    ratios[modality] = tanh(relu(ratios[modality]-1))
+            #Calculate the coeffs
             for modality in modality_list:
                 coeffs[modality] = self.q_base * (1 + self.alpha * ratios[modality]) if ratios[modality]>0 else 0
-    
                 coeffs[modality] = clip(coeffs[modality],0.0,1.0)
             model.encoder_res.pop('output')
+  
             cleaned_fea,update_flag=self.modality_drop.execute_drop(model.encoder_res,coeffs,model)
-            model.encoder_res['output'] = model.fusion_module(cleaned_fea)
-            model.Uni_res['ouput'] = model.encoder_res['output']
             
+            model.Uni_res['output'] = model.fusion_module(cleaned_fea)
             select_mask=update_flag!=0
             label=label[select_mask]
+            
+            
             for modality in modality_list:
-                model.encoder_res[modality]=model.encoder_res[modality][select_mask]
-                model.Uni_res[modality] = model.encoder_res[modality]
+              
+                model.Uni_res[modality]=model.Uni_res[modality][select_mask]
+                
+
             for modality in model.Uni_res.keys():
                 loss[modality] = criterion(model.Uni_res[modality],label)
             
             loss['output'].backward()
+            
         else:
             pass
 
@@ -233,19 +214,3 @@ class OPMTrainer(BaseTrainer):
         # batch.clear()
 
         return loss['output']
-    
-def calcu_q(performance_1,performance_2,q_base,fix_lambda):
-    q=torch.tensor([0.0,0.0])
-    relu = nn.ReLU(inplace=True)
-    ratio_1=torch.tanh(relu(performance_1/performance_2-1))
-    ratio_2=torch.tanh(relu(performance_2/performance_1-1))
-    
-    lamda = fix_lambda
-
-    
-    q[0] = q_base * (1 + lamda * ratio_1) if ratio_1>0 else 0
-    q[1] = q_base * (1 + lamda * ratio_2) if ratio_2>0 else 0
-    
-    q=torch.clip(q,0.0,1.0)
-    
-    return q
