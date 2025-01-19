@@ -101,13 +101,13 @@ class UMPC_FoodDataset(Dataset):
             img = self.load_image(index,img_path)
             # Transform if necessary
             if self.transform:
-                x = {'visual':self.transform(img).unsqueeze(1),'text':text_tokens['input_ids'].unsqueeze(0), 'label':class_idx} ##text:40 
+                x = {'visual':self.transform(img).unsqueeze(1),'text':text_tokens['input_ids'].unsqueeze(0), 'label':class_idx,'idx': index} ##text:40 
                 return x
                 return self.transform(img).unsqueeze(1), text_tokens, txt, class_idx 
             else:
-                return img, text_tokens, txt, class_idx 
+                return img, text_tokens, txt, class_idx ,index
         elif self.mode =="Text_only":
-            return  text_tokens, txt, class_idx            
+            return  text_tokens, txt, class_idx ,index           
 
 if __name__ == '__main__':   
     print('start')

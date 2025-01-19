@@ -147,7 +147,8 @@ class UCFDataset(Dataset):
             'flow':flow_n,
             'visual':images,
             'label': self.classes.index(self.data2class[datum]),
-            'raw':datum
+            'raw':datum,
+            'idx':idx
         }
 
 

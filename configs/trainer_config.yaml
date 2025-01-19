@@ -79,6 +79,45 @@ trainer_para:
     modulation_starts: 0
     modulation_ends: 80
     scaling: 10
+  MLA:
+    alpha: 1
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+  ReconBoost:
+    alpha: 0.5
+    method: "None"
+    modulation_starts: 0
+    modulation_ends: 80
+    T_epochs: 1
+    weight1: 5
+    weight2: 1
+  MMPareto:
+    alpha: 1.5
+    method: 'None'
+    modulation_starts: 0
+    modulation_ends: 80
+  OPM:
+    alpha: 0.5
+    p_exe: 0.7
+    q_base: 0.4
+    method: 'None'
+    modulation_starts: 0
+    modulation_ends: 80
+  Sample:
+    alpha: 0.5
+    # method: 'Sample-level'  
+    method: 'Modality-level'
+    modulation_starts: 1
+    modulation_ends: 80
+    part_ratio: 0.2
+  ReLearning:
+    move_lambda: 3
+    method: None
+    modulation_starts: 0
+    modulation_ends: 80
+    reinit_epoch: 20
+    reinit_num: 4
   LinearProbe:
     alpha: 0.3
     method: 'None'

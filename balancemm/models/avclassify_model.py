@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import lightning as L
 from .resnet_arch import ResNet18, ResNet
-from .fusion_arch import SumFusion, ConcatFusion, FiLM, GatedFusion, ConcatFusion_3, ConcatFusion_N
+from .fusion_arch import SumFusion, ConcatFusion, FiLM, GatedFusion, ConcatFusion_3, ConcatFusion_N,SharedHead
 from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
@@ -36,6 +36,8 @@ class BaseClassifierModel(nn.Module):
             self.fusion_module = FiLM(output_dim = self.n_classes, x_film=True)
         elif self.fusion == 'gated':
             self.fusion_module = GatedFusion(output_dim = self.n_classes, x_gate=True)
+        elif self.fusion == 'shared':
+            self.fusion_module = SharedHead(input_dim = max(self.modality_size.values()),output_dim = self.n_classes)
         else:
             raise NotImplementedError('Incorrect fusion method: {}!'.format(self.fusion))
         
@@ -465,7 +467,200 @@ class MMTM(nn.Module):
             if modality == 'text':
                 data[modality] = data[modality].squeeze(2)
         return data
+
+class BaseClassifier_MLAModel(BaseClassifierModel):
+    # mid fusion
+    def __init__(self, args):
+        super(BaseClassifier_MLAModel, self).__init__(args)
+        
+    def forward(self,
+                batch,
+                padding = [],
+                mask = None, 
+                dependent_modality = {"audio": False, "visual": False, "text": False}, 
+                pt = 0,
+                types= 0) -> dict[str, torch.Tensor]:
+        self.encoder_res = {}
+        for modality in self.modalitys:
+            modality_data = batch[modality]
+            modality_data = modality_data.to(self.device)
+            if modality in padding:
+                if mask is None:
+                    modality_data = torch.zeros_like(modality_data, device=modality_data.device)
+            modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
+            self.encoder_res[modality] = modality_res 
+    
+        # self.Unimodality_Calculate()
+        return self.encoder_res
+    
+    def Unimodality_Calculate(self) -> dict[str, torch.Tensor]:
+        self.Uni_res = {}
+        for modality in self.encoder_res.keys():
+            if self.fusion == 'shared':
+                self.Uni_res[modality] = self.fusion_module.fc_out(self.encoder_res[modality])
+        key = list(self.modalitys)
+        conf = self.calculate_gating_weights(self.Uni_res)
+        
+        if len(self.modalitys) == 3:
+            self.Uni_res['output'] = self.Uni_res[key[0]] * conf[key[0]] + self.Uni_res[key[1]] * conf[key[1]] + self.Uni_res[key[2]] * conf[key[2]]
+        else:
+            self.Uni_res['output'] = self.Uni_res[key[0]] * conf[key[0]] + self.Uni_res[key[1]] * conf[key[1]] 
+        # if len(self.modalitys) == 3:
+        #     self.Uni_res['output'] = self.Uni_res[key[0]] * conf[key[0]] + self.Uni_res[key[1]] * conf[key[1]] + self.Uni_res[key[2]] * conf[key[2]]
+        # else:
+        #     self.Uni_res['output'] = self.Uni_res[key[0]] * av_alpha + self.Uni_res[key[1]] * (1-av_alpha)
+        # softmax =nn.Softmax(dim= 1)
+        # for modality in self.Uni_res.keys():
+        #     softmax_res = softmax(self.Uni_res[modality])
+        #     self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        return self.Uni_res
+
+    def calculate_entropy(self,output):
+        
+        probabilities = F.softmax(output,dim=1)
+        log_probabilities = torch.log(probabilities)
+        entropy = -torch.sum(probabilities*log_probabilities,dim = 1,keepdim=True)
+        
+        return entropy
+
+    def calculate_gating_weights(self,output):
+        key = list(self.modalitys)
+        entropy = {}
+        gating_weight = {}
+        for modality in self.modalitys:
+            entropy[modality] = self.calculate_entropy(output[modality])
+        max_entropy = torch.max(entropy[key[0]],entropy[key[1]])
+        for modality in self.modalitys:
+            gating_weight[modality] = torch.exp(max_entropy - entropy[modality])
+        sum_weights = sum(gating_weight.values())
+        # gating_weight_1 = torch.exp(max_entropy - entropy_1)
+        # gating_weight_2 = torch.exp(max_entropy - entropy_2)
+        
+        # sum_weights = gating_weight + gating_weight_2
+        for modality in self.modalitys:
+            gating_weight[modality] /= sum_weights
+        # gating_weight_1 /= sum_weights
+        # gating_weight_2 /= sum_weights
+        
+        return gating_weight
+
+    def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int, limit_modality: list) -> tuple[torch.Tensor, dict[str, list]]:
+        # ** drop
+        padding = []
+        for modality in self.modalitys:
+            if modality not in limit_modality:
+                padding.append(modality)
+        self(batch,padding=padding)
+        self.Unimodality_Calculate()
+        n_classes = self.n_classes
+        softmax  = nn.Softmax(dim = 1)
+        label = batch['label']
+        label = label.to(self.device)
+        out = self.Uni_res['output']
+        loss = F.cross_entropy(out, label)
+        for modality in self.Uni_res.keys():
+            softmax_res = softmax(self.Uni_res[modality])
+            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        # for modality in self.Uni_res.keys():
+        #     acc_res[modality] = [0.0 for _ in range(n_classes)]
+        #     pred_res[modality] = softmax(self.Uni_res[modality])
+        # for i in range(label.shape[0]):
+        #     for modality in self.Uni_res.keys():
+        #         modality_pred = np.argmax(pred_res[modality][i].cpu().data.numpy())
+        #         if np.asarray(label[i].cpu()) == modality_pred:
+        #             acc_res[modality][label[i]] += 1.0
+            
+        #     num[label[i]] += 1.0
+        return loss
+
+class BaseClassifier_ReconBoostModel(BaseClassifierModel):
+    # mid fusion
+    def __init__(self, args):
+        super(BaseClassifier_ReconBoostModel, self).__init__(args)
+       
+        self.boost_rate  = nn.Parameter(torch.tensor(0.01, requires_grad=True, device=self.device))
+        
+    def modality_model(self,modality,modality_data):
+        modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
+        modality_res = self.fusion_module.fc_out(modality_res)
+        
+        return modality_res
            
+    def forward(self,
+                batch,
+                mask_model = None,
+                padding = [],
+                mask = None, 
+                dependent_modality = {"audio": False, "visual": False, "text": False}, 
+                pt = 0,
+                types= 0) -> dict[str, torch.Tensor]:
+        self.Uni_res = {}
+        self.Uni_res['output'] = None
+        with torch.no_grad():
+            for modality in self.modalitys:
+                if modality == mask_model:
+                    continue
+                modality_data = batch[modality]
+                modality_data = modality_data.to(self.device)
+                if modality in padding:
+                    if mask is None:
+                        modality_data = torch.zeros_like(modality_data, device=modality_data.device)
+                self.Uni_res[modality] = self.modality_model(modality,modality_data)
+                if self.Uni_res['output'] is None:
+                    self.Uni_res['output'] = self.Uni_res[modality]
+                else: 
+                    self.Uni_res['output'] = self.Uni_res['output'] + self.Uni_res[modality]
+        self.Uni_res['output'] = self.boost_rate * self.Uni_res['output']
+        softmax  = nn.Softmax(dim = 1)
+        for modality in self.Uni_res.keys():
+            softmax_res = softmax(self.Uni_res[modality])
+            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        return self.Uni_res['output']
+    
+    def forward_grad(self,
+                batch,
+                padding = [],
+                mask = None, 
+                dependent_modality = {"audio": False, "visual": False, "text": False}, 
+                pt = 0,
+                types= 0) -> dict[str, torch.Tensor]:
+        self.Uni_res = {}
+        self.Uni_res['output'] = None
+        for modality in self.modalitys:
+            modality_data = batch[modality]
+            modality_data = modality_data.to(self.device)
+            self.Uni_res[modality] = self.modality_model(modality,modality_data)
+            if self.Uni_res['output'] is None:
+                self.Uni_res['output'] = self.Uni_res[modality]
+            else: 
+                self.Uni_res['output'] = self.Uni_res['output'] + self.Uni_res[modality]
+
+        self.Uni_res['output'] = self.boost_rate * self.Uni_res['output']
+        softmax  = nn.Softmax(dim = 1)
+        for modality in self.Uni_res.keys():
+            softmax_res = softmax(self.Uni_res[modality])
+            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        return self.Uni_res['output']
+    
+    def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int, limit_modality: list) -> tuple[torch.Tensor, dict[str, list]]:
+        # ** drop
+        padding = []
+        for modality in self.modalitys:
+            if modality not in limit_modality:
+                padding.append(modality)
+        self.forward(batch, padding = padding)
+        n_classes = self.n_classes
+        softmax  = nn.Softmax(dim = 1)
+        label = batch['label']
+        label = label.to(self.device)
+        loss = F.cross_entropy(self.Uni_res['output'], label)
+        for modality in self.Uni_res.keys():
+            softmax_res = softmax(self.Uni_res[modality])
+            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+ 
+        return loss
+    
+               
 class AVClassifierModel(nn.Module):
     def __init__(self, args):
         super(AVClassifierModel, self).__init__()

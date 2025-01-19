@@ -3,6 +3,7 @@ from collections import defaultdict
 from torch.utils.data.dataset import Dataset
 import logging
 from copy import deepcopy
+from tqdm import tqdm
 from math import factorial
 import torch
 def generate_all_combinations(input_list: list[str], include_empty: bool = True):
@@ -62,5 +63,49 @@ def Calculate_Shapley(trainer, model, CalcuLoader: Dataset, logger: logging.Logg
     else:
         return 
     
+def Calculate_Shapley_Sample(trainer, model, CalcuLoader: Dataset, logger: logging.Logger,conduct: bool = True,is_print: bool = False) -> dict[str: float]:
+    if not conduct:
+        return None
+    modalitys = model.modalitys  
+    n = len(modalitys)  
+    Shapley = {modality: {} for modality in modalitys}  
+    res_cache = defaultdict(lambda: None)  
+    
+    for batch_idx, batch in tqdm(enumerate(CalcuLoader)):
+        label = batch['label'].to(model.device)
+        batch_size = len(label)
 
+        all_combinations = generate_all_combinations(modalitys, include_empty=True)
+        for combo in all_combinations:
+            identifier = tuple(sorted(combo))
+            if res_cache[identifier] is None:
+                if not combo:
+                    res_cache[identifier] = torch.zeros(batch_size, dtype=torch.bool)
+                else:
+                    with torch.no_grad():
+                        model.validation_step(batch, batch_idx,limit_modality=combo)
+                    res_cache[identifier] = (model.pridiction['output'] == label)
+        
+        for i in range(batch_size):
+            sample_idx = int(batch['idx'][i])
+ 
+            for modality in modalitys:
+                shapley_value = 0.0
+                temp_modalitys = [m for m in modalitys if m != modality]
+                combinations = generate_all_combinations(temp_modalitys, include_empty=True)
+                
+                for combo in combinations:
+                    S_size = len(combo)
+                    v_combo = res_cache[tuple(sorted(combo))][i]
 
+                    add_combo = sorted(combo + [modality])
+                    v_add = res_cache[tuple(add_combo)][i]
+
+                    weight = (factorial(S_size) * factorial(n - S_size - 1)) / factorial(n)
+                    marginal_contribution = float(v_add) - float(v_combo)
+                    shapley_value += weight * marginal_contribution
+                
+                Shapley[modality][sample_idx] = shapley_value
+                
+
+    return Shapley

@@ -39,7 +39,15 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
                                                      num_workers = config_dataloader.num_workers, 
                                                      multiprocessing_context='spawn', 
                                                      pin_memory = config_dataloader.pin_memory)
-
+    if config.trainer['name'] == 'Sample':
+        train_val_dataloader = torch.utils.data.DataLoader(train_dataset,  
+                                                   batch_size=config_dataloader.batch_size, 
+                                                   shuffle=False, 
+                                                   drop_last = config_dataloader.drop_last,
+                                                     num_workers = config_dataloader.num_workers, 
+                                                     multiprocessing_context='spawn', 
+                                                     pin_memory = config_dataloader.pin_memory)
+        
     val_dataloader = torch.utils.data.DataLoader(val_dataset,  batch_size=config_dataloader.batch_size, drop_last = config_dataloader.drop_last, 
                                                  num_workers = config_dataloader.num_workers, 
                                                 multiprocessing_context='spawn', 
@@ -61,6 +69,17 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
                                                worker_init_fn=worker_init_fn,
                                                generator=g)
 
+        if config.trainer['name'] == 'Sample':
+            train_val_dataloader = torch.utils.data.DataLoader(train_dataset,
+                                               batch_size=config_dataloader.batch_size, 
+                                                shuffle=False, 
+                                                drop_last = config_dataloader.drop_last,
+                                                num_workers = config_dataloader.num_workers, 
+                                                multiprocessing_context='spawn', 
+                                                pin_memory = config_dataloader.pin_memory,
+                                               worker_init_fn=worker_init_fn,
+                                               generator=g)
+            
         val_dataloader = torch.utils.data.DataLoader(val_dataset,
                                                 batch_size=config_dataloader.batch_size, 
                                                 shuffle=config_dataloader.shuffle, 
@@ -82,5 +101,6 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
     # print batchsize and len
     fabric.print(f"Train dataloader: {len(train_dataloader)} batches, {len(train_dataloader.dataset)} samples")
     fabric.print(f"Val dataloader: {len(val_dataloader)} batches, {len(val_dataloader.dataset)} samples")
-
+    if config.trainer['name'] == 'Sample':
+        return train_dataloader, train_val_dataloader, val_dataloader, test_dataloader
     return train_dataloader, val_dataloader, test_dataloader

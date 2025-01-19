@@ -118,7 +118,7 @@ class MoseiDataset(Dataset):
             Y = torch.argmax(Y, dim=-1)
         # for indx in range(1000):
         #     print(self.vision[indx].shape)
-        return {'text' : X[1], 'visual': X[3], 'audio' : X[2], 'label':Y}
+        return {'text' : X[1], 'visual': X[3], 'audio' : X[2], 'label':Y, 'idx': index}
         return self.text[index], Y   ##, META        
 
 if __name__ == '__main__':

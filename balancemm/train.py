@@ -16,6 +16,7 @@ import logging
 from datetime import datetime
 from .evaluation.modalitys import Calculate_Shapley
 from .trainer.LinearProbe_trainer import NewLinearHead
+import copy
 def train_and_test(args: dict):
     dict_args = args
     args = SimpleNamespace(**args)
@@ -59,7 +60,10 @@ def train_and_test(args: dict):
     else:
         device = torch.device('cuda:' + args.Main_config['device'])
     args.model['device'] = device
-    train_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
+    if args.trainer['name'] != 'Sample':
+        train_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
+    else:
+        train_dataloader, train_val_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
     args.trainer['checkpoint_dir'] = args.checkpoint_dir ##
     model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
@@ -75,22 +79,33 @@ def train_and_test(args: dict):
         temp_model.to(device)
         temp_model.device = device
         temp_optimizer = create_optimizer(temp_model, args.train['optimizer'], args.train['parameter'])
-        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, temp_optimizer,logger,tb_logger)
+        temp_optimizer_origin = copy.deepcopy(temp_optimizer.state_dict())
+        trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, temp_optimizer,temp_optimizer_origin,logger,tb_logger)
+    elif args.trainer['name'] == 'SampleTrainer':
+        trainer.fit(model, train_dataloader, train_val_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger)
     else :
         trainer.fit(model, train_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger) 
     end_time = datetime.now()
     total_time = end_time - start_time
     total_time = total_time.total_seconds() / 3600
+    
     logger.info("Training time :{:.2f}".format(total_time))
     logger.info('Use the best model to Test')
     model.eval()
     best_state = torch.load(args.checkpoint_dir+ '/epoch_normal.ckpt')
     model.load_state_dict(best_state['model'])
-    trainer.val_loop(model, test_dataloader)
+    _, Metrics_res = trainer.val_loop(model, test_dataloader)
     logger.info('Calculate the shapley value of best model')
     Calculate_Shapley(trainer = trainer, model = model, CalcuLoader = test_dataloader, logger= logger)
     logger.info(f'The best val acc is : {trainer.best_acc}')
     print(f'The best val acc is : {trainer.best_acc}')
+    # for metircs in sorted(Metrics_res.keys()):
+    #     if metircs == 'acc':
+    #         valid_acc = Metrics_res[metircs]
+    #         for modality in sorted(valid_acc.keys()):
+    #             if modality == 'output':
+    #                 print(f'The test acc is : {Metrics_res[metrics][modality]}')
+    # print(f'The imbalance is :{imbalance}')
 
     # 多卡（模型名字区别）
 
@@ -168,7 +183,6 @@ def linear_probe_eval(args: dict):
     model.load_state_dict(best_state['model'])
     new_head.load_state_dict(best_state['new_head'])
     trainer.val_loop(model, new_head,test_dataloader)
-    logger.info('Calculate the shapley value of best model')
     logger.info(f'The best val acc is : {trainer.best_acc}')
     print(f'The best val acc is : {trainer.best_acc}')
 
