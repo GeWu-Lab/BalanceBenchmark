@@ -76,7 +76,7 @@ class ResNet(nn.Module):
         if modality == 'audio':
             self.conv1 = nn.Conv2d(1, self.inplanes, kernel_size=7, stride=2, padding=3,
                                    bias=False)
-        elif modality == 'visual':
+        elif modality == 'visual' or modality == 'front_view' or modality == 'back_view':
             self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                    bias=False)
         elif modality == 'flow':

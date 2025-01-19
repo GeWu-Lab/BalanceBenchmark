@@ -75,7 +75,7 @@ Transformer_:
     n_layers: 2
 ResNet18:
   output_dim: 512
-  if_pretrain: True
+  if_pretrain: False
   pretrain_path: '/data/users/shaoxuan_xu/3_OGM/Pretrained_model/resnet18.pth'
   audio:
     modality: 'audio'
@@ -83,3 +83,7 @@ ResNet18:
     modality: 'visual'
   flow:
     modality: 'flow'
+  front_view:
+    modality: 'front_view'
+  back_view:
+    modality: 'back_view'

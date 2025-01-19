@@ -13,12 +13,13 @@ normals=("AMCoTrainer" "GBlendingTrainer" "MBSDTrainer" "baselineTrainer")
 groups=(alphas lams unique scalings normals)
 # methods=("MMCosineTrainer" "GreedyTrainer")
 # methods=("AGMTrainer" "OGMTrainer" "GreedyTrainer")
-methods=("OGMTrainer")
+methods=("GreedyTrainer")
+# methods=("OGMTrainer" "AGM" "CML" "MBSD")
 # methods=("AGMTrainer" "GBlendingTrainer" "OGMTrainer")
 # 定义参数范围
 
 alpha_scaler=(0.1 0.5 1.0 1.5)
-target_accuracy=0.81  # 预设目标准确率
+target_accuracy=0.8744  # 预设目标准确率
 
 # # 日志文件
 # log_file="training_log_$normals.txt"
@@ -86,9 +87,9 @@ for method in "${methods[@]}"; do
             if [ "$group_method" == "$method" ]; then
                 now_group=$group
                 if [ "$method" == "AGMTrainer" ]; then
-                    alpha_scaler=(0.1 0.5 1.0 1.5)
+                    alpha_scaler=(0.5 1.0 1.5)
                 fi
-                if [ "$method" == "UMT" ]; then
+                if [ "$method" == "UMTTrainer" ]; then
                     alpha_scaler=(0.1 1 10 50)
                 fi
                 if [ "$method" == "OGMTrainer" ]; then

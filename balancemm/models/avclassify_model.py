@@ -41,7 +41,7 @@ class BaseClassifierModel(nn.Module):
         
     def Resnet_Process(self, modality_data : torch.Tensor, modality : str) -> torch.Tensor:
         B = len(modality_data)
-        if modality == 'visual' or modality == 'flow': 
+        if modality == 'visual' or modality == 'flow' or modality == 'front_view' or modality == 'back_view': 
             if modality == 'visual':
                 modality_data = modality_data.permute(0, 2, 1, 3, 4).contiguous().float()
             else:
@@ -235,13 +235,16 @@ class BaseClassifier_GreedyModel(BaseClassifierModel):
             })
     def Resnet_Process(self, modality_data : torch.Tensor, modality : str) -> torch.Tensor:
         encoder = self.modality_encoder[modality]
-        if modality == 'visual' or modality == 'flow': 
+        if modality == 'visual' or modality == 'flow' or modality == 'front_view' or modality == 'back_view': 
             if modality == 'visual':
                 modality_data = modality_data.permute(0, 2, 1, 3, 4).contiguous().float()
             else:
                 modality_data = modality_data.contiguous().float()
-            (B, T, C, H, W) = modality_data.size()
-            x = modality_data.view(B * T, C, H, W)
+            # (B, T, C, H, W) = modality_data.size()
+            # print(modality_data.size())
+            # x = modality_data.view(B * T, C, H, W)
+            (_, C, H, W)  = modality_data.size()
+            x = modality_data.view(-1, C, H, W)
             x = encoder.conv1(x)
             x = encoder.bn1(x)
             x = encoder.relu(x)
@@ -312,7 +315,7 @@ class BaseClassifier_GreedyModel(BaseClassifierModel):
         for modality in modality_list:
             B = len(batch[modality])
             if self.enconders[modality]['name'] == 'ResNet18':
-                if modality == 'visual' or modality == 'flow': 
+                if modality == 'visual' or modality == 'flow' or modality == 'front_view' or modality == 'back_view': 
                     res = self.encoder_res[modality]
                     (_, C, H, W) = res.size()
                     res = res.view(B, -1, C, H, W)
