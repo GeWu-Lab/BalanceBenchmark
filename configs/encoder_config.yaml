@@ -83,3 +83,7 @@ ResNet18:
     modality: 'visual'
   flow:
     modality: 'flow'
+  front_view:
+    modality: 'front_view'
+  back_view:
+    modality: 'back_view'

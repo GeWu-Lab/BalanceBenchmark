@@ -124,11 +124,15 @@ class MoseiDataset(Dataset):
 if __name__ == '__main__':
     dataset_path = '/home/zequn_yang/MMT/data/'
     data='mosei_senti'
-    split_type= 'test'
+    split_type= 'valid'
     #train = 16326 test = 4659
     if_align = False
     dataset_path = os.path.join(dataset_path, data+'_data.pkl' if if_align else data+'_data_noalign.pkl' )
     dataset = pickle.load(open(dataset_path, 'rb'))
-    count = 0
-    # for split_type in dataset.keys():
-    print(dataset[split_type]['vision'][0].shape)
+    count = {0:0, 1:0}
+    for split_type in dataset.keys():
+        count = {0:0, 1:0}
+        for i in range(len(dataset[split_type]['labels'])):
+            Y = acc2(dataset[split_type]['labels'][i][0][0])
+            count[Y]+=1
+        print(split_type, count)

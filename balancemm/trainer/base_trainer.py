@@ -593,6 +593,72 @@ class BaseTrainer():
 
             if postfix_str:
                 prog_bar.set_postfix_str(postfix_str)
+    
+    def feature_loop(
+        self,
+        model: BaseClassifierModel,
+        val_loader: Optional[torch.utils.data.DataLoader],
+        modality: str,
+        limit_batches: Union[int, float] = float("inf"),
+        limit_modalitys: list = ['ALL']
+    ):
+        """The validation loop ruunning a single validation epoch.
+
+        Args:
+            model: the LightningModule to evaluate
+            val_loader: The dataloader yielding the validation batches.
+            limit_batches: Limits the batches during this validation epoch.
+                If greater than the number of batches in the ``val_loader``, this has no effect.
+
+        """
+        if val_loader is None:
+            return
+        self.fabric.call("on_validation_model_eval")  # calls `model.eval()`
+        torch.set_grad_enabled(False)
+        self.fabric.call("on_validation_epoch_start")
+        iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
+        if limit_modalitys == ["ALL"]:
+            limit_modalitys = list(model.modalitys).copy()
+        modalitys = list(model.modalitys)
+        modalitys.append('output')
+        MetricsCalculator = BatchMetricsCalculator(model.n_classes, modalitys)
+        features = []
+        for batch_idx, batch in enumerate(iterable):
+            # end epoch if stopping training completely or max batches for this epoch reached
+            if self.should_stop or batch_idx >= limit_batches:
+                break
+
+            self.fabric.call("on_validation_batch_start", batch, batch_idx)
+
+            out = model.validation_step(batch, batch_idx,limit_modalitys)
+            for idx in range(len(batch['label'])):
+                features.append((model.encoder_res[modality][idx].detach(),batch['label'][idx]))
+            # avoid gradients in stored/accumulated values -> prevents potential OOM
+            out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
+
+            self.fabric.call("on_validation_batch_end", out, batch, batch_idx)
+            self._current_val_return = out
+
+            self._format_iterable(iterable, self._current_val_return, "val")
+            # for modality in acc.keys():
+            #     if modality not in _acc:
+            #         _acc[modality] = 0
+            #     _acc[modality] += sum(acc[modality])
+            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            # count += len(batch['label'])
+        Metrics_res = MetricsCalculator.compute_metrics()
+        self._current_metrics = Metrics_res
+        if Metrics_res['acc']['output'] > self.best_acc:
+            self.should_save = True
+            self.best_acc = Metrics_res['acc']['output']
+
+        self.fabric.call("on_validation_epoch_end")
+
+        self.fabric.call("on_validation_model_train")
+        torch.set_grad_enabled(True)
+        return features, Metrics_res
+
+
     # def on_train_epoch_end(loggers):
     #      # 示例：如何为不同的 logger 添加自定义日志
     #     for logger in loggers:

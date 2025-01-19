@@ -40,6 +40,7 @@ class GBlendingTrainer(BaseTrainer):
         optimizer: torch.optim.Optimizer,
         scheduler_cfg: torch.optim.lr_scheduler,
         temp_optimizer: torch.optim.Optimizer,
+        temp_optimizer_origin,
         logger,
         tb_logger,
         ckpt_path: Optional[str] = None,
@@ -91,7 +92,8 @@ class GBlendingTrainer(BaseTrainer):
                 tb_logger.log_hyperparams({"epochs": self.current_epoch})
             if self.current_epoch % self.super_epoch == 0:
                 model.train()
-                weights = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, temp_optimizer,logger)
+
+                weights = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, temp_optimizer,logger,temp_optimizer_origin)
                 logger.info(weights)
                 if tb_logger:
                     for modality in weights.keys():
@@ -310,7 +312,7 @@ class GBlendingTrainer(BaseTrainer):
         
     #     return loss
                 
-    def super_epoch_origin(self, model, temp_model, limit_batches, train_loader, test_loader, optimizer, logger):
+    def super_epoch_origin(self, model, temp_model, limit_batches, train_loader, test_loader, optimizer, logger,optimizer_origin):
         temp_model.load_state_dict(model.state_dict(),strict=True)
         criterion = nn.CrossEntropyLoss()
         weights = {}
@@ -318,6 +320,7 @@ class GBlendingTrainer(BaseTrainer):
         modalitys.append('output')
         for modality in modalitys:
             temp_model.load_state_dict(model.state_dict(),strict=True)
+            optimizer.load_state_dict(optimizer_origin)
             padding = []
             pre_train_loss = 0
             now_train_loss = 0
@@ -368,7 +371,9 @@ class GBlendingTrainer(BaseTrainer):
             o_pre = pre_validation_loss - pre_train_loss
             o_now = now_validation_loss - now_train_loss
             o = o_now - o_pre
+
             weights[modality] = abs((g )/(o**2))
+
         sums = sum(weights.values() ) 
         info = ''
         logger.info(f'super_epoch begin in {self.current_epoch}')

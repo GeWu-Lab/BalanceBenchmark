@@ -6,3 +6,13 @@ python -m balancemm --model BaseClassifier --trainer GBlendingTrainer --lr 0.003
 python -m balancemm --model BaseClassifier_AMCo --trainer AMCoTrainer --lr 0.003 --alpha 1.0 --dataset Mosei --device 1
 python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 1
 python -m balancemm --model BaseClassifier --trainer GBlendingTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 0
+
+
+python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 1 --mode all_test
+
+python -m balancemm --model BaseClassifier --trainer OGMTrainer --lr 0.01 --alpha 0.3 --mu 0 --scaling 0 --lam 0 --eta 0 --dataset Mosei --device 0 --mode all_test
+python -m balancemm --model BaseClassifier --trainer unimodalTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 1
+
+python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 1 --mode tsne
+
+python -m balancemm --model BaseClassifier --trainer unimodalTrainer --lr 0.001 --alpha 1.0 --dataset ModelNet40 --device 1

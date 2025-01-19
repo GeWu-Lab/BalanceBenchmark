@@ -81,6 +81,7 @@ def train_and_test(args: dict):
         temp_optimizer = create_optimizer(temp_model, args.train['optimizer'], args.train['parameter'])
         temp_optimizer_origin = copy.deepcopy(temp_optimizer.state_dict())
         trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, temp_optimizer,temp_optimizer_origin,logger,tb_logger)
+
     elif args.trainer['name'] == 'SampleTrainer':
         trainer.fit(model, train_dataloader, train_val_dataloader, val_dataloader, optimizer, scheduler, logger,tb_logger)
     else :
@@ -90,22 +91,66 @@ def train_and_test(args: dict):
     total_time = total_time.total_seconds() / 3600
     
     logger.info("Training time :{:.2f}".format(total_time))
+    #val best
+    print(f'The best val acc is : {trainer.best_acc}')
+    logger.info(f'The best val acc is : {trainer.best_acc}')
     logger.info('Use the best model to Test')
+    #load best
     model.eval()
     best_state = torch.load(args.checkpoint_dir+ '/epoch_normal.ckpt')
     model.load_state_dict(best_state['model'])
-    _, Metrics_res = trainer.val_loop(model, test_dataloader)
+# <<<<<<< newversion
+    #test sharply
     logger.info('Calculate the shapley value of best model')
     Calculate_Shapley(trainer = trainer, model = model, CalcuLoader = test_dataloader, logger= logger)
-    logger.info(f'The best val acc is : {trainer.best_acc}')
-    print(f'The best val acc is : {trainer.best_acc}')
-    # for metircs in sorted(Metrics_res.keys()):
-    #     if metircs == 'acc':
-    #         valid_acc = Metrics_res[metircs]
-    #         for modality in sorted(valid_acc.keys()):
-    #             if modality == 'output':
-    #                 print(f'The test acc is : {Metrics_res[metrics][modality]}')
-    # print(f'The imbalance is :{imbalance}')
+    #best test
+    _, Metrics_res = trainer.val_loop(model, test_dataloader)
+    test_acc = Metrics_res['acc']['output']
+    info = ''
+    output_info = ''
+    for metircs in sorted(Metrics_res.keys()):
+        if metircs == 'acc':
+            valid_acc = Metrics_res[metircs]
+            for modality in sorted(valid_acc.keys()):
+                tag = "valid_acc"
+                if modality == 'output':
+                    output_info += f"test_acc: {valid_acc[modality]}"
+
+                else:
+                    info += f", acc_{modality}: {valid_acc[modality]}"
+                
+                    
+        if metircs == 'f1':
+            valid_f1 = Metrics_res[metircs]
+            for modality in sorted(valid_f1.keys()):
+                tag = "valid_f1"
+                if modality == 'output':
+                    output_info += f", test_f1: {valid_f1[modality]}"
+
+                else:
+                    info += f", f1_{modality}: {valid_f1[modality]}"
+                
+    info = output_info+ ', ' + info
+        
+    logger.info(info)
+    for handler in logger.handlers:
+        handler.flush()
+    logger.info(f'The best test acc is : {test_acc}')
+    print(f'The best test acc is : {test_acc}')
+# =======
+#     _, Metrics_res = trainer.val_loop(model, test_dataloader)
+#     logger.info('Calculate the shapley value of best model')
+#     Calculate_Shapley(trainer = trainer, model = model, CalcuLoader = test_dataloader, logger= logger)
+#     logger.info(f'The best val acc is : {trainer.best_acc}')
+#     print(f'The best val acc is : {trainer.best_acc}')
+#     # for metircs in sorted(Metrics_res.keys()):
+#     #     if metircs == 'acc':
+#     #         valid_acc = Metrics_res[metircs]
+#     #         for modality in sorted(valid_acc.keys()):
+#     #             if modality == 'output':
+#     #                 print(f'The test acc is : {Metrics_res[metrics][modality]}')
+#     # print(f'The imbalance is :{imbalance}')
+# >>>>>>> main
 
     # 多卡（模型名字区别）
 

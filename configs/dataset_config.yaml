@@ -97,6 +97,19 @@ dataset:
       input_dim: None
     visual:
       input_dim: None
+  ModelNet40:
+    csv_path_train: /data/users/yake_wei/KS_2023/ks_train_overlap.txt
+    visual_path_train: /data/users/yake_wei/KS_2023/train-frames-1fps/train
+    audio_path_train: /data/users/yake_wei/KS_2023/train_spec
+    csv_path_test: /data/users/yake_wei/KS_2023/ks_test_overlap.txt
+    visual_path_test: /data/users/yake_wei/KS_2023/val-frames-1fps/test
+    audio_path_test: /data/users/yake_wei/KS_2023/test_spec
+    validation: false
+    classes: 40  
+    front_view:
+      input_dim: 224
+    back_view:
+      input_dim: 224
 # train:
 #     name: UMPC_Food
 #     mode: train
