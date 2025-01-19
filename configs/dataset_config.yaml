@@ -60,11 +60,11 @@ dataset:
   Cremad:
     classes: 6
     fps: 2
-    visual_path : '/data/users/public/cremad/visual/'
-    audio_path : '/data/users/public/cremad/audio/'
-    stat_path : '/data/users/public/cremad/stat.csv'
-    train_txt : '/data/users/public/cremad/train.csv'
-    test_txt : '/data/users/public/cremad/test.csv'
+    visual_path : '/data/users/public/cremad/cremad/visual/'
+    audio_path : '/data/users/public/cremad/cremad/audio/'
+    stat_path : '/data/users/public/cremad/cremad/stat.csv'
+    train_txt : '/data/users/public/cremad/cremad/train.csv'
+    test_txt : '/data/users/public/cremad/cremad/test.csv'
     validation: false
     audio:
       input_dim: None

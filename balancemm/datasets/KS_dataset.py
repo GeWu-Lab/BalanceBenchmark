@@ -106,7 +106,7 @@ class KSDataset(Dataset):
 
         label = self.label[idx]
 
-        return {'visual':image_n, 'audio':spectrogram, 'label': label}
+        return {'visual':image_n, 'audio':spectrogram, 'label': label,'idx': idx}
     
 
 

@@ -7,16 +7,16 @@ Main_config:
   model: "BaseClassifier" #
   model: "BaseClassifier" #
   tasks: "Classifier" #
-  trainer: "MBSDTrainer"
-  device: '0'
-  dataset: Mosei
+  trainer: "LinearProbeTrainer"
+  device: '1'
+  dataset: Cremad
 
 Train:
-  dataset: Mosei
-  dataset: Mosei
+  dataset: Cremad
+
 
 Test:
-  dataset: Mosei
+  dataset: Cremad
 
 # dataset:
 #   dataloader:

@@ -19,8 +19,9 @@ def add_to_pythonpath(path):
     os.environ['PYTHONPATH'] = pythonpath
 add_to_pythonpath(os.getcwd())
 from balancemm.utils.parser_utils import parse_cli_args_to_dict, load_config_dict, ensure_and_get_config_path
-from balancemm.train import train_and_test
+from balancemm.train import train_and_test, linear_probe_eval
 from balancemm.test import only_test, all_test, t_sne
+
 from lightning import fabric
 import datetime
 from .utils.train_utils import set_seed
@@ -86,6 +87,8 @@ def create_config(config_dict: dict, args):
         trainer_settings['trainer_para'][name]['lam'] = args.lam
     if args.momentum: 
         trainer_settings['trainer_para'][name]['momentum_coef'] = args.momentum
+    if args.super_epoch: 
+        trainer_settings['trainer_para'][name]['super_epoch'] = args.super_epoch
     try:
         #waiting for support iteration
         config_dict['dataset'] = dataset_settings['dataset'][config_dict['Main_config']['dataset']]
@@ -134,7 +137,7 @@ def create_config(config_dict: dict, args):
     if config_dict.get("Test") is None:
         raise ValueError("Test set not specified.")
 
-    if mode == "train_and_test":
+    if mode == "train_and_test" or mode == "linear_probe":
         if config_dict.get("Train") is None:
             raise ValueError("Train set not specified.")
         if config_dict.get("Val") is None:
@@ -184,6 +187,9 @@ if __name__ == "__main__":
     parser.add_argument('--lam', type= float, default= None)
     parser.add_argument('--scaling', type= float, default= None)
     parser.add_argument('--momentum', type= float, default= None)
+    parser.add_argument('--super_epoch', type= int, default= None)
+    parser.add_argument('--eps', type= float, default= None)
+    parser.add_argument('--sigma', type= float, default= None)
     parser.add_argument('--dataset', type= str, default= None)
     parser.add_argument('--device', type= str, default= None)
     
@@ -222,3 +228,5 @@ if __name__ == "__main__":
         all_test(args)
     elif args['mode'] == "tsne":
         t_sne(args)
+    elif args['mode'] == "linear_probe":
+        linear_probe_eval(args)

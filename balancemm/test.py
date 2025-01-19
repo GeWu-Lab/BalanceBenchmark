@@ -168,7 +168,7 @@ def all_test(args: dict):
                             info += f", f1_{modality}: {valid_f1[modality]}"
                         
             info = output_info+ ', ' + info
-                
+            Calculate_Shapley(trainer = trainer, model = model, CalcuLoader = test_dataloader, logger= logger)              
             logger.info(info)
             for handler in logger.handlers:
                 handler.flush()
@@ -288,3 +288,4 @@ def t_sne(args: dict):
             for handler in logger.handlers[:]:
                 handler.close()
                 logger.removeHandler(handler)
+

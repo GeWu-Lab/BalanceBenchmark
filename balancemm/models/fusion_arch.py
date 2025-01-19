@@ -12,7 +12,14 @@ class SumFusion(nn.Module):
         output = self.fc_x(x) + self.fc_y(y)
         return x, y, output
 
-
+class SharedHead(nn.Module):
+    def __init__(self, input_dim=512, output_dim=100):
+        super(SharedHead, self).__init__()
+        self.fc_out = nn.Linear(input_dim, output_dim)
+    def forward(self, x):
+        output = self.fc_out(x)
+        return output
+    
 class ConcatFusion(nn.Module):
     def __init__(self, input_dim=1024, output_dim=100):
         super(ConcatFusion, self).__init__()

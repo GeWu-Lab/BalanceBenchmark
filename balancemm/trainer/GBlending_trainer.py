@@ -16,6 +16,8 @@ import lightning as L
 import torch
 import numpy as np
 from ..models.avclassify_model import BaseClassifierModel
+from ..evaluation.modalitys import Calculate_Shapley
+from lightning.fabric.loggers import TensorBoardLogger
 class GBlendingTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(GBlendingTrainer,self).__init__(fabric,**para_dict)
@@ -80,11 +82,17 @@ class GBlendingTrainer(BaseTrainer):
                     self.should_stop = True
 
         weights = {}
+        tb = {}
+        if tb_logger:
+            for modality in model.modalitys:
+                tb[modality] = TensorBoardLogger(root_dir=tb_logger.root_dir, name=f'tensorboard',default_hp_metric=False,version=0,sub_dir = f'{modality}')
+        Shapley = {}
         while not self.should_stop:
             if tb_logger:
                 tb_logger.log_hyperparams({"epochs": self.current_epoch})
             if self.current_epoch % self.super_epoch == 0:
                 model.train()
+
                 weights = self.super_epoch_origin(model, temp_model, self.limit_train_batches, train_loader, val_loader, temp_optimizer,logger,temp_optimizer_origin)
                 logger.info(weights)
                 if tb_logger:
@@ -108,34 +116,33 @@ class GBlendingTrainer(BaseTrainer):
                 if metircs == 'acc':
                     valid_acc = Metrics_res[metircs]
                     for modality in sorted(valid_acc.keys()):
+                        tag = 'train_acc'
                         if modality == 'output':
                             output_info += f"train_acc: {valid_acc[modality]}"
-                            if tb_logger:
-                                tb_logger.log_metrics({
-                                    "train_acc": valid_acc[modality]
-                                }, step=self.current_epoch)
+                            tb_logger.log_metrics({
+                                tag: valid_acc[modality]
+                            }, step=self.current_epoch)
                         else:
                             info += f", acc_{modality}: {valid_acc[modality]}"
-                            if tb_logger:
-                                tb_logger.log_metrics({
-                                    f"acc_{modality}": valid_acc[modality]
-                                }, step=self.current_epoch)
+                            tb[modality].log_metrics({
+                                tag: valid_acc[modality]
+                            }, step=self.current_epoch)
                         
                 if metircs == 'f1':
                     valid_f1 = Metrics_res[metircs]
                     for modality in sorted(valid_f1.keys()):
+                        tag = "train_f1"
                         if modality == 'output':
                             output_info += f", train_f1: {valid_f1[modality]}"
-                            if tb_logger:
-                                tb_logger.log_metrics({
-                                    "train_f1": valid_f1[modality]
-                                }, step=self.current_epoch)
+                            tb_logger.log_metrics({
+                                tag: valid_f1[modality]
+                            }, step=self.current_epoch)
                         else:
                             info += f", f1_{modality}: {valid_f1[modality]}"
-                            if tb_logger:
-                                tb_logger.log_metrics({
-                                    f"f1_{modality}": valid_f1[modality]
-                                }, step=self.current_epoch)
+                        
+                            tb[modality].log_metrics({
+                                tag: valid_f1[modality]
+                            }, step=self.current_epoch)
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
@@ -150,38 +157,44 @@ class GBlendingTrainer(BaseTrainer):
                         'valid_loss': valid_loss,
                     }, step=self.current_epoch)
                 ##parse the Metrics
+                Shapley = Calculate_Shapley(self, model,val_loader,logger)
+                for modality in model.modalitys:
+                    tag = "Shapley_value"
+                    tb[modality].log_metrics({
+                                    tag: Shapley[modality]
+                                }, step=self.current_epoch)
                 for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':
                         valid_acc = Metrics_res[metircs]
                         for modality in sorted(valid_acc.keys()):
+                            tag = "valid_acc"
                             if modality == 'output':
                                 output_info += f"valid_acc: {valid_acc[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        "valid_acc": valid_acc[modality]
-                                    }, step=self.current_epoch)
-                                self.PrecisionCalculator.ClearAll()
+                                tb_logger.log_metrics({
+                                    tag: valid_acc[modality]
+                                }, step=self.current_epoch)
                             else:
                                 info += f", acc_{modality}: {valid_acc[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        f"acc_{modality}": valid_acc[modality]
-                                    }, step=self.current_epoch)
+                            
+                                tb[modality].log_metrics({
+                                    tag: valid_acc[modality]
+                                }, step=self.current_epoch)
+                                
                     if metircs == 'f1':
                         valid_f1 = Metrics_res[metircs]
                         for modality in sorted(valid_f1.keys()):
+                            tag = "valid_f1"
                             if modality == 'output':
                                 output_info += f", valid_f1: {valid_f1[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        "valid_f1": valid_f1[modality]
-                                    }, step=self.current_epoch)
+                                tb_logger.log_metrics({
+                                    tag: valid_f1[modality]
+                                }, step=self.current_epoch)
                             else:
                                 info += f", f1_{modality}: {valid_f1[modality]}"
-                                if tb_logger:
-                                    tb_logger.log_metrics({
-                                        f"f1_{modality}": valid_f1[modality]
-                                    }, step=self.current_epoch)
+                           
+                                tb[modality].log_metrics({
+                                    tag: valid_f1[modality]
+                                }, step=self.current_epoch)
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
@@ -358,7 +371,9 @@ class GBlendingTrainer(BaseTrainer):
             o_pre = pre_validation_loss - pre_train_loss
             o_now = now_validation_loss - now_train_loss
             o = o_now - o_pre
-            weights[modality] = abs(g )/(o**2)
+
+            weights[modality] = abs((g )/(o**2))
+
         sums = sum(weights.values() ) 
         info = ''
         logger.info(f'super_epoch begin in {self.current_epoch}')
