@@ -12,6 +12,7 @@ from .food_dataset import UMPC_FoodDataset
 from .Mosei_dataset import MoseiDataset
 from .balance_dataset import BalanceDataset
 from .ucf101_dataset import UCFDataset
+from .ModelNet40_dataset import ModelNet40Dataset
 import pandas as pd
 __all__ = ['find_dataset', 'create_dataset']
 
@@ -103,6 +104,15 @@ class SampleDataset(Dataset):
                 elif modality == 'visual':
                     data['visual'] = torch.zeros_like(data['visual'])
         return data
+    def _handle_modelnet_data(self, idx, data):
+    
+        if idx in self.zero_modality_samples:
+            for modality in self.zero_modality_samples[idx]:
+                if modality == 'front_view':
+                    data['front_view'] = torch.zeros_like(data['front_view'])
+                elif modality == 'back_view':
+                    data['back_view'] = torch.zeros_like(data['back_view'])
+        return data
 
 
     def __getitem__(self, idx):
@@ -117,6 +127,8 @@ class SampleDataset(Dataset):
             return self._handle_food_data(idx, data)
         elif isinstance(self.dataset, UCFDataset):
             return self._handle_food_data(idx, data)
+        elif isinstance(self.dataset, ModelNet40Dataset):
+            return self._handle_modelnet_data(idx,data)
         else:
             raise ValueError('Dataset name is required.')
             
@@ -134,24 +146,20 @@ def create_dataset_sample_level(dataset_opt: dict, mode: str, contribution: dict
 
     zero_modality_samples = {}
     if isinstance(dataset,MoseiDataset):
-        new_vision = [dataset.vision]
-        new_text = [dataset.text]
-        new_audio = [dataset.audio]
-        new_labels = [dataset.labels]
-        if dataset.meta is not None:
-            new_meta = [dataset.meta]  
-        else:
-            new_meta = None
-        
+        new_vision = dataset.vision.clone()
+        new_text = dataset.text.clone()
+        new_audio = dataset.audio.clone()
+        new_labels = dataset.labels.clone()
     elif isinstance(dataset,UCFDataset):
         new_data = dataset.data.copy()
         new_data2class = dataset.data2class.copy()
     elif isinstance(dataset,UMPC_FoodDataset):
         new_data = dataset.data.copy()
+    elif isinstance(dataset, ModelNet40Dataset):  
+        new_filepaths = dataset.filepaths.copy()
     else:
         new_data = dataset.data.copy()
         new_label = dataset.label.copy() if hasattr(dataset, 'label') else None
-
     for i in range(len(dataset)-len(dataset) % 64): # batch_size
         for modality in modality_list:
             shapley_value = contribution[modality][i]
@@ -165,15 +173,12 @@ def create_dataset_sample_level(dataset_opt: dict, mode: str, contribution: dict
             else:
                 continue
             for _ in range(copies):
-                
                 if isinstance(dataset,MoseiDataset):
                     new_idx = len(new_vision)
-                    new_vision.append(dataset.vision[i:i+1])
-                    new_text.append(dataset.text[i:i+1])
-                    new_audio.append(dataset.audio[i:i+1])
-                    new_labels.append(dataset.labels[i:i+1])
-                    if new_meta is not None: 
-                        new_meta.append(dataset.meta[i:i+1])
+                    new_vision = torch.cat([new_vision, dataset.vision[i:i+1]])
+                    new_text = torch.cat([new_text, dataset.text[i:i+1]])
+                    new_audio = torch.cat([new_audio, dataset.audio[i:i+1]])
+                    new_labels = torch.cat([new_labels, dataset.labels[i:i+1]])
                 elif isinstance(dataset,(KSDataset, BalanceDataset, CremadDataset)):
                     new_idx = len(new_data)
                     new_data.append(dataset.data[i])
@@ -187,6 +192,10 @@ def create_dataset_sample_level(dataset_opt: dict, mode: str, contribution: dict
                     datum = dataset.data[i]
                     new_data.append(datum)
                     new_data2class[datum] = dataset.data2class[datum]
+                elif isinstance(dataset, ModelNet40Dataset):
+                    new_idx = len(new_filepaths)
+                    new_filepaths.append(dataset.filepaths[i])
+                    
                 if new_idx not in zero_modality_samples:
                     zero_modality_samples[new_idx] = []
                 for modality_another in modality_list:
@@ -195,12 +204,10 @@ def create_dataset_sample_level(dataset_opt: dict, mode: str, contribution: dict
                     zero_modality_samples[new_idx].append(modality_another)
              
     if isinstance(dataset,MoseiDataset):
-        dataset.vision = torch.cat(new_vision, dim=0)
-        dataset.text = torch.cat(new_text, dim=0)
-        dataset.audio = torch.cat(new_audio, dim=0)
-        dataset.labels = torch.cat(new_labels, dim=0)
-        if new_meta is not None:
-            dataset.meta = np.concatenate(new_meta, axis=0)
+        dataset.vision = new_vision
+        dataset.text = new_text
+        dataset.audio = new_audio
+        dataset.labels = new_labels
     elif isinstance(dataset,(KSDataset, BalanceDataset, CremadDataset)):
         dataset.data = new_data
         if new_label is not None:
@@ -209,7 +216,9 @@ def create_dataset_sample_level(dataset_opt: dict, mode: str, contribution: dict
         dataset.data = new_data
     elif isinstance(dataset,UCFDataset):
         dataset.data = new_data
-        dataset.data2class = new_data2class  
+        dataset.data2class = new_data2class 
+    elif isinstance(dataset, ModelNet40Dataset):
+        dataset.filepaths = new_filepaths
     
     sample_dataset = SampleDataset(dataset, zero_modality_samples)
     return sample_dataset
@@ -224,13 +233,27 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
     dataset = dataset_cls(dataset_opt)
 
     zero_modality_samples = {}
-
+    if isinstance(dataset,MoseiDataset):
+        new_vision = dataset.vision.clone()
+        new_text = dataset.text.clone()
+        new_audio = dataset.audio.clone()
+        new_labels = dataset.labels.clone()
+    elif isinstance(dataset,UCFDataset):
+        new_data = dataset.data.copy()
+        new_data2class = dataset.data2class.copy()
+    elif isinstance(dataset,UMPC_FoodDataset):
+        new_data = dataset.data.copy()
+    elif isinstance(dataset, ModelNet40Dataset):  
+        new_filepaths = dataset.filepaths.copy()
+    else:
+        new_data = dataset.data.copy()
+        new_label = dataset.label.copy() if hasattr(dataset, 'label') else None
     length = len(dataset)-len(dataset) % 64
     num = int(length * part_ratio)
     choice = np.random.choice(length, num)
     print(len(choice))
     part_contribution = {modality: 0.0 for modality in modality_list} 
-    
+     
     for i in choice:
         for modality in modality_list:
             part_contribution[modality] += contribution[modality][i] 
@@ -246,7 +269,7 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
                     continue
                 
                 difference += abs(gap[modality] - gap[modality_another])
-        difference /= factorial(len(modality_list))
+        difference /= (len(modality_list)-1)
         difference = (difference / 3 * 2 ) 
     elif func == 'tanh':
         tanh = torch.nn.Tanh()
@@ -257,7 +280,7 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
                     continue
                 
                 difference += abs(gap(modality) - gap(modality_another))
-        difference /= factorial(len(modality_list))
+        difference /= (len(modality_list)-1)
         difference = tanh(torch.tensor((difference / 3 * 2 )))
     elif func == 'square':
         difference = 0.0
@@ -271,37 +294,15 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
         difference = (difference / 3 * 2 ) ** 1.5
     resample_num = int(difference * length)
     sample_choice = np.random.choice(length, resample_num)
-    
-    if isinstance(dataset,MoseiDataset):
-        new_vision = [dataset.vision]
-        new_text = [dataset.text]
-        new_audio = [dataset.audio]
-        new_labels = [dataset.labels]
-        if dataset.meta is not None:
-            new_meta = [dataset.meta]  
-        else:
-            new_meta = None
-        
-    elif isinstance(dataset,UCFDataset):
-        new_data = dataset.data.copy()
-        new_data2class = dataset.data2class.copy()
-    elif isinstance(dataset,UMPC_FoodDataset):
-        new_data = dataset.data.copy()
-    else:
-        new_data = dataset.data.copy()
-        new_label = dataset.label.copy() if hasattr(dataset, 'label') else None
 
     for i in sample_choice:
         for modality in modality_list:
             if isinstance(dataset,MoseiDataset):
                 new_idx = len(new_vision)
-                new_vision.append(dataset.vision[i:i+1])
-                new_text.append(dataset.text[i:i+1])
-                new_audio.append(dataset.audio[i:i+1])
-                new_labels.append(dataset.labels[i:i+1])
-                if new_meta is not None: 
-                    new_meta.append(dataset.meta[i:i+1])
-
+                new_vision = torch.cat([new_vision, dataset.vision[i:i+1]])
+                new_text = torch.cat([new_text, dataset.text[i:i+1]])
+                new_audio = torch.cat([new_audio, dataset.audio[i:i+1]])
+                new_labels = torch.cat([new_labels, dataset.labels[i:i+1]])
             elif isinstance(dataset,(KSDataset, BalanceDataset, CremadDataset)):
                 new_idx = len(new_data)
                 new_data.append(dataset.data[i])
@@ -315,6 +316,9 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
                 datum = dataset.data[i]
                 new_data.append(datum)
                 new_data2class[datum] = dataset.data2class[datum]
+            elif isinstance(dataset, ModelNet40Dataset):
+                new_idx = len(new_filepaths)
+                new_filepaths.append(dataset.filepaths[i])
             if new_idx not in zero_modality_samples:
                 zero_modality_samples[new_idx] = []
             for modality_another in modality_list:
@@ -323,17 +327,17 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
                 if gap[modality] > gap[modality_another]:
                     zero_modality_samples[new_idx].append(modality_another)
     if isinstance(dataset,MoseiDataset):
-        dataset.vision = torch.cat(new_vision, dim=0)
-        dataset.text = torch.cat(new_text, dim=0)
-        dataset.audio = torch.cat(new_audio, dim=0)
-        dataset.labels = torch.cat(new_labels, dim=0)
-        if new_meta is not None:
-            dataset.meta = np.concatenate(new_meta, axis=0)
+        dataset.vision = new_vision
+        dataset.text = new_text
+        dataset.audio = new_audio
+        dataset.labels = new_labels
     elif isinstance(dataset, UMPC_FoodDataset):
         dataset.data = new_data
     elif isinstance(dataset,UCFDataset):
         dataset.data = new_data
         dataset.data2class = new_data2class 
+    elif isinstance(dataset, ModelNet40Dataset):
+        dataset.filepaths = new_filepaths
     elif isinstance(dataset,(KSDataset, BalanceDataset, CremadDataset)):
         dataset.data = new_data
         if new_label is not None:
