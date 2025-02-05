@@ -53,7 +53,11 @@ def create_config(config_dict: dict, args):
     # config_dict = global_settings | config_dict
     if args.device :
         config_dict['Main_config']['device'] = args.device
-    config_dict['fabric']['devices'] = list(map(int,config_dict['Main_config']['device'].split(',')))
+    # config_dict['fabric']['devices'] = list(map(int,config_dict['Main_config']['device'].split(',')))
+    gpu_ids = list(map(int,config_dict['Main_config']['device'].split(',')))
+    gpu_counts = len(gpu_ids)
+    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, gpu_ids))
+    config_dict['fabric']['devices'] = [i for i in range(gpu_counts)]
     if isinstance(config_dict['train']['parameter']['base_lr'], str):
         config_dict['train']['parameter']['base_lr'] = float(config_dict['train']['parameter']['base_lr'])
     print('==================')

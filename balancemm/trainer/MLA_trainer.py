@@ -24,8 +24,8 @@ class GSPlugin():
 
         # dtype = torch.cuda.FloatTensor  # run on GPU
         with torch.no_grad():
-            self.Pl = torch.eye(1024).to(device)
-            # self.Pl = torch.eye(512).to(device)
+            # self.Pl = torch.eye(1024).to(device)
+            self.Pl = torch.eye(512).to(device)
         self.exp_count = 0
 
     # @torch.no_grad()

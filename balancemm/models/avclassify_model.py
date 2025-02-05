@@ -8,12 +8,159 @@ from typing import Mapping
 import numpy as np
 from .encoders import image_encoder, text_encoder
 from ..encoders import create_encoders
+import torch.distributed as dist
 # def build_encoders(config_dict: dict[str, str])->dict[str, nn.Module]:
 #     modalitys = config_dict.keys()
 #     for modality in modalitys:
 #         encoder_class = find_encoder(modality, config_dict[modality]['name'])
 #         config_dict[modality] = encoder_class(config_dict[modality])
 #     return config_dict
+import warnings
+class MultiModalParallel(nn.DataParallel):
+    """自定义的DataParallel，支持多卡validation"""
+    def __init__(self, model, device_ids):
+        super().__init__(model, device_ids)
+    @property
+    def n_classes(self):
+        return self.module.n_classes
+        
+    @property
+    def fusion(self):
+        return self.module.fusion
+        
+    @property
+    def modalitys(self):
+        return self.module.modalitys
+        
+    @property
+    def enconders(self):
+        return self.module.enconders
+        
+    @property
+    def modality_encoder(self):
+        return self.module.modality_encoder
+        
+    @property
+    def device(self):
+        return self.module.device
+        
+    @property
+    def modality_size(self):
+        return self.module.modality_size
+        
+    @property
+    def encoder_res(self):
+        return self.module.encoder_res
+        
+    @encoder_res.setter
+    def encoder_res(self, value):
+        self.module.encoder_res = value
+        
+    @property
+    def Uni_res(self):
+        return self.module.Uni_res
+        
+    @Uni_res.setter
+    def Uni_res(self, value):
+        self.module.Uni_res = value
+        
+    @property
+    def pridiction(self):
+        return self.module.pridiction
+        
+    @pridiction.setter
+    def prediction(self, value):
+        self.module.pridiction = value
+
+    @property
+    def fusion_module(self):
+        return self.module.fusion_module
+    def validation_step(self, batch, batch_idx, limit_modality):
+        """并行运行validation_step"""
+        # 将method转发到forward中
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Was asked to gather along dimension 0"
+            )
+            return self.forward(batch, 
+                            batch_idx=batch_idx, 
+                            limit_modality=limit_modality, 
+                            _run_validation=True)  # 标记这是validation调用
+    def Unimodality_Calculate(self, mask = None, dependent_modality = {}):
+        """并行运行Unimodality_Calculate"""
+        # 将method转发到forward中
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Was asked to gather along dimension 0"
+            )
+            return self.forward((mask, dependent_modality), _run_Unimodality=True)  # 标记这是validation调用
+    
+    def forward(self, batch, **kwargs):
+        """重写forward以支持validation_step"""
+        # 检查是否是validation调用
+        if kwargs.pop('_run_validation', False):
+            # 分发到多个GPU上运行validation_step
+            replicas = self.replicate(self.module, self.device_ids)
+            
+            batch_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)
+            # kwargs_scattered = self.scatter(kwargs, target_gpus=self.device_ids)
+            # 在多个GPU上并行运行validation_step
+            results = self.parallel_apply(
+                [replica.validation_step for replica in replicas],
+                batch_scattered, kwargs_scattered
+            )
+            
+            outputs = [r[0] for r in results]
+            encoder_res = [r[1] for r in results]
+            Uni_res = [r[2] for r in results]
+            prediction = [r[3] for r in results]
+            self.module.encoder_res = self.gather(encoder_res, self.output_device)
+            self.module.Uni_res = self.gather(Uni_res, self.output_device)
+            self.module.pridiction = self.gather(prediction, self.output_device)
+            # self.encoder_res = self.module.encoder_res
+            # self.Uni_res = self.module.Uni_res
+            
+            return self.gather(outputs, self.output_device).sum()
+        elif kwargs.pop('_run_Unimodality', False):
+            replicas = self.replicate(self.module, self.device_ids)
+            mask_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)            # kwargs_scattered = self.scatter(kwargs, target_gpus=self.device_ids)
+            # 在多个GPU上并行运行validation_step
+            results = self.parallel_apply(
+                [replica.Unimodality_Calculate for replica in replicas],
+                mask_scattered,
+                kwargs_scattered
+            )
+            encoder_res = [r[0] for r in results]
+            Uni_res = [r[1] for r in results]
+            prediction = [r[2] for r in results]
+            self.module.encoder_res = self.gather(encoder_res, self.output_device)
+            self.module.Uni_res = self.gather(Uni_res, self.output_device)
+            self.module.prediction = self.gather(prediction, self.output_device)
+                
+            
+            return self.module.Uni_res
+        else:
+            replicas = self.replicate(self.module, self.device_ids)
+            
+            batch_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)
+            # kwargs_scattered = self.scatter(kwargs, target_gpus=self.device_ids)
+            # 在多个GPU上并行运行validation_step
+            results = self.parallel_apply(
+                replicas,
+                batch_scattered, kwargs_scattered
+            )
+            encoder_res = [r[0] for r in results]
+            Uni_res = [r[1] for r in results]
+            prediction = [r[2] for r in results]
+            self.module.encoder_res = self.gather(encoder_res, self.output_device)
+            self.module.Uni_res = self.gather(Uni_res, self.output_device)
+            self.module.pridiction = self.gather(prediction, self.output_device)
+            # print(len(self.module.prediction['output']),123)
+                
+            
+            return self.module.encoder_res
 class BaseClassifierModel(nn.Module):
     # mid fusion
     def __init__(self, args):
@@ -23,7 +170,7 @@ class BaseClassifierModel(nn.Module):
         self.modalitys = args['encoders'].keys()
         self.enconders = args['encoders']
         self.modality_encoder = nn.ModuleDict(create_encoders(args['encoders']))
-        self.device = args['device']
+        self.device = 'cuda:0' if args['device'] != ' ' else 'cpu'
         self.modality_size = args['modality_size']
         self.encoder_res = {}
         self.Uni_res = {}
@@ -93,7 +240,7 @@ class BaseClassifierModel(nn.Module):
         self.encoder_res = {}
         for modality in self.modalitys:
             modality_data = batch[modality]
-            modality_data = modality_data.to(self.device)
+            # modality_data = modality_data.to(self.device)
             if modality in padding:
                 if mask is None:
                     modality_data = torch.zeros_like(modality_data, device=modality_data.device)
@@ -102,12 +249,13 @@ class BaseClassifierModel(nn.Module):
         self.encoder_res['output'] = self.fusion_module(self.encoder_res)
         ##new
         self.Unimodality_Calculate()
-        return self.encoder_res
+        return self.encoder_res,self.Uni_res, self.pridiction
     
     def Unimodality_Calculate(self) -> dict[str, torch.Tensor]:
         modality_nums = 0
         all_nums = len(self.encoder_res.keys())-1
         self.Uni_res = {}
+        self.pridiction = {}
         now_size = 0
         for modality in self.encoder_res.keys():
             if modality == 'output':
@@ -127,25 +275,28 @@ class BaseClassifierModel(nn.Module):
         for modality in self.Uni_res.keys():
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
-        return self.Uni_res
+        return self.encoder_res,self.Uni_res, self.pridiction
 
     def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int, limit_modality: list) -> tuple[torch.Tensor, dict[str, list]]:
         # ** drop
+        self.prediction = {}
         padding = []
         for modality in self.modalitys:
             if modality not in limit_modality:
                 padding.append(modality)
         self(batch, padding = padding)
-        self.Uni_res = self.Unimodality_Calculate()
+        self.Unimodality_Calculate()
         n_classes = self.n_classes
         softmax  = nn.Softmax(dim = 1)
         label = batch['label']
-        label = label.to(self.device)
+        # label = label.to(self.device)
         out = self.Uni_res['output']
+        # print(out.device, label.device)
         loss = F.cross_entropy(out, label)
         for modality in self.Uni_res.keys():
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        # self.pridiction['device'] = out.device
         # for modality in self.Uni_res.keys():
         #     acc_res[modality] = [0.0 for _ in range(n_classes)]
         #     pred_res[modality] = softmax(self.Uni_res[modality])
@@ -156,7 +307,7 @@ class BaseClassifierModel(nn.Module):
         #             acc_res[modality][label[i]] += 1.0
             
         #     num[label[i]] += 1.0
-        return loss
+        return loss,self.encoder_res,self.Uni_res, self.pridiction
 
 
 class BaseClassifier_AMCoModel(BaseClassifierModel):

@@ -1,22 +1,22 @@
 model:
   BaseClassifier:
-    encoders: {front_view: ResNet18, back_view: ResNet18}
+    encoders: {audio: ResNet18, visual: ResNet18}
     fusion: "concat"
     modality_size: 1024
   BaseClassifier_AMCo:
-    encoders: {front_view: ResNet18, back_view: ResNet18}
+    encoders: {audio: ResNet18, visual: ResNet18}
     fusion: "concat"
     modality_size: 512
   BaseClassifier_Greedy:
-    encoders: {front_view: ResNet18, back_view: ResNet18}
+    encoders: {audio: ResNet18, visual: ResNet18}
     fusion: "concat"
     modality_size: 512
   BaseClassifier_MLA:
-    encoders: {audio: Transformer_,visual: Transformer_, text: Transformer_}
+    encoders: {audio: ResNet18, visual: ResNet18}
     fusion: "shared"
     modality_size: 1024
   BaseClassifier_ReconBoost:
-    encoders: {audio: Transformer_,visual: Transformer_, text: Transformer_}
+    encoders: {audio: ResNet18, visual: ResNet18}
     fusion: "shared"
     modality_size: 1024
   # encoder名字的规范化 更多的encoder official的encoder

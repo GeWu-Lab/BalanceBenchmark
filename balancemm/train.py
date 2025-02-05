@@ -16,6 +16,8 @@ import logging
 from datetime import datetime
 from .evaluation.modalitys import Calculate_Shapley
 from .trainer.LinearProbe_trainer import NewLinearHead
+from .models.avclassify_model import MultiModalParallel
+
 import copy
 def train_and_test(args: dict):
     dict_args = args
@@ -55,22 +57,26 @@ def train_and_test(args: dict):
         fabric.print('set float32 matmul precision to high')
         torch.set_float32_matmul_precision('high')
     device = args.Main_config['device']
+    # if device == '':
+    #     device = torch.device('cpu')
+    # else:
+    #     device = torch.device('cuda:' + args.Main_config['device'])
     if device == '':
-        device = torch.device('cpu')
+        model = create_model(args.model)
     else:
-        device = torch.device('cuda:' + args.Main_config['device'])
-    args.model['device'] = device
+        model = create_model(args.model)
+        print(list(range(torch.cuda.device_count())))
+        model = MultiModalParallel(model, device_ids = list(range(torch.cuda.device_count())))
+        model = model.cuda()
+    # args.model['device'] = device
     if args.trainer['name'] != 'Sample':
         train_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
     else:
         train_dataloader, train_val_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
     args.trainer['checkpoint_dir'] = args.checkpoint_dir ##
-    model = create_model(args.model)
     optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
     trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger,tb_logger)
-    model.to(device)
-    model.device = device
         
     # 记录开始时间
     start_time = datetime.now()

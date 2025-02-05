@@ -77,7 +77,7 @@ class BaseTrainer():
         self.should_stop = False
         self.should_train = should_train
         self.should_save = False
-        self.best_acc = 0.0
+        self.best_acc = {'output':0.0}
         # ensures limit_X_batches is either int or inf
         if not isinstance(limit_train_batches, int):
             assert limit_train_batches == float("inf")
@@ -377,8 +377,6 @@ class BaseTrainer():
         
         if limit_modalitys == ["ALL"]:
             limit_modalitys = list(model.modalitys).copy()
-        count = 0
-        _acc = {}
         valid_loss = 0
         modalitys = list(model.modalitys)
         modalitys.append('output')

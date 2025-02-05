@@ -16,3 +16,7 @@ python -m balancemm --model BaseClassifier --trainer unimodalTrainer --lr 0.01 -
 python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.01 --alpha 1.0 --dataset Mosei --device 1 --mode tsne
 
 python -m balancemm --model BaseClassifier --trainer unimodalTrainer --lr 0.001 --alpha 1.0 --dataset ModelNet40 --device 1
+
+python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.005 --alpha 1.0 --dataset Balance --device 1 --mode all_test
+
+python -m balancemm --model BaseClassifier --trainer LFMTrainer --lr 0.005 --alpha 1.0 --dataset Balance --device 1

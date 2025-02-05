@@ -75,7 +75,7 @@ class baselineTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-
+            # print(len(batch['label']), len(model.module.pridiction['output']))
             self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
@@ -101,8 +101,9 @@ class baselineTrainer(BaseTrainer):
         #     a, v, out = model(batch)
         # else:
         #     a, v, t, out = model(batch)
-        _ = model.validation_step(batch= batch, batch_idx= batch_idx, limit_modality = model.modalitys)
-        out = model.encoder_res['output']        
+        # _ = model.validation_step(batch= batch, batch_idx= batch_idx, limit_modality = model.modalitys)
+        model(batch)
+        out = model.encoder_res['output']    
         loss = criterion(out, label)
         loss.backward()
         return loss

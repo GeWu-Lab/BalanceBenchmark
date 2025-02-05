@@ -125,3 +125,11 @@ trainer_para:
     modulation_ends: 80
     modality: 2
     trainer_probed: "OGMTrainer"
+  LFM:
+    alpha: 1
+    method: 'learning-fitted'
+    modulation_starts: 0
+    modulation_ends: 80
+    modality: 2
+    trainer_probed: "OGMTrainer"
+    lr_alpha: 0.0001
