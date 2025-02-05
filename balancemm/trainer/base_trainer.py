@@ -211,13 +211,13 @@ class BaseTrainer():
                     tb_logger.log_metrics({
                         'valid_loss': valid_loss,
                     }, step=self.current_epoch)
-                with torch.no_grad():
-                    Shapley = Calculate_Shapley(self, model,val_loader,logger)
-                for modality in modality_list:
-                    tag = "Shapley_value"
-                    tb[modality].log_metrics({
-                                    tag: Shapley[modality]
-                                }, step=self.current_epoch)
+                # with torch.no_grad():
+                #     Shapley = Calculate_Shapley(self, model,val_loader,logger)
+                # for modality in modality_list:
+                #     tag = "Shapley_value"
+                #     tb[modality].log_metrics({
+                #                     tag: Shapley[modality]
+                #                 }, step=self.current_epoch)
                 ##parse the Metrics
                 for metircs in sorted(Metrics_res.keys()):
                     if metircs == 'acc':

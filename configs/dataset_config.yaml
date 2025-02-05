@@ -1,7 +1,7 @@
 
 dataloader:
-  eff_batch_size: 64
-  num_workers: 4 # number of workers for dataloader
+  eff_batch_size: 128
+  num_workers: 8 # number of workers for dataloader
   fast_run: False # if true, only use part of the dataset
   shuffle: True # if true, shuffle the dataset
   drop_last: True # if true, drop the last batch if the size is not equal to batch_size
@@ -110,6 +110,14 @@ dataset:
       input_dim: 224
     back_view:
       input_dim: 224
+  VGG:
+    validation: false
+    classes: 309
+    use_video_frames: 3
+    audio:
+      input_dim: None
+    visual:
+      input_dim: None
 # train:
 #     name: UMPC_Food
 #     mode: train

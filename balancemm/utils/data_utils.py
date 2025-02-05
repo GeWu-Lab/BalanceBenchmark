@@ -38,7 +38,8 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
                                                    drop_last = config_dataloader.drop_last,
                                                      num_workers = config_dataloader.num_workers, 
                                                      multiprocessing_context='spawn', 
-                                                     pin_memory = config_dataloader.pin_memory)
+                                                     pin_memory = config_dataloader.pin_memory,
+                                                     prefetch_factor=6)
     if config.trainer['name'] == 'Sample':
         train_val_dataloader = torch.utils.data.DataLoader(train_dataset,  
                                                    batch_size=config_dataloader.batch_size, 
@@ -46,16 +47,19 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
                                                    drop_last = config_dataloader.drop_last,
                                                      num_workers = config_dataloader.num_workers, 
                                                      multiprocessing_context='spawn', 
-                                                     pin_memory = config_dataloader.pin_memory)
+                                                     pin_memory = config_dataloader.pin_memory,
+                                                     prefetch_factor=6)
         
     val_dataloader = torch.utils.data.DataLoader(val_dataset,  batch_size=config_dataloader.batch_size, drop_last = config_dataloader.drop_last, 
                                                  num_workers = config_dataloader.num_workers, 
                                                 multiprocessing_context='spawn', 
-                                                pin_memory = config_dataloader.pin_memory)
+                                                pin_memory = config_dataloader.pin_memory,
+                                                prefetch_factor=6)
     test_dataloader = torch.utils.data.DataLoader(test_dataset,  batch_size=config_dataloader.batch_size, drop_last = config_dataloader.drop_last, 
                                                  num_workers = config_dataloader.num_workers, 
                                                 multiprocessing_context='spawn', 
-                                                pin_memory = config_dataloader.pin_memory)
+                                                pin_memory = config_dataloader.pin_memory,
+                                                prefetch_factor=6)
 
     if config.Train['dataset'] == 'UMPC_Food':
         g = torch.Generator()
