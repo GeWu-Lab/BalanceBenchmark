@@ -408,8 +408,7 @@ class BaseTrainer():
         valid_loss /= MetricsCalculator.total_samples
         Metrics_res = MetricsCalculator.compute_metrics()
         self._current_metrics = Metrics_res
-        self.best_acc={}
-        self.best_acc['output'] = 0
+        
         if Metrics_res['acc']['output'] > self.best_acc['output']:
             self.should_save = True
             self.best_acc['output'] = Metrics_res['acc']['output']
