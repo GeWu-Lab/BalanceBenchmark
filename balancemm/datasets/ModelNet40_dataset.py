@@ -78,4 +78,4 @@ class ModelNet40Dataset(Dataset):
                     img = self.transform(img)
                 trans_imgs.append(img) 
             data = torch.stack(trans_imgs)
-            return {"front_view":trans_imgs[0],"back_view":trans_imgs[1], "label": class_id}
+            return {"front_view":trans_imgs[0],"back_view":trans_imgs[1], "label": class_id, "idx": idx}
