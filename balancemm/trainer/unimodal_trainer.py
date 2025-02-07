@@ -110,7 +110,7 @@ class unimodalTrainer(BaseTrainer):
         #     a, v, out = model(batch)
         # else:
         #     a, v, t, out = model(batch)
-        _ = model(batch= batch)
+        model(batch)
         out = model.encoder_res['output']        
         loss = criterion(out, label)
         loss.backward()

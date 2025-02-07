@@ -96,8 +96,8 @@ class OGMTrainer(BaseTrainer):
         label = batch['label']
         label = label.to(model.device)
         model(batch)
-        Uni_res = model.Unimodality_Calculate()
-        loss = criterion(Uni_res['output'], label)
+        # model.Unimodality_Calculate()
+        loss = criterion(model.Uni_res['output'], label)
         loss.backward()
         modality_list = model.modalitys
 
@@ -111,9 +111,9 @@ class OGMTrainer(BaseTrainer):
 
         for modality in modality_list:
             if modality_nums == 2 or self.method == 'OGM_GE3':
-                score_modality = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(Uni_res['output'].size(0))])
+                score_modality = sum([softmax(model.Uni_res[modality])[i][label[i]] for i in range(model.Uni_res['output'].size(0))])
             elif modality_nums == 3:
-                score_modality = sum([softmax(torch.cos(Uni_res[modality]))[i][label[i]] if label[i] == torch.argmax(Uni_res[modality][i]) else 0 for i in range(Uni_res['output'].size(0))])
+                score_modality = sum([softmax(torch.cos(model.Uni_res[modality]))[i][label[i]] if label[i] == torch.argmax(model.Uni_res[modality][i]) else 0 for i in range(model.Uni_res['output'].size(0))])
             else:
                 raise("Wrong number of modalitys for OGM, it should be 2 or 3, but given {:0}".format(modality_nums))
             try:

@@ -127,7 +127,7 @@ class AMCoTrainer(BaseTrainer):
                                             pt = pt)
         else:
             model(batch)
-        model.Unimodality_Calculate(mask, dependent_modality)
+        # model.Unimodality_Calculate(mask, dependent_modality)
       
         label = batch['label']
         label = label.to(model.device)

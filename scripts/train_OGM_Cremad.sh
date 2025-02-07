@@ -20,3 +20,13 @@ python -m balancemm --model BaseClassifier --trainer unimodalTrainer --lr 0.001 
 python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.005 --alpha 1.0 --dataset Balance --device 1 --mode all_test
 
 python -m balancemm --model BaseClassifier --trainer LFMTrainer --lr 0.005 --alpha 1.0 --dataset Balance --device 1
+
+python -m balancemm --model BaseClassifier --trainer unimodalTrainer --lr 0.001 --alpha 1.0 --dataset VGG --device 0,1
+
+python -m balancemm --model BaseClassifier --trainer unimodalTrainer --lr 0.001 --alpha 1.0 --dataset VGG --device 2,3
+
+python -m balancemm --model BaseClassifier --trainer OGMTrainer --lr 0.001 --alpha 1.0 --dataset VGG --device 2,3
+
+python -m balancemm --model BaseClassifier --trainer baselineTrainer --lr 0.001 --alpha 1.0 --dataset VGG --device 0,1
+
+python -m balancemm --model BaseClassifier_AMCo --trainer AMCoTrainer --lr 0.001 --alpha 1.0 --dataset VGG --device 0,1

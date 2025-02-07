@@ -103,7 +103,7 @@ class MultiModalParallel(nn.DataParallel):
         if kwargs.pop('_run_validation', False):
             # 分发到多个GPU上运行validation_step
             replicas = self.replicate(self.module, self.device_ids)
-            
+            kwargs_None = None
             batch_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)
             # kwargs_scattered = self.scatter(kwargs, target_gpus=self.device_ids)
             # 在多个GPU上并行运行validation_step
@@ -144,7 +144,7 @@ class MultiModalParallel(nn.DataParallel):
         else:
             replicas = self.replicate(self.module, self.device_ids)
             
-            batch_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)
+            batch_scattered, kwargs_scattered = self.scatter(batch, None, self.device_ids)
             # kwargs_scattered = self.scatter(kwargs, target_gpus=self.device_ids)
             # 在多个GPU上并行运行validation_step
             results = self.parallel_apply(
@@ -324,7 +324,7 @@ class BaseClassifier_AMCoModel(BaseClassifierModel):
         self.encoder_res = {}
         for modality in self.modalitys:
             modality_data = batch[modality]
-            modality_data = modality_data.to(self.device)
+            # modality_data = modality_data.to(self.device)
             if modality in padding:
                 modality_data = torch.zeros_like(modality_data, device=modality_data.device)
                 modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
@@ -338,13 +338,14 @@ class BaseClassifier_AMCoModel(BaseClassifierModel):
             self.Unimodality_Calculate(mask,dependent_modality)
         self.encoder_res['output'] = self.linear_star(self.encoder_res['output'])
         self.Uni_res['output'] = self.encoder_res['output'] 
-        return self.encoder_res
+        return self.encoder_res, self.Uni_res, self.pridiction
     
     def Unimodality_Calculate(self, mask= None, dependent_modality = {}) -> dict[str, torch.Tensor]:
         softmax = nn.Softmax(dim = 1)
         modality_nums = 0
         all_nums = len(self.encoder_res.keys())-1
         self.Uni_res = {}
+        self.pridiction = {} ## 111
         self.Uni_res['output'] = torch.zeros_like(self.encoder_res['output'])
         now_size = 0
         for modality in self.encoder_res.keys():
@@ -366,7 +367,7 @@ class BaseClassifier_AMCoModel(BaseClassifierModel):
         for modality in self.Uni_res.keys():
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
-        return self.Uni_res
+        return self.encoder_res,self.Uni_res, self.pridiction
 
 
 class BaseClassifier_GreedyModel(BaseClassifierModel):

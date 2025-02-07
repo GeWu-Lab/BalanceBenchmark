@@ -147,12 +147,38 @@ class VGGDataset(Dataset):
             ])
 
         # Visual
+        # for i in range(pick_num):
+        #     if self.data_trans_mode == 'train':
+        #         t[i] = random.randint(i * seg + 1, i * seg + seg) if file_num > 6 else 1
+        #         if t[i] >= 10:
+        #             t[i] = 9
+        #     else:
+        #         t[i] = i*seg + max(int(seg/2), 1) if file_num > 6 else 1
+
+        #     path1.append('frame_0000' + str(t[i]) + '.jpg')
+        #     image.append(Image.open(path + "/" + path1[i]).convert('RGB'))  # 0-255
+        #     image_arr.append(transf(image[i]))
+        #     image_arr[i] = image_arr[i].unsqueeze(1).float()
+        pick_num = self.args['use_video_frames']
         image_samples = os.listdir(self.video[idx])
-        select_index = np.random.choice(len(image_samples), size=self.args['use_video_frames'], replace=False)
+        image_samples = sorted(image_samples)
+        file_num = len(image_samples)
+        select_index = np.random.choice(len(image_samples), size=pick_num, replace=False)
         select_index.sort()
-        images = torch.zeros((self.args['use_video_frames'], 3, 224, 224))
-        for i in range(self.args['use_video_frames']):
-            img = Image.open(os.path.join(self.video[idx], image_samples[i])).convert('RGB')
+        images = torch.zeros((pick_num, 3, 224, 224))
+        t = [0] * pick_num
+        seg = (file_num//pick_num)
+        for i in range(pick_num):
+            if self.mode == 'train':
+                t[i] = random.randint(i * seg + 1, i * seg + seg) if file_num > 6 else 1
+                if t[i] >= 10:
+                    t[i] = 9
+            else:
+                t[i] = i*seg + max(int(seg/2), 1) if file_num > 6 else 1
+        for i, idx_frame in enumerate(select_index):
+            img_path = os.path.join(self.video[idx], image_samples[t[i]-1])
+                # img_path = os.path.join(self.video[idx], image_samples[min(i * seg + max(int(seg/2), 1), len(image_samples)-1)])
+            img = Image.open(img_path).convert('RGB')
             img = transform(img)
             images[i] = img
         # images = transform(self.images[idx])

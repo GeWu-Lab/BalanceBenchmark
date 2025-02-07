@@ -1,6 +1,6 @@
 
 dataloader:
-  eff_batch_size: 128
+  eff_batch_size: 96
   num_workers: 8 # number of workers for dataloader
   fast_run: False # if true, only use part of the dataset
   shuffle: True # if true, shuffle the dataset
