@@ -8,7 +8,7 @@ seed: 42
 #   drop_last: true # if true, drop the last batch if the size is not equal to batch_size
 #   pin_memory: true # if true, use pin_memory for dataloader
 dataloader:
-  eff_batch_size: 96
+  eff_batch_size: 32
   num_workers: 32 # number of workers for dataloader
   fast_run: false # if true, only use part of the dataset
   shuffle: true # if true, shuffle the dataset
@@ -35,7 +35,7 @@ log:
 
 train:
   parameter:
-    total_epoch: 60 # number of epochs to train
+    total_epoch: 30 # number of epochs to train
     warmup: 10 # warmup beta and lr
     base_lr: 0.001 # base learning rate. Using linear law, lr = eff_batch_size/base_bs*base_lr
     lr: -1 # learning rate. If set, override base_lr, set to -1 to use base_lr
@@ -45,6 +45,10 @@ train:
     resume: '' # path to the checkpoint
     checkpoint_frequency: 1 # number of epoch interval to save the checkpoint
     num_checkpoint_keep: 3 # set to -1 to save all checkpoints
+  # optimizer:
+  #   type: "SGD" # type of optimizer
+  #   momentum: 0.9
+  #   weight_decay: 0.0001
   optimizer:
     type: "AdamW" # type of optimizer
     # momentum: 0.9

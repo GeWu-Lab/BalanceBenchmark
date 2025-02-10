@@ -82,8 +82,8 @@ def train_and_test(args: dict):
     start_time = datetime.now()
     if args.trainer['name'] == 'GBlendingTrainer':
         temp_model = create_model(args.model)
-        temp_model.to(device)
-        temp_model.device = device
+        temp_model = MultiModalParallel(temp_model,device_ids = list(range(torch.cuda.device_count())))
+        temp_model.cuda()
         temp_optimizer = create_optimizer(temp_model, args.train['optimizer'], args.train['parameter'])
         temp_optimizer_origin = copy.deepcopy(temp_optimizer.state_dict())
         trainer.fit(model, temp_model,train_dataloader, val_dataloader, optimizer, scheduler, temp_optimizer,temp_optimizer_origin,logger,tb_logger)
@@ -105,7 +105,6 @@ def train_and_test(args: dict):
     model.eval()
     best_state = torch.load(args.checkpoint_dir+ '/epoch_normal.ckpt')
     model.load_state_dict(best_state['model'])
-# <<<<<<< newversion
     #test sharply
     logger.info('Calculate the shapley value of best model')
     Calculate_Shapley(trainer = trainer, model = model, CalcuLoader = test_dataloader, logger= logger)

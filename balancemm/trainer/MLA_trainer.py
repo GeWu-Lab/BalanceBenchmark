@@ -23,6 +23,10 @@ class GSPlugin():
         super().__init__()
 
         # dtype = torch.cuda.FloatTensor  # run on GPU
+        if device != ' ':
+            device = 'cuda:0'
+        else:
+            device = 'cpu'
         with torch.no_grad():
             # self.Pl = torch.eye(1024).to(device)
             self.Pl = torch.eye(512).to(device)
@@ -46,6 +50,11 @@ class GSPlugin():
 
                     self.Pl.data = self.Pl.data / pnorm2
                     w.grad.add_(torch.mm(w.grad.data, torch.t(self.Pl.data)))
+                    # grad_update = torch.mm(w.grad.data, torch.t(self.Pl.data))
+                    # if w.grad is None:
+                        # w.grad = grad_update
+                    # else:
+                        # w.grad = w.grad + grad_update
                    
                     
                     
@@ -125,25 +134,34 @@ class MLATrainer(BaseTrainer):
     def training_step(self, model, batch, batch_idx,len_dataloader,optimizer):
 
         # TODO: make it simpler and easier to extend
-        softmax = nn.Softmax(dim=1)
-        log_softmax = nn.LogSoftmax(dim=1)
-        tanh = nn.Tanh()
-        relu = nn.ReLU(inplace=True)
         modality_list = model.modalitys
         key = list(modality_list)
         # out_v,out_a,out = Uni_res['visual'], Uni_res['audio'], Uni_res['output']
         label = batch['label']
-        label = label.to(model.device)
+        # label = label.to(model.device)
         loss = 0
         loss_modality = {}
-        model(batch)
+        # feature =model(batch)
         if  self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-             
+            # feature = {}
+            # for modality in modality_list:
+            #     feature[modality] = model.encoder_res[modality].clone().contiguous()
             for modality in modality_list:
-                out = model.fusion_module.fc_out(model.encoder_res[modality])
+                feature = model.feature_extract(batch, modality = modality)
+                out = model.fusion_module.fc_out(feature)
                 loss = self.criterion(out,label)
-                loss.backward()
-                encoder_out = model.encoder_res[modality].detach()
+                # print("12345")
+                try:
+                    loss.backward()
+                except RuntimeError as e:
+                    # 打印计算图信息
+                    print("Computation graph:")
+                    for name, param in model.named_parameters():
+                        if param.grad is not None:
+                            print(f"{name} grad shape: {param.grad.shape}")
+                    raise e
+                # print("678910")
+                encoder_out = feature.detach()
                 self.gs_plugin.before_update(model.fusion_module.fc_out, encoder_out, 
                                     batch_idx, len_dataloader, self.gs_plugin.exp_count)
                 

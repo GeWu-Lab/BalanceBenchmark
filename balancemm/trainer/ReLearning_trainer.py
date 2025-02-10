@@ -417,7 +417,7 @@ class ReLearningTrainer(BaseTrainer):
         label = batch['label']
         label = label.to(model.device)
         model(batch)
-        model.Unimodality_Calculate()
+        # model.Unimodality_Calculate()
         modality_list = model.modalitys
 
 

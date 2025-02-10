@@ -351,15 +351,18 @@ class ReconBoostTrainer(BaseTrainer):
       
         label = batch['label']
  
-        device = model.device
+        # device = model.device
         
-        modality_data = batch[modality].to(model.device)
-        pre_modality_data = batch[pre_modality].to(model.device)
+        # modality_data = batch[modality].to(model.device)
+        # pre_modality_data = batch[pre_modality].to(model.device)
+        modality_data = batch[modality]
+        pre_modality_data = batch[pre_modality]
        
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-            out_join = model.forward(batch, mask_model=modality) ## mask_model = model_name global_ft: true or false
-            
-            out_obj = model.modality_model(modality,modality_data)
+            model.forward(batch, mask_model=modality) ## mask_model = model_name global_ft: true or false
+            out_join = model.Uni_res['output']
+            # out_obj = model.modality_model(modality_data,modality = modality,)
+            out_obj = model.modality_model(batch,modality = modality,)
             target = torch.zeros(label.size(0),model.n_classes).to(model.device).scatter_(1,label.view(-1,1),1)
             boosting_loss = - self.weight1 *  (target * log_softmax(out_obj)).mean(-1) \
                         + self.weight2 * (target * softmax(out_join.detach()) * log_softmax(out_obj)).mean(-1)
@@ -367,7 +370,7 @@ class ReconBoostTrainer(BaseTrainer):
             if self.current_epoch == 0:
                 loss = boosting_loss
             else:
-                pre_out_obj = model.modality_model(pre_modality,pre_modality_data)
+                pre_out_obj = model.modality_model(batch,modality = pre_modality)
                 ga_loss = mse_criterion(softmax(out_obj.detach()), softmax(pre_out_obj.detach())) ## ga loss
                 loss = boosting_loss + self.alpha * ga_loss
             loss.mean().backward()
@@ -387,11 +390,12 @@ class ReconBoostTrainer(BaseTrainer):
         log_softmax = nn.LogSoftmax(dim=1)
         # out_a, out_v = model.AVCalculate(a, v, out)
         label = batch['label']
-        device = model.device
+        # device = model.device
         # print(a.shape, v.shape, model.head.weight.shape)
         ## our modality-wise normalization on weight and feature
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
-            out = model.forward_grad(batch) ## mask_model = model_name global_ft: true or false
+            model.forward_grad(batch) ## mask_model = model_name global_ft: true or false
+            out = model.Uni_res['output']
             loss = criterion(out,label)
             loss.backward()
                 

@@ -96,7 +96,43 @@ class MultiModalParallel(nn.DataParallel):
                 message="Was asked to gather along dimension 0"
             )
             return self.forward((mask, dependent_modality), _run_Unimodality=True)  # 标记这是validation调用
-    
+    def feature_extract(self,batch,**kwargs):
+        replicas = self.replicate(self.module, self.device_ids)
+        batch_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)
+        results = self.parallel_apply(
+                [replica.feature_extract for replica in replicas],
+                batch_scattered, kwargs_scattered
+            )
+        encoder_res = [r for r in results]
+        modality_res = self.gather(encoder_res, self.output_device)
+        return modality_res
+    def forward_grad(self,batch, **kwargs):
+        replicas = self.replicate(self.module, self.device_ids)
+        batch_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)
+        results = self.parallel_apply(
+                [replica.forward_grad for replica in replicas],
+                batch_scattered, kwargs_scattered
+            )
+        encoder_res = [r[0] for r in results]
+        Uni_res = [r[1] for r in results]
+        prediction = [r[2] for r in results]
+        self.module.encoder_res = self.gather(encoder_res, self.output_device)
+        self.module.Uni_res = self.gather(Uni_res, self.output_device)
+        self.module.pridiction = self.gather(prediction, self.output_device)
+        return self.module.Uni_res['output']
+    def modality_model(self, batch, **kwargs):
+        replicas = self.replicate(self.module, self.device_ids)
+        batch_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)
+        results = self.parallel_apply(
+            [replica.modality_model for replica in replicas],
+            batch_scattered,
+            kwargs_scattered
+        )
+        
+        encoder_res = [r for r in results]
+        modality_res = self.gather(encoder_res, self.output_device)
+        return modality_res
+
     def forward(self, batch, **kwargs):
         """重写forward以支持validation_step"""
         # 检查是否是validation调用
@@ -144,7 +180,7 @@ class MultiModalParallel(nn.DataParallel):
         else:
             replicas = self.replicate(self.module, self.device_ids)
             
-            batch_scattered, kwargs_scattered = self.scatter(batch, None, self.device_ids)
+            batch_scattered, kwargs_scattered = self.scatter(batch, kwargs, self.device_ids)
             # kwargs_scattered = self.scatter(kwargs, target_gpus=self.device_ids)
             # 在多个GPU上并行运行validation_step
             results = self.parallel_apply(
@@ -158,9 +194,16 @@ class MultiModalParallel(nn.DataParallel):
             self.module.Uni_res = self.gather(Uni_res, self.output_device)
             self.module.pridiction = self.gather(prediction, self.output_device)
             # print(len(self.module.prediction['output']),123)
-                
+            # encoder_res_gathered = self.gather([r[0] for r in results], self.output_device)
+        
+            # # 为字典中的每个tensor创建新的副本
+            # encoder_res = {
+            #     modality: data.clone().contiguous() 
+            #     for modality, data in encoder_res_gathered.items()
+            # }
             
             return self.module.encoder_res
+        
 class BaseClassifierModel(nn.Module):
     # mid fusion
     def __init__(self, args):
@@ -624,7 +667,6 @@ class MMTM(nn.Module):
         return data
 
 class BaseClassifier_MLAModel(BaseClassifierModel):
-    # mid fusion
     def __init__(self, args):
         super(BaseClassifier_MLAModel, self).__init__(args)
         
@@ -638,7 +680,7 @@ class BaseClassifier_MLAModel(BaseClassifierModel):
         self.encoder_res = {}
         for modality in self.modalitys:
             modality_data = batch[modality]
-            modality_data = modality_data.to(self.device)
+            # modality_data = modality_data.to(self.device)
             if modality in padding:
                 if mask is None:
                     modality_data = torch.zeros_like(modality_data, device=modality_data.device)
@@ -646,10 +688,11 @@ class BaseClassifier_MLAModel(BaseClassifierModel):
             self.encoder_res[modality] = modality_res 
     
         # self.Unimodality_Calculate()
-        return self.encoder_res
+        return self.encoder_res, self.Uni_res, self.pridiction
     
     def Unimodality_Calculate(self) -> dict[str, torch.Tensor]:
         self.Uni_res = {}
+        self.pridiction = {}
         for modality in self.encoder_res.keys():
             if self.fusion == 'shared':
                 self.Uni_res[modality] = self.fusion_module.fc_out(self.encoder_res[modality])
@@ -668,7 +711,7 @@ class BaseClassifier_MLAModel(BaseClassifierModel):
         # for modality in self.Uni_res.keys():
         #     softmax_res = softmax(self.Uni_res[modality])
         #     self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
-        return self.Uni_res
+        return self.encoder_res, self.Uni_res, self.pridiction
 
     def calculate_entropy(self,output):
         
@@ -693,7 +736,7 @@ class BaseClassifier_MLAModel(BaseClassifierModel):
         
         # sum_weights = gating_weight + gating_weight_2
         for modality in self.modalitys:
-            gating_weight[modality] /= sum_weights
+            gating_weight[modality] = gating_weight[modality] / sum_weights  # 非原地操作
         # gating_weight_1 /= sum_weights
         # gating_weight_2 /= sum_weights
         
@@ -710,7 +753,7 @@ class BaseClassifier_MLAModel(BaseClassifierModel):
         n_classes = self.n_classes
         softmax  = nn.Softmax(dim = 1)
         label = batch['label']
-        label = label.to(self.device)
+        # label = label.to(self.device)
         out = self.Uni_res['output']
         loss = F.cross_entropy(out, label)
         for modality in self.Uni_res.keys():
@@ -726,7 +769,12 @@ class BaseClassifier_MLAModel(BaseClassifierModel):
         #             acc_res[modality][label[i]] += 1.0
             
         #     num[label[i]] += 1.0
-        return loss
+        return loss,self.encoder_res,self.Uni_res, self.pridiction
+    def feature_extract(self,batch,modality):
+        modality_data = batch[modality]
+        modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
+        return modality_res
+
 
 class BaseClassifier_ReconBoostModel(BaseClassifierModel):
     # mid fusion
@@ -735,7 +783,8 @@ class BaseClassifier_ReconBoostModel(BaseClassifierModel):
        
         self.boost_rate  = nn.Parameter(torch.tensor(0.01, requires_grad=True, device=self.device))
         
-    def modality_model(self,modality,modality_data):
+    def modality_model(self,batch,modality):
+        modality_data = batch[modality]
         modality_res = self.Encoder_Process(modality_data = modality_data, modality_name= modality)
         modality_res = self.fusion_module.fc_out(modality_res)
         
@@ -750,17 +799,19 @@ class BaseClassifier_ReconBoostModel(BaseClassifierModel):
                 pt = 0,
                 types= 0) -> dict[str, torch.Tensor]:
         self.Uni_res = {}
+        self.pridiction = {}
         self.Uni_res['output'] = None
         with torch.no_grad():
             for modality in self.modalitys:
                 if modality == mask_model:
                     continue
                 modality_data = batch[modality]
-                modality_data = modality_data.to(self.device)
+                # modality_data = modality_data.to(self.device)
+                modality_data = modality_data
                 if modality in padding:
                     if mask is None:
                         modality_data = torch.zeros_like(modality_data, device=modality_data.device)
-                self.Uni_res[modality] = self.modality_model(modality,modality_data)
+                self.Uni_res[modality] = self.modality_model(batch,modality) ###
                 if self.Uni_res['output'] is None:
                     self.Uni_res['output'] = self.Uni_res[modality]
                 else: 
@@ -770,7 +821,7 @@ class BaseClassifier_ReconBoostModel(BaseClassifierModel):
         for modality in self.Uni_res.keys():
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
-        return self.Uni_res['output']
+        return self.encoder_res, self.Uni_res, self.pridiction
     
     def forward_grad(self,
                 batch,
@@ -780,11 +831,13 @@ class BaseClassifier_ReconBoostModel(BaseClassifierModel):
                 pt = 0,
                 types= 0) -> dict[str, torch.Tensor]:
         self.Uni_res = {}
+        self.pridiction = {}
         self.Uni_res['output'] = None
         for modality in self.modalitys:
             modality_data = batch[modality]
-            modality_data = modality_data.to(self.device)
-            self.Uni_res[modality] = self.modality_model(modality,modality_data)
+            # modality_data = modality_data.to(self.device)
+            modality_data = modality_data
+            self.Uni_res[modality] = self.modality_model(batch,modality)
             if self.Uni_res['output'] is None:
                 self.Uni_res['output'] = self.Uni_res[modality]
             else: 
@@ -795,7 +848,7 @@ class BaseClassifier_ReconBoostModel(BaseClassifierModel):
         for modality in self.Uni_res.keys():
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
-        return self.Uni_res['output']
+        return self.encoder_res, self.Uni_res, self.pridiction
     
     def validation_step(self, batch : dict[str, torch.Tensor], batch_idx : int, limit_modality: list) -> tuple[torch.Tensor, dict[str, list]]:
         # ** drop
@@ -807,13 +860,13 @@ class BaseClassifier_ReconBoostModel(BaseClassifierModel):
         n_classes = self.n_classes
         softmax  = nn.Softmax(dim = 1)
         label = batch['label']
-        label = label.to(self.device)
+        # label = label.to(self.device)
         loss = F.cross_entropy(self.Uni_res['output'], label)
         for modality in self.Uni_res.keys():
             softmax_res = softmax(self.Uni_res[modality])
             self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
  
-        return loss
+        return loss,self.encoder_res, self.Uni_res, self.pridiction
     
                
 class AVClassifierModel(nn.Module):

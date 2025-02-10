@@ -184,7 +184,8 @@ class VGGDataset(Dataset):
         # images = transform(self.images[idx])
 
         spectrogram = torch.tensor(spectrogram).unsqueeze(0).float()
-
+        images = images.permute(1,0,2,3)
+        
         # label
         label = self.label[idx]
 
