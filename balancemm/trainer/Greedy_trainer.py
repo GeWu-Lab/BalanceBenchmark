@@ -15,12 +15,11 @@ from typing import Any, Iterable, List, Literal, Optional, Tuple, Union, cast
 import lightning as L
 import torch
 import numpy as np
-from ..models.avclassify_model import BaseClassifier_GreedyModel
+from ..models.avclassify_model import BaseClassifierGreedyModel
 class GreedyTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(GreedyTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
-        self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
         
@@ -37,7 +36,7 @@ class GreedyTrainer(BaseTrainer):
     
     def train_loop(
         self,
-        model: BaseClassifier_GreedyModel,
+        model: BaseClassifierGreedyModel,
         optimizer: torch.optim.Optimizer,
         train_loader: torch.utils.data.DataLoader,
         limit_batches: Union[int, float] = float("inf"),
@@ -59,7 +58,7 @@ class GreedyTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -106,7 +105,7 @@ class GreedyTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -120,10 +119,10 @@ class GreedyTrainer(BaseTrainer):
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
 
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
-    def training_step(self, model: BaseClassifier_GreedyModel, batch, batch_idx):
+    def training_step(self, model: BaseClassifierGreedyModel, batch, batch_idx):
 
         # TODO: make it simpler and easier to extend
         modality_list = model.modalitys
@@ -140,12 +139,12 @@ class GreedyTrainer(BaseTrainer):
         # print(a.shape, v.shape, model.head.weight.shape)
 
         ## our modality-wise normalization on weight and feature
-        out = model.encoder_res['output']
+        out = model.encoder_result['output']
         loss = criterion(out, label) 
         loss.backward()
         return loss
     
-    def compute_learning_speed(self,model:BaseClassifier_GreedyModel):
+    def compute_learning_speed(self,model:BaseClassifierGreedyModel):
         modality_list = model.modalitys
         wn_main, wn_bypass = [0]*len(modality_list), [0]*len(modality_list)
         gn_main, gn_bypass = [0]*len(modality_list), [0]*len(modality_list)

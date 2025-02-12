@@ -30,35 +30,35 @@ class NewLinearHead(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.fc_out = nn.Linear(input_dim, output_dim)
-        self.Uni_res = {}
-        self.pridiction = {}
-    def forward(self, encoder_res):
-        output = torch.cat(list(encoder_res.values()), dim=1)
+        self.unimodal_result = {}
+        self.prediction = {}
+    def forward(self, encoder_result):
+        output = torch.cat(list(encoder_result.values()), dim=1)
         output = self.fc_out(output)
         return output
         
-    def Unimodalitiy_Calaulate(self, encoder_res, modality_size):
+    def Unimodalitiy_Calaulate(self, encoder_result, modality_size):
         softmax = softmax =nn.Softmax(dim= 1)
         now_size = 0
-        all_nums = len(encoder_res.keys())-1
+        all_nums = len(encoder_result.keys())-1
         
-        for modality in encoder_res.keys():
+        for modality in encoder_result.keys():
             if modality == 'output':
-                self.Uni_res[modality] = encoder_res[modality]
+                self.unimodal_result[modality] = encoder_result[modality]
                 continue
                 
             weight_size = self.fc_out.weight.size(1)
-            self.Uni_res[modality] = (torch.mm(encoder_res[modality],
+            self.unimodal_result[modality] = (torch.mm(encoder_result[modality],
                                         torch.transpose(self.fc_out.weight[:,
                                                                         now_size:
                                                                         now_size + modality_size[modality]], 0, 1))
                             + self.fc_out.bias / all_nums)
             now_size += modality_size[modality]
-        for modality in encoder_res.keys():
-            softmax_res = softmax(self.Uni_res[modality])
-            self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        for modality in encoder_result.keys():
+            softmax_res = softmax(self.unimodal_result[modality])
+            self.prediction[modality] = torch.argmax(softmax_res, dim = 1)
         
-        return self.Uni_res
+        return self.unimodal_result
 class LinearProbeTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}, args = {}):
         super(LinearProbeTrainer,self).__init__(fabric,**para_dict)
@@ -105,7 +105,7 @@ class LinearProbeTrainer(BaseTrainer):
         """
         print(self.max_epochs)
        
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
         # setup dataloaders
         if self.should_train:
             train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
@@ -182,7 +182,7 @@ class LinearProbeTrainer(BaseTrainer):
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
-                self.PrecisionCalculator.ClearAll()
+                self.precision_calculator.ClearAll()
             if self.should_validate:
                 model.eval()
                 new_head.eval()
@@ -274,7 +274,7 @@ class LinearProbeTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -302,7 +302,7 @@ class LinearProbeTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model,new_head=new_head, batch=batch, batch_idx=batch_idx)
 
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = new_head.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = new_head.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -313,7 +313,7 @@ class LinearProbeTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     def training_step(self, model: BaseClassifierModel, new_head: NewLinearHead,batch, batch_idx):
 
@@ -325,10 +325,10 @@ class LinearProbeTrainer(BaseTrainer):
        
         with torch.no_grad():
             model(batch= batch)
-        encoder_features = {k: v for k, v in model.encoder_res.items() if k != 'output'}
+        encoder_features = {k: v for k, v in model.encoder_result.items() if k != 'output'}
         out = new_head(encoder_features)
         encoder_features['output'] = out   
-        new_head.Uni_res = new_head.Unimodalitiy_Calaulate(encoder_features,model.modality_size)
+        new_head.unimodal_result = new_head.Unimodalitiy_Calaulate(encoder_features,model.modality_size)
         loss = criterion(out, label)
 
         loss.backward()
@@ -390,7 +390,7 @@ class LinearProbeTrainer(BaseTrainer):
 
             self._format_iterable(iterable, self._current_val_return, "val")
             
-            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = new_head.pridiction)
+            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = new_head.prediction)
             valid_loss += out
          
         valid_loss /= MetricsCalculator.total_samples
@@ -426,8 +426,8 @@ class LinearProbeTrainer(BaseTrainer):
         modality_list = model.modalitys
         encoder_features = {}
         for modality in modality_list:
-            encoder_features[modality] = model.encoder_res[modality]
+            encoder_features[modality] = model.encoder_result[modality]
         encoder_features['output'] = new_head(encoder_features)
-        new_head.Uni_res = new_head.Unimodalitiy_Calaulate(encoder_features,model.modality_size)
+        new_head.unimodal_result = new_head.Unimodalitiy_Calaulate(encoder_features,model.modality_size)
         loss = criterion(encoder_features['output'], label)
         return loss

@@ -84,7 +84,7 @@ def all_test(args: dict):
         if os.path.basename(root).startswith('train_20241104') or os.path.basename(root).startswith('train_20241105') or os.path.basename(root).startswith('train_20241106'):
             checkpoint_path = os.path.join(root, 'checkpoints', 'epoch_normal.ckpt')
             if os.path.isfile(checkpoint_path):
-                print(f"找到checkpoint: {checkpoint_path}")
+                print(f"find checkpoint: {checkpoint_path}")
             else:
                 continue
             args.out_dir = root.replace("train_and_test", "all_test")
@@ -136,7 +136,7 @@ def all_test(args: dict):
             model.to(device)
             model.device = device
                 
-            # 记录开始时间
+            # logging start time
             logger.info('Use the best model to Test')
             model.eval()
             best_state = torch.load(checkpoint_path)
@@ -190,7 +190,7 @@ def t_sne(args: dict):
             args = copy.deepcopy(targs)
             checkpoint_path = os.path.join(root, 'checkpoints', 'epoch_normal.ckpt')
             if os.path.isfile(checkpoint_path):
-                print(f"找到checkpoint: {checkpoint_path}")
+                print(f"find checkpoint: {checkpoint_path}")
             else:
                 continue
             args.out_dir = root.replace("train_and_test", "all_test")
@@ -242,7 +242,6 @@ def t_sne(args: dict):
             model.to(device)
             model.device = device
                 
-            # 记录开始时间
             logger.info('Use the best model to Test')
             model.eval()
             best_state = torch.load(checkpoint_path)

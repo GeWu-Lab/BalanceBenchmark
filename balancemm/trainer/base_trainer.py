@@ -96,7 +96,7 @@ class BaseTrainer():
         self.checkpoint_frequency = checkpoint_frequency
         self.PrecisionCalculatorType = BatchMetricsCalculator
         self.FlopsMonitor = FLOPsMonitor()
-        self.PrecisionCalculator = None
+        self.precision_calculator = None
         self._current_metrics = {}
         self.logger = logger
         self.tb_logger = tb_logger
@@ -126,7 +126,7 @@ class BaseTrainer():
         print(self.max_epochs)
         # self.fabric.launch()
         # setup calculator
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
         # setup dataloaders
         if self.should_train:
             train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
@@ -201,7 +201,7 @@ class BaseTrainer():
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
-                self.PrecisionCalculator.ClearAll()
+                self.precision_calculator.ClearAll()
             if self.should_validate:
                 model.eval()
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
@@ -294,7 +294,6 @@ class BaseTrainer():
                 for supported values.
 
         """
-        ## loop和step合并
         self.fabric.call("on_train_epoch_start")
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
@@ -303,9 +302,7 @@ class BaseTrainer():
             # end epoch if stopping training completely or max batches for this epoch reached
             if self.should_stop or batch_idx >= limit_batches:
                 break
-            # for i in range(len(batch)):
-            #     print(len(batch))
-            #     print(batch[i].shape)
+        
             self.fabric.call("on_train_batch_start", batch, batch_idx)
 
             # check if optimizer should step in gradient accumulation
@@ -323,20 +320,15 @@ class BaseTrainer():
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
-            # this guard ensures, we only step the scheduler once per global step
-            # if should_optim_step:
-            #     self.step_scheduler(model, scheduler_cfg, level="step", current_value=self.global_step)
-
-            # add output values to progress bar
             
             self._format_iterable(iterable, self._current_train_return, "train")
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
 
         self.fabric.call("on_train_epoch_end")
 
@@ -360,13 +352,6 @@ class BaseTrainer():
         if val_loader is None:
             return
 
-        # # no validation but warning if val_loader was passed, but validation_step not implemented
-        # if val_loader is not None and not is_overridden("validation_step", _unwrap_objects(model)):
-        #     L.fabric.utilities.rank_zero_warn(
-        #         "Your LightningModule does not have a validation_step implemented, "
-        #         "but you passed a validation dataloder. Skipping Validation."
-        #     )
-        #     return
 
         self.fabric.call("on_validation_model_eval")  # calls `model.eval()`
         torch.set_grad_enabled(False)
@@ -400,7 +385,7 @@ class BaseTrainer():
             #     if modality not in _acc:
             #         _acc[modality] = 0
             #     _acc[modality] += sum(acc[modality])
-            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             valid_loss += out
             # count += len(batch['label'])
         valid_loss /= MetricsCalculator.total_samples
@@ -430,12 +415,12 @@ class BaseTrainer():
 
         """
         model.validation_step(batch, batch_idx=batch_idx)
-        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.encoder_res
+        outputs: Union[torch.Tensor, Mapping[str, Any]] = model.encoder_result
         #calculate
         # model.Unimodal_Calculate()
-        # for modality in self.Uni_res.keys():
-        #     softmax_res = softmax(self.Uni_res[modality])
-        #     self.pridiction[modality] = torch.argmax(softmax_res, dim = 1)
+        # for modality in self.unimodal_result.keys():
+        #     softmax_res = softmax(self.unimodal_result[modality])
+        #     self.prediction[modality] = torch.argmax(softmax_res, dim = 1)
         loss = outputs if isinstance(outputs, torch.Tensor) else outputs["loss"]
 
         self.fabric.call("on_before_backward", loss)
@@ -629,7 +614,7 @@ class BaseTrainer():
 
             out = model.validation_step(batch, batch_idx,limit_modalitys)
             for idx in range(len(batch['label'])):
-                features.append((model.encoder_res[modality][idx].detach(),batch['label'][idx]))
+                features.append((model.encoder_result[modality][idx].detach(),batch['label'][idx]))
             # avoid gradients in stored/accumulated values -> prevents potential OOM
             out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
 
@@ -641,7 +626,7 @@ class BaseTrainer():
             #     if modality not in _acc:
             #         _acc[modality] = 0
             #     _acc[modality] += sum(acc[modality])
-            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            MetricsCalculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             # count += len(batch['label'])
         Metrics_res = MetricsCalculator.compute_metrics()
         self._current_metrics = Metrics_res
@@ -654,17 +639,3 @@ class BaseTrainer():
         self.fabric.call("on_validation_model_train")
         torch.set_grad_enabled(True)
         return features, Metrics_res
-
-
-    # def on_train_epoch_end(loggers):
-    #      # 示例：如何为不同的 logger 添加自定义日志
-    #     for logger in loggers:
-    #         if isinstance(logger, CSVLogger):
-    #             # CSVLogger 特定的操作（如果需要）
-    #             pass
-    #         elif isinstance(logger, TensorBoardLogger):
-    #             # TensorBoard 特定的操作
-    #             logger.experiment.add_histogram('weights', self.model[0].weight, self.current_epoch)
-    #         elif isinstance(self.logger, WandbLogger):
-    #             # Wandb 特定的操作
-    #             self.logger.experiment.log({"custom_metric": self.train_acc.compute()})

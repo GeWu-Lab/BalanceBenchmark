@@ -25,7 +25,6 @@ class UMTTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}, args = {}):
         super(UMTTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
-        self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
 
@@ -48,7 +47,6 @@ class UMTTrainer(BaseTrainer):
                 loaded_model[modality].load_state_dict(torch.load(get_checkpoint_files(path)[0])['model'])
             self.loaded_model = nn.ModuleDict(loaded_model)
 
-        ##new
     def train_loop(
         self,
         model: L.LightningModule,
@@ -73,7 +71,7 @@ class UMTTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -108,7 +106,7 @@ class UMTTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -121,7 +119,7 @@ class UMTTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     def training_step(self, model: BaseClassifierModel, batch, batch_idx):
 
@@ -135,14 +133,14 @@ class UMTTrainer(BaseTrainer):
         # else:
         #     a, v, t, out = model(batch)
         _ = model(batch= batch)
-        out = model.encoder_res['output']        
+        out = model.encoder_result['output']        
         loss = criterion(out, label)
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
             for modality in self.loaded_model.keys():
                 with torch.no_grad():
                     self.loaded_model[modality](batch)
-                out_unimodal = self.loaded_model[modality].encoder_res[modality]
-                loss += self.alpha * MSE(out_unimodal, model.encoder_res[modality])
+                out_unimodal = self.loaded_model[modality].encoder_result[modality]
+                loss += self.alpha * MSE(out_unimodal, model.encoder_result[modality])
 
         loss.backward()
         return loss

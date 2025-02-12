@@ -243,7 +243,7 @@ class newGrad(nn.Module):
                             if another not in combo:
                                 padding.append(another)
                         self.model(batch, padding = padding)
-                        out = self.model.Uni_res['output']
+                        out = self.model.unimodal_result['output']
                         res_cache[indentifer] = out
                     else:
                         out = res_cache[indentifer]
@@ -256,7 +256,7 @@ class newGrad(nn.Module):
                             if another not in combo_add:
                                 padding.append(another)
                         self.model(batch, padding = padding)
-                        out_add = self.model.Uni_res['output']
+                        out_add = self.model.unimodal_result['output']
                         res_cache[indentifer] = out_add
                     else:
                         out_add = res_cache[indentifer]
@@ -267,7 +267,7 @@ class newGrad(nn.Module):
                         res[modality] += weight * (out_add - out)
         self.model.train()
         self.model(batch)
-        out = self.model.Uni_res['output']
+        out = self.model.unimodal_result['output']
         return res, out
                 
             
@@ -306,7 +306,7 @@ class AGMTrainer(BaseTrainer):
         print(self.max_epochs)
         # self.fabric.launch()
         # setup calculator
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
         # setup dataloaders
         if self.should_train:
             train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
@@ -382,7 +382,7 @@ class AGMTrainer(BaseTrainer):
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
-                self.PrecisionCalculator.ClearAll()
+                self.precision_calculator.ClearAll()
             if self.should_validate:
                 model.eval()
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
@@ -475,7 +475,7 @@ class AGMTrainer(BaseTrainer):
         """
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         self.fabric.call("on_train_epoch_start")
         self.starts += 1
         iterable = self.progbar_wrapper(
@@ -516,7 +516,7 @@ class AGMTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -529,7 +529,7 @@ class AGMTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model, batch, batch_idx, total_batch, train_scores):
@@ -584,209 +584,6 @@ class AGMTrainer(BaseTrainer):
             nn.utils.clip_grad_norm_(Mod.parameters(), max_norm=5.0)
 
         
-        # # print(a.shape, v.shape, model.head.weight.shape)
-
-        # ## our modality-wise normalization on weight and feature
-    
-        # iteration = (self.current_epoch) * total_batch + step + 1
-        # #avg_batch = get_segment_wise_relation(label,cfgs)
-        # # out_a = 0.5*(total_out-pad_audio_out + pad_visual_out)
-        # # out_v = 0.5*(total_out - pad_visual_out +pad_audio_out)
-        # # out_a, out_v, out_t = model.AVTCalculate(a, v, t, out) 
-        # # print(f'2 cuda allocated: {torch.cuda.memory_allocated() // (1024 ** 3)} GB')
-        # # print(out.shape)
-        # loss = criterion(out, label)
-
-        # # loss = loss + loss_avs * cfgs.lam_AGM
-        # loss_a = criterion(out_a, label)
-        # loss_v = criterion(out_v, label)
-
-
-        # # # calculate acc
-        # # prediction = softmax(out)
-        # # pred_a = softmax(out_a)
-        # # pred_v = softmax(out_v)
-        # # for j in range(image.shape[0]):
-        # #     ma = np.argmax(prediction[j].cpu().data.numpy())
-        # #     v = np.argmax(pred_v[j].cpu().data.numpy())
-        # #     a = np.argmax(pred_a[j].cpu().data.numpy())
-        # #     num[label[j]] += 1.0
-
-        # #     if np.asarray(label[j].cpu()) == ma:
-        # #         acc[label[j]] += 1.0
-        # #     if np.asarray(label[j].cpu()) == v:
-        # #         acc_v[label[j]] += 1.0
-        # #     if np.asarray(label[j].cpu()) == a:
-        # #         acc_a[label[j]] += 1.0
-
-        
-        # if torch.isnan(out_a).any() or torch.isnan(out_v).any():
-        #     raise ValueError
-        # score_audio = 0.
-        # score_visual = 0.
-        # score_text = 0.
-        # for k in range(out_a.size(0)):
-        #     if torch.isinf(torch.log(softmax(out_a)[k][label[k]])) or softmax(out_a)[k][label[k]] < 1e-8:
-        #         score_audio += -torch.log(torch.tensor(1e-8, dtype=out_a.dtype, device=out_a.device))
-        #     else:
-        #         score_audio += -torch.log(softmax(out_a)[k][label[k]])
-
-        #     if torch.isinf(torch.log(softmax(out_v)[k][label[k]])) or softmax(out_v)[k][label[k]] < 1e-8:
-        #         score_visual += -torch.log(torch.tensor(1e-8, dtype=out_v.dtype, device=out_v.device))
-        #     else:
-        #         score_visual += -torch.log(softmax(out_v)[k][label[k]])
-
-        #     if self.modality ==2:
-        #         pass
-        #     if torch.isinf(torch.log(softmax(out_t)[k][label[k]])) or softmax(out_t)[k][label[k]] < 1e-8:
-        #         score_text += -torch.log(torch.tensor(1e-8, dtype=out_v.dtype, device=out_v.device))
-        #     else:
-        #         score_text += -torch.log(softmax(out_v)[k][label[k]])
-        # score_audio = score_audio / out_a.size(0)
-        # score_visual = score_visual / out_v.size(0)
-        # if self.modality == 3:
-        #     score_text = score_text / out_t.size(0)
-
-        
-        #     score_mean = (score_audio + score_visual + score_text)/3
-        #     ratio_a = math.exp(3/2*(score_audio.item() - score_mean.item())) ##r
-        #     ratio_v = math.exp(3/2*(score_visual.item() - score_mean.item()))
-        #     ratio_t = math.exp(3/2*(score_text.item() - score_mean.item()))
-
-        #     train_score_mean = (train_score_a + train_score_v +train_score_v)/3
-        #     optimal_ratio_a = math.exp(3/2*(train_score_a - train_score_mean)) ##eta
-        #     optimal_ratio_v = math.exp(3/2*(train_score_v - train_score_mean))
-        #     optimal_ratio_t = math.exp(3/2*(train_score_t - train_score_mean))
-
-
-        #     # coeff_a = math.exp(cfgs.alpha * (optimal_ratio_a - ratio_a))
-        #     # coeff_v = math.exp(cfgs.alpha * (optimal_ratio_v - ratio_v))
-
-        #     # if optimal_ratio_a - ratio_a> 10 or optimal_ratio_v - ratio_v >10 or optimal_ratio_t - ratio_t >10:
-        #     #     print('difference:',optimal_ratio_a - ratio_a,optimal_ratio_v - ratio_v)
-        #     coeff_a = math.exp(self.alpha * min(optimal_ratio_a - ratio_a,10))
-        #     coeff_v = math.exp(self.alpha * min(optimal_ratio_v - ratio_v,10))
-        #     coeff_t = math.exp(self.alpha * min(optimal_ratio_t - ratio_t,10))
-
-        #     train_score_a = train_score_a * (iteration - 1) / iteration + score_audio.item() / iteration ##s^
-        #     train_score_v = train_score_v * (iteration - 1) / iteration + score_visual.item() / iteration
-        #     train_score_t = train_score_t * (iteration - 1) / iteration + score_text.item() / iteration
-        #     # ra_score_a = ra_score_a * step / (step + 1) + score_audio.item() / (step + 1)
-        #     # ra_score_v = ra_score_v * step / (step + 1) + score_visual.item() / (step + 1)
-
-        #     # if cfgs.method == "AGM" and cfgs.modulation_starts <= epoch <= cfgs.modulation_ends:
-        #     if self.modulation_starts <= self.current_epoch <= self.modulation_ends:  
-            
-        #         Mod.update_scale(coeff_a, coeff_v, coeff_t)
-        #     # print(f'3 cuda allocated: {torch.cuda.memory_allocated() // (1024 ** 3)} GB')
-        # else:
-        #     ratio_a = math.exp(score_visual.item() - score_audio.item()) ##r
-        #     ratio_v = math.exp(score_audio.item() - score_visual.item())
-
-        #     optimal_ratio_a = math.exp(train_score_v - train_score_a) ##eta
-        #     optimal_ratio_v = math.exp(train_score_a - train_score_v)
-        #     coeff_a = math.exp(self.alpha * min(optimal_ratio_a - ratio_a,10))
-        #     coeff_v = math.exp(self.alpha * min(optimal_ratio_v - ratio_v,10))
-        #     train_score_a = train_score_a * (iteration - 1) / iteration + score_audio.item() / iteration ##s^
-        #     train_score_v = train_score_v * (iteration - 1) / iteration + score_visual.item() / iteration
-        #     train_score_t = 0
-
-        #     if self.modulation_starts <= self.current_epoch <= self.modulation_ends:  
-            
-        #         Mod.update_scale(coeff_a, coeff_v)
-
-        # self.fabric.call("on_before_backward", loss)
-        # self.fabric.backward(loss)
-        # self.fabric.call("on_after_backward")
-
-        # grad_max = torch.max(Mod.net.fusion_module.fc_out.weight.grad)
-        # grad_min = torch.min(Mod.net.fusion_module.fc_out.weight.grad)
-        # if grad_max > 1 or grad_min < -1:
-        #     nn.utils.clip_grad_norm_(Mod.parameters(), max_norm=1.0)
+      
         return loss, train_scores
     
-    # def val_loop(
-    #     self,
-    #     model: L.LightningModule,
-    #     val_loader: Optional[torch.utils.data.DataLoader],
-    #     limit_batches: Union[int, float] = float("inf"),
-    # ):
-    #     """The validation loop ruunning a single validation epoch.
-
-    #     Args:
-    #         model: the LightningModule to evaluate
-    #         val_loader: The dataloader yielding the validation batches.
-    #         limit_batches: Limits the batches during this validation epoch.
-    #             If greater than the number of batches in the ``val_loader``, this has no effect.
-
-    #     """
-    #     # no validation if val_loader wasn't passed
-    #     if val_loader is None:
-    #         return
-
-    #     # # no validation but warning if val_loader was passed, but validation_step not implemented
-    #     # if val_loader is not None and not is_overridden("validation_step", _unwrap_objects(model)):
-    #     #     L.fabric.utilities.rank_zero_warn(
-    #     #         "Your LightningModule does not have a validation_step implemented, "
-    #     #         "but you passed a validation dataloder. Skipping Validation."
-    #     #     )
-    #     #     return
-
-    #     self.fabric.call("on_validation_model_eval")  # calls `model.eval()`
-
-    #     torch.set_grad_enabled(False)
-
-    #     self.fabric.call("on_validation_epoch_start")
-
-    #     iterable = self.progbar_wrapper(val_loader, total=min(len(val_loader), limit_batches), desc="Validation")
-
-    #     count = 0
-    #     _acc = 0
-    #     if self.modality == 2:
-    #         model = GradMod_2(model)
-    #     else:
-    #         model = GradMod(model)
-    #     count = 0
-    #     _acc = 0
-    #     _acc_a = 0
-    #     _acc_v = 0
-    #     _acc_t = 0
-    #     valid_loss = 0
-    #     for batch_idx, batch in enumerate(iterable):
-    #         # end epoch if stopping training completely or max batches for this epoch reached
-    #         if self.should_stop or batch_idx >= limit_batches:
-    #             break
-
-    #         self.fabric.call("on_validation_batch_start", batch, batch_idx)
-
-    #         out, acc, acc_a, acc_v, acc_t = model.validation_step(batch, batch_idx)
-    #         # avoid gradients in stored/accumulated values -> prevents potential OOM
-    #         out = apply_to_collection(out, torch.Tensor, lambda x: x.detach())
-
-    #         self.fabric.call("on_validation_batch_end", out, batch, batch_idx)
-    #         self._current_val_return = out
-
-    #         self._format_iterable(iterable, self._current_val_return, "val")
-
-    #         count += len(out)
-    #         _acc += acc
-    #         _acc_a += acc_a
-    #         _acc_v += acc_v
-    #         _acc_t += acc_t
-    #         valid_loss += out
-    #     valid_loss /= count
-    #     _acc /= count
-    #     _acc_a /= count
-    #     _acc_v /= count
-    #     _acc_t /= count
-    #     #print("valid_acc : {}".format(_acc))
-    #     if _acc > self.best_acc:
-    #         self.should_save = True
-    #         self.best_acc = _acc
-    #     print("valid_acc : {}".format(_acc))
-
-    #     self.fabric.call("on_validation_epoch_end")
-
-    #     self.fabric.call("on_validation_model_train")
-    #     torch.set_grad_enabled(True)
-    #     return valid_loss, _acc, _acc_a, _acc_v, _acc_t

@@ -44,7 +44,7 @@ class OGMTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -71,7 +71,7 @@ class OGMTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -84,7 +84,7 @@ class OGMTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
     
     def training_step(self, model : BaseClassifierModel, batch, batch_idx):
 
@@ -97,7 +97,7 @@ class OGMTrainer(BaseTrainer):
         label = label.to(model.device)
         model(batch)
         # model.Unimodality_Calculate()
-        loss = criterion(model.Uni_res['output'], label)
+        loss = criterion(model.unimodal_result['output'], label)
         loss.backward()
         modality_list = model.modalitys
 
@@ -111,9 +111,9 @@ class OGMTrainer(BaseTrainer):
 
         for modality in modality_list:
             if modality_nums == 2 or self.method == 'OGM_GE3':
-                score_modality = sum([softmax(model.Uni_res[modality])[i][label[i]] for i in range(model.Uni_res['output'].size(0))])
+                score_modality = sum([softmax(model.unimodal_result[modality])[i][label[i]] for i in range(model.unimodal_result['output'].size(0))])
             elif modality_nums == 3:
-                score_modality = sum([softmax(torch.cos(model.Uni_res[modality]))[i][label[i]] if label[i] == torch.argmax(model.Uni_res[modality][i]) else 0 for i in range(model.Uni_res['output'].size(0))])
+                score_modality = sum([softmax(torch.cos(model.unimodal_result[modality]))[i][label[i]] if label[i] == torch.argmax(model.unimodal_result[modality][i]) else 0 for i in range(model.unimodal_result['output'].size(0))])
             else:
                 raise("Wrong number of modalitys for OGM, it should be 2 or 3, but given {:0}".format(modality_nums))
             try:
@@ -139,8 +139,8 @@ class OGMTrainer(BaseTrainer):
                     for modality_another in modality_list:
                         if modality_another == modality: 
                             continue
-                        ## 如果没有1e-3会显存爆炸
-                        ratios[modality] /= (scores[modality_another]+ 1e-5)
+        
+                        ratios[modality] /= (scores[modality_another]+ 1e-5) # prevent OOM
                 if modality_nums == 3:
                     ratios[modality] /= (minscore + 1e-5)
         #Calculate the coeffects
@@ -164,12 +164,5 @@ class OGMTrainer(BaseTrainer):
         else:
             pass
 
-
-        # model.Uni_res.clear()
-        # model.encoder_res.clear()
-        # scores.clear()
-        # ratios.clear()
-        # coeffs.clear()
-        # batch.clear()
 
         return loss

@@ -93,7 +93,7 @@ class OPMTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -120,7 +120,7 @@ class OPMTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -133,7 +133,7 @@ class OPMTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
     
     def training_step(self, model : BaseClassifierModel, batch, batch_idx):
 
@@ -160,7 +160,7 @@ class OPMTrainer(BaseTrainer):
         
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
             for modality in modality_list:
-                scores[modality] = sum([softmax(model.Uni_res[modality])[i][label[i]] for i in range(model.Uni_res['output'].shape[0])])
+                scores[modality] = sum([softmax(model.unimodal_result[modality])[i][label[i]] for i in range(model.unimodal_result['output'].shape[0])])
             ##Calculate the ratios
             for modality in modality_list:
                 ratios[modality] = scores[modality]
@@ -168,8 +168,8 @@ class OPMTrainer(BaseTrainer):
                     for modality_another in modality_list:
                         if modality_another == modality: 
                             continue
-                        ## 如果没有1e-5会显存爆炸
-                        ratios[modality] /= (scores[modality_another]+ 1e-5)
+                      
+                        ratios[modality] /= (scores[modality_another]+ 1e-5)  # prevent OOM
                         ratios[modality] = tanh(relu(ratios[modality]-1))
                 if modality_nums == 3:
                     temp_score = 0.0
@@ -183,34 +183,26 @@ class OPMTrainer(BaseTrainer):
             for modality in modality_list:
                 coeffs[modality] = self.q_base * (1 + self.alpha * ratios[modality]) if ratios[modality]>0 else 0
                 coeffs[modality] = clip(coeffs[modality],0.0,1.0)
-            model.encoder_res.pop('output')
+            model.encoder_result.pop('output')
   
-            cleaned_fea,update_flag=self.modality_drop.execute_drop(model.encoder_res,coeffs,model)
+            cleaned_fea,update_flag=self.modality_drop.execute_drop(model.encoder_result,coeffs,model)
             
-            model.Uni_res['output'] = model.fusion_module(cleaned_fea)
+            model.unimodal_result['output'] = model.fusion_module(cleaned_fea)
             select_mask=update_flag!=0
             label=label[select_mask]
             
             
             for modality in modality_list:
               
-                model.Uni_res[modality]=model.Uni_res[modality][select_mask]
+                model.unimodal_result[modality]=model.unimodal_result[modality][select_mask]
                 
 
-            for modality in model.Uni_res.keys():
-                loss[modality] = criterion(model.Uni_res[modality],label)
+            for modality in model.unimodal_result.keys():
+                loss[modality] = criterion(model.unimodal_result[modality],label)
             
             loss['output'].backward()
             
         else:
             pass
-
-
-        # model.Uni_res.clear()
-        # model.encoder_res.clear()
-        # scores.clear()
-        # ratios.clear()
-        # coeffs.clear()
-        # batch.clear()
 
         return loss['output']

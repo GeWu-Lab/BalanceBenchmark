@@ -1,12 +1,5 @@
 seed: 42
-# dataloader:
-#   eff_batch_size: 1024 # effective batch_size = num_node*num_process_per_node*batch_size_per_process = world_size*batch_size_per_process
-#   batch_size: -1 # batch size per process, set to -1 to use eff_batch_size
-#   num_workers: 4 # number of workers for dataloader
-#   fast_run: false # if true, only use part of the dataset
-#   shuffle: true # if true, shuffle the dataset
-#   drop_last: true # if true, drop the last batch if the size is not equal to batch_size
-#   pin_memory: true # if true, use pin_memory for dataloader
+
 dataloader:
   eff_batch_size: 32
   num_workers: 32 # number of workers for dataloader
@@ -28,10 +21,6 @@ log:
   log_per_epoch: -1 # number of log for each epoch. If set will override log_interval
   comment: '' # comment for the logger
 
-# model:
-#   type: VTClassifier
-#   n_classes: 101
-#   fusion: concat
 
 train:
   parameter:

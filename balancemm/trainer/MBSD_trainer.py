@@ -19,8 +19,6 @@ import torch
 class MBSDTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(MBSDTrainer,self).__init__(fabric,**para_dict)
-        self.alpha = method_dict['alpha']
-        self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
 
@@ -48,7 +46,7 @@ class MBSDTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -77,7 +75,7 @@ class MBSDTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -91,7 +89,7 @@ class MBSDTrainer(BaseTrainer):
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
 
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model, batch, batch_idx , dependent_modality : str = 'none'):
@@ -108,8 +106,8 @@ class MBSDTrainer(BaseTrainer):
         y_pred = {}
         model(batch)
         for modality in modality_list:
-            m[modality] = model.encoder_res[modality]
-        m['out'] = model.encoder_res['output']
+            m[modality] = model.encoder_result[modality]
+        m['out'] = model.encoder_result['output']
         model.Unimodality_Calculate()    
         # out_a, out_v = model.AVCalculate(a, v, out)
         label = batch['label']
@@ -120,18 +118,18 @@ class MBSDTrainer(BaseTrainer):
     
         loss['out'] = criterion(m['out'], label)
         for modality in modality_list:
-            loss_modality[modality] = criterion(model.Uni_res[modality], label)
-        # loss_v = criterion(Uni_res[], label)
+            loss_modality[modality] = criterion(model.unimodal_result[modality], label)
+        # loss_v = criterion(unimodal_result[], label)
         # loss_a = criterion(out_a, label)
 
         for modality in modality_list:
-            prediction[modality] = softmax(model.Uni_res[modality])
+            prediction[modality] = softmax(model.unimodal_result[modality])
         # prediction_a = softmax(out_a)
         # prediction_v = softmax(out_v)
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
             if len(modality_list) == 2:
                 
-                loss_RS = 1/model.Uni_res[key[0]].shape[1] * torch.sum((model.Uni_res[key[0]] - model.Uni_res[key[1]])**2, dim = 1)
+                loss_RS = 1/model.unimodal_result[key[0]].shape[1] * torch.sum((model.unimodal_result[key[0]] - model.unimodal_result[key[1]])**2, dim = 1)
 
                 w = torch.tensor([0.0 for _ in range(len(m['out']))])
                 w = w.to(device)
@@ -196,9 +194,9 @@ class MBSDTrainer(BaseTrainer):
                     pw2[i] = min(prediction[key[0]][i][label[i]], prediction[key[2]][i][label[i]])
                     ps3[i] = max(prediction[key[1]][i][label[i]], prediction[key[2]][i][label[i]])
                     pw3[i] = min(prediction[key[1]][i][label[i]], prediction[key[2]][i][label[i]])
-                loss_RS1 = 1/model.Uni_res[key[0]].shape[1] * torch.sum((prediction[key[0]]-prediction[key[1]])**2,dim=1)
-                loss_RS2 = 1/model.Uni_res[key[0]].shape[1] * torch.sum((prediction[key[0]]-prediction[key[2]])**2,dim=1)
-                loss_RS3 = 1/model.Uni_res[key[0]].shape[1] * torch.sum((prediction[key[1]]-prediction[key[2]])**2,dim=1)
+                loss_RS1 = 1/model.unimodal_result[key[0]].shape[1] * torch.sum((prediction[key[0]]-prediction[key[1]])**2,dim=1)
+                loss_RS2 = 1/model.unimodal_result[key[0]].shape[1] * torch.sum((prediction[key[0]]-prediction[key[2]])**2,dim=1)
+                loss_RS3 = 1/model.unimodal_result[key[0]].shape[1] * torch.sum((prediction[key[1]]-prediction[key[2]])**2,dim=1)
             
                 loss_KL1 = F.kl_div(ps1, pw1, reduction = 'none')
                 loss_KL2 = F.kl_div(ps2, pw2, reduction = 'none')
@@ -226,11 +224,6 @@ class MBSDTrainer(BaseTrainer):
                 total_loss = loss['out'] + loss_modality[key[0]] + loss_modality[key[1]] + loss_modality[key[2]] + loss_KL.squeeze() + loss_RS.squeeze()## erase the dim of 1
                 
         else:
-            # model(batch)
-            # for modality in modality_list:
-            #     m[modality] = model.encoder_res[modality]
-            # m['out'] = model.encoder_res['output']
-            # out_a, out_v = model.AVCalculate(a, v, out)
         
             total_loss = loss['out']
         total_loss.backward()

@@ -1,8 +1,7 @@
 
 ViT_B:
   if_pretrain: False
-  pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
-  output_dim: 1000
+  pretrain_path: None
   audio:
     tpye: None
   visual:
@@ -12,7 +11,7 @@ ViT_B:
 
 Transformer_LA:
   if_pretrain: False
-  pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
+  pretrain_path: None
   output_dim: 1000
   audio:
     layer: 6
@@ -40,7 +39,7 @@ Transformer_LA:
     modality: "text"
 Transformer:
   if_pretrain: True
-  pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
+  pretrain_path: None
   output_dim: 1024
   audio:
     n_features: 512
@@ -59,7 +58,7 @@ Transformer:
     n_layers: 2
 Transformer_:
   if_pretrain: False
-  pretrain_path: '/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased'
+  pretrain_path: None
   output_dim: 1024
   audio:
     dim: 1024

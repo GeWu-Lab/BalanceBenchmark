@@ -15,7 +15,7 @@ class text_encoder(nn.Module):
     def __init__(self, output_dim=1024):
         super().__init__()
         config = BertConfig()
-        self.textEncoder= BertModel(config).from_pretrained('/data/users/shaoxuan_xu/menglucui/UMPC_Food/Pretrained_model/dataroot/models/google-bert/bert-base-uncased')    
+        self.textEncoder= BertModel(config).from_pretrained('')    
         self.linear = nn.Linear(config.hidden_size, output_dim)
         
     def forward(self, x):

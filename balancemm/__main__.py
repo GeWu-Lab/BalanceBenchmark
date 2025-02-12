@@ -93,6 +93,30 @@ def create_config(config_dict: dict, args):
         trainer_settings['trainer_para'][name]['momentum_coef'] = args.momentum
     if args.super_epoch: 
         trainer_settings['trainer_para'][name]['super_epoch'] = args.super_epoch
+    if args.sigma:
+        trainer_settings['trainer_para'][name]['sigma'] = args.sigma
+    if args.U:
+        trainer_settings['trainer_para'][name]['U'] = args.U
+    if args.eps:
+        trainer_settings['trainer_para'][name]['eps'] = args.eps
+    if args.T_epochs:
+        trainer_settings['trainer_para'][name]['T_epochs'] = args.T_epochs
+    if args.weight1:
+        trainer_settings['trainer_para'][name]['weight1'] = args.weight1
+    if args.weight2:
+        trainer_settings['trainer_para'][name]['weight2'] = args.weight2
+    if args.p_exe:
+        trainer_settings['trainer_para'][name]['p_exe'] = args.p_exe
+    if args.q_base:
+        trainer_settings['trainer_para'][name]['q_base'] = args.q_base
+    if args.part_ratio:
+        trainer_settings['trainer_para'][name]['part_ratio'] = args.part_ratio
+    if args.move_lambda:
+        trainer_settings['trainer_para'][name]['move_lambda'] = args.move_lambda
+    if args.reinit_epoch:
+        trainer_settings['trainer_para'][name]['reinit_epoch'] = args.reinit_epoch
+    if args.lr_alpha:
+        trainer_settings['trainer_para'][name]['lr_alpha'] = args.lr_alpha
     try:
         #waiting for support iteration
         config_dict['dataset'] = dataset_settings['dataset'][config_dict['Main_config']['dataset']]
@@ -184,6 +208,8 @@ if __name__ == "__main__":
     parser.add_argument('--model', type=str, default= None)
     parser.add_argument('--trainer', type=str, default= None)
     parser.add_argument('--mode', type= str, default= None)
+    parser.add_argument('--dataset', type=str, default=None)
+    parser.add_argument('--device', type=str, default=None)
     parser.add_argument('--lr', type=float, default= None)
     parser.add_argument('--alpha', type= float, default= None)
     parser.add_argument('--eta', type= float, default= None)
@@ -194,9 +220,17 @@ if __name__ == "__main__":
     parser.add_argument('--super_epoch', type= int, default= None)
     parser.add_argument('--eps', type= float, default= None)
     parser.add_argument('--sigma', type= float, default= None)
-    parser.add_argument('--dataset', type= str, default= None)
-    parser.add_argument('--device', type= str, default= None)
-    
+    parser.add_argument('--U', type= float, default= None)
+    parser.add_argument('--window_size', type= float, default= None)
+    parser.add_argument('--T_epochs', type= float, default= None)
+    parser.add_argument('--weight1', type= float, default= None)
+    parser.add_argument('--weight2', type= float, default= None)
+    parser.add_argument('--p_exe', type= int, default= None)
+    parser.add_argument('--q_base', type= float, default= None)
+    parser.add_argument('--part_ratio', type= float, default= None)
+    parser.add_argument('--move_lambda', type= str, default= None)
+    parser.add_argument('--reinit_epoch', type= str, default= None)
+    parser.add_argument('--lr_alpha', type= str, default= None)
     args = sys.argv[1:]
     print(args)
     os.environ['http_proxy'] = ''

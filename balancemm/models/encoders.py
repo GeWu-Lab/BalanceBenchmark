@@ -17,7 +17,7 @@ class text_encoder(nn.Module):
     def __init__(self, dim_text_repr=768):
         super().__init__()
         config = BertConfig()
-        self.textEncoder= BertModel(config).from_pretrained('/home/zequn_yang/Food_101_new/pretrained')    
+        self.textEncoder= BertModel(config).from_pretrained('')    
 
     def forward(self, x):
         text = x

@@ -5,9 +5,6 @@ import torch.utils.data as data
 from pathlib import Path
 from random import randrange
 import numpy as np
-import h5py
-import pickle
-import random
 from torch.utils.data import Dataset
 from transformers import BertTokenizer
 import torch
@@ -29,13 +26,13 @@ def find_classes(directory) :
     return classes, class_to_idx,idx_to_class
 
 # 1. Subclass torch.utils.data.Dataset
-class UMPC_FoodDataset(Dataset):
+class FOOD101Dataset(Dataset):
     
     # 2. Initialize with a targ_dir and transform (optional) parameter
     def __init__(self, args:dict,transform=None):
         # 3. Create class attributes
         # targ_dir = args['dataset_path']
-        targ_dir = '/data/users/zequn_yang/Food101'
+        targ_dir = args['targ_dir']
         phase = args['mode']
         mode = 'all'
         #resize = 384
@@ -55,7 +52,7 @@ class UMPC_FoodDataset(Dataset):
         self.img_dir='%s/images/%s' % (self.dataset_root, phase)
         
         self.data = pd.read_csv(self.csv_file_path)
-        self.tokenizer = BertTokenizer.from_pretrained('/home/zequn_yang/Food_101_new/pretrained')
+        self.tokenizer = BertTokenizer.from_pretrained('')
         # Setup transforms
         if phase == 'train': 
             self.transform = train_transforms
@@ -103,13 +100,7 @@ class UMPC_FoodDataset(Dataset):
             if self.transform:
                 x = {'visual':self.transform(img).unsqueeze(1),'text':text_tokens['input_ids'].unsqueeze(0), 'label':class_idx,'idx': index} ##text:40 
                 return x
-                return self.transform(img).unsqueeze(1), text_tokens, txt, class_idx 
             else:
                 return img, text_tokens, txt, class_idx ,index
         elif self.mode =="Text_only":
             return  text_tokens, txt, class_idx ,index           
-
-if __name__ == '__main__':   
-    print('start')
-    a = UMPC_FoodDataset({'mode':'train'})
-    a.__getitem__(0)

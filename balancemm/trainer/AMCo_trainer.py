@@ -53,7 +53,7 @@ class AMCoTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -100,7 +100,7 @@ class AMCoTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -114,7 +114,7 @@ class AMCoTrainer(BaseTrainer):
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
 
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model: BaseClassifierModel, batch, batch_idx, dependent_modality, mask ,pt):
@@ -134,14 +134,14 @@ class AMCoTrainer(BaseTrainer):
         # print(a.shape, v.shape, model.head.weight.shape)
 
         ## our modality-wise normalization on weight and feature
-        out = model.Uni_res['output']
+        out = model.unimodal_result['output']
         loss = criterion(out, label) 
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
             loss.backward(retain_graph = True)
             for modality in model.modalitys:      
-                loss_uni = criterion(model.Uni_res[modality],label)
+                loss_uni = criterion(model.unimodal_result[modality],label)
                 loss_uni.backward()
-            out_combine = torch.cat([value for key,value in model.Uni_res.items() if key != 'output'],1)
+            out_combine = torch.cat([value for key,value in model.unimodal_result.items() if key != 'output'],1)
             sft_out = softmax(out_combine)
             now_dim = 0
             for modality in model.modalitys:
@@ -191,7 +191,7 @@ class AMCoTrainer_2(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -236,7 +236,7 @@ class AMCoTrainer_2(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -249,7 +249,7 @@ class AMCoTrainer_2(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
     
     def training_step(self, model, batch, batch_idx, dependent_modality, mask ,pt):
 

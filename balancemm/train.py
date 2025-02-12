@@ -78,7 +78,6 @@ def train_and_test(args: dict):
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
     trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger,tb_logger)
         
-    # 记录开始时间
     start_time = datetime.now()
     if args.trainer['name'] == 'GBlendingTrainer':
         temp_model = create_model(args.model)
@@ -157,7 +156,6 @@ def train_and_test(args: dict):
 #     # print(f'The imbalance is :{imbalance}')
 # >>>>>>> main
 
-    # 多卡（模型名字区别）
 
     
 def linear_probe_eval(args: dict):
@@ -212,7 +210,6 @@ def linear_probe_eval(args: dict):
     scheduler = create_scheduler(optimizer, args.train['scheduler'])
     trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger,tb_logger)
         
-    # 记录开始时间
     start_time = datetime.now()
     if args.trainer['name'] == 'GBlendingTrainer':
         temp_model = create_model(args.model)
@@ -235,5 +232,3 @@ def linear_probe_eval(args: dict):
     trainer.val_loop(model, new_head,test_dataloader)
     logger.info(f'The best val acc is : {trainer.best_acc}')
     print(f'The best val acc is : {trainer.best_acc}')
-
-    # 多卡（模型名字区别）

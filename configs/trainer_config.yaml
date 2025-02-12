@@ -3,8 +3,6 @@ trainer_para:
     grad_accum_steps: 1
     max_epochs: 30
   baseline:
-    alpha: 0.3
-    method: 'None'
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
@@ -29,14 +27,11 @@ trainer_para:
     eps: 0.3
     modality: 2
   CML:
-    alpha: 0.1
-    method: "None"
     modulation_starts: 0
     modulation_ends: 80
     lam: 0.1
-    modality: 3
+    modality: 2
   GBlending:
-    alpha: 0.1
     method: "online"
     modulation_starts: 0
     modulation_ends: 80
@@ -44,49 +39,36 @@ trainer_para:
     modality: 2
   PMR:
     alpha: 0.6
-    method: "None"
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
-    embed_dim: 512
     momentum_coef: 0.5
-    mu: 0.01
     eta: 0.01
-    norm_epoch: 10
   MBSD:
-    alpha: 0.1
-    method: "None"
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
   MMCosine:
-    alpha: 0.1
-    method: "None"
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
     scaling: 15
   Greedy:
     alpha: 0.001
-    method: "None"
     modulation_starts: 0
     modulation_ends: 80
     modality: 2
     window_size: 5
   UMT:
     alpha: 1
-    method: "None"
     modulation_starts: 0
     modulation_ends: 80
     scaling: 10
   MLA:
-    alpha: 1
-    method: "None"
     modulation_starts: 0
     modulation_ends: 80
   ReconBoost:
     alpha: 0.5
-    method: "None"
     modulation_starts: 0
     modulation_ends: 80
     T_epochs: 1

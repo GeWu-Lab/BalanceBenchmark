@@ -1,6 +1,6 @@
 model:
   BaseClassifier:
-    encoders: {audio: ResNet18, visual: ResNet18}
+    encoders: {audio: Transformer_, visual: Transformer_, text:  Transformer_}
     fusion: "concat"
     modality_size: 1024
   BaseClassifier_AMCo:
@@ -15,11 +15,12 @@ model:
     encoders: {audio: ResNet18, visual: ResNet18}
     fusion: "shared"
     modality_size: 1024
+    # If use Transformer as encoder, set the modality_size to 1024. If use ResNet18 as encoder, set the modality_size to 512.
   BaseClassifier_ReconBoost:
     encoders: {audio: ResNet18, visual: ResNet18}
     fusion: "shared"
     modality_size: 1024
-  # encoder名字的规范化 更多的encoder official的encoder
+# expand other configuration of fusion methods
 fusion:
   concat:
     out_put_dim: 100

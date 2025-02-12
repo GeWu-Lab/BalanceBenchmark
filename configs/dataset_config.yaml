@@ -1,29 +1,22 @@
 
-dataloader:
-  eff_batch_size: 96
-  num_workers: 8 # number of workers for dataloader
-  fast_run: False # if true, only use part of the dataset
-  shuffle: True # if true, shuffle the dataset
-  drop_last: True # if true, drop the last batch if the size is not equal to batch_size
-  pin_memory: True # if true, use pin_memory for dataloader
 
 dataset:  
-  #名称规范化
-  Mosei:
-    dataset_path: /home/zequn_yang/MMT/data/  #
+  CMUMOSEI:
+    dataset_path: None
     data : mosei_senti
     if_align: false
-    classes: 2  #
+    classes: 2  
     validation: True
-    audio:  ###
+    audio:  
       input_dim: 74
     visual:
       input_dim: 35 
     text:
       input_dim: 300
 
-  UMPC_Food:
-    dataset_path: /data/users/zequn_yang/Food101
+  FOOD101:
+    targ_dir: None
+    dataset_path: None
     classes: 101
     validation: false
     text:
@@ -31,15 +24,15 @@ dataset:
     visual:
       input_dim: 224
   
-  UCF:
+  UCF101:
     classes: 101
     validation: false
-    stat_path : '/data/users/zequn_yang/UCF-101/classInd.txt'
-    train_txt : '/data/users/zequn_yang/UCF-101/trainlist01.txt'
-    test_txt : '/data/users/zequn_yang/UCF-101/testlist01.txt'
-    visual_path : '/data/users/zequn_yang/UCF-101/ucf101-frames-1fps/video-set/'
-    flow_path_v : '/data/users/zequn_yang/UCF-101/v/'
-    flow_path_u : '/data/users/zequn_yang/UCF-101/u/'
+    stat_path : None
+    train_txt : None
+    test_txt : None
+    visual_path : None
+    flow_path_v : None
+    flow_path_u : None
     flow:
       input_dim: 224
     visual:
@@ -47,9 +40,9 @@ dataset:
 
   
   Balance:
-    csv_path: /home/ruize_xu/Imbalance_train_test_val.json
-    visual_path: /home/ruize_xu/imbalance/all_frame/
-    audio_path: /home/ruize_xu/imbalance/all_spec/
+    csv_path: None
+    visual_path: None
+    audio_path: None
     validation: false
     classes: 30  
     audio:
@@ -57,86 +50,43 @@ dataset:
     visual:
       input_dim: None
   
-  Cremad:
+  CREMAD:
     classes: 6
     fps: 2
-    visual_path : '/data/users/public/cremad/cremad/visual/'
-    audio_path : '/data/users/public/cremad/cremad/audio/'
-    stat_path : '/data/users/public/cremad/cremad/stat.csv'
-    train_txt : '/data/users/public/cremad/cremad/train.csv'
-    test_txt : '/data/users/public/cremad/cremad/test.csv'
+    visual_path : None
+    audio_path : None
+    stat_path : None
+    train_txt : None
+    test_txt : None
     validation: false
     audio:
       input_dim: None
     visual:
       input_dim: None
 
-  KS:
-    csv_path_train: /data/users/yake_wei/KS_2023/ks_train_overlap.txt
-    visual_path_train: /data/users/yake_wei/KS_2023/train-frames-1fps/train
-    audio_path_train: /data/users/yake_wei/KS_2023/train_spec
-    csv_path_test: /data/users/yake_wei/KS_2023/ks_test_overlap.txt
-    visual_path_test: /data/users/yake_wei/KS_2023/val-frames-1fps/test
-    audio_path_test: /data/users/yake_wei/KS_2023/test_spec
+  KineticsSounds:
+    csv_path_train: None
+    visual_path_train: None
+    audio_path_train: None
+    csv_path_test: None
+    visual_path_test: None
+    audio_path_test: None
     validation: false
     classes: 31  
     audio:
       input_dim: None
     visual:
       input_dim: None
-  KS:
-    csv_path_train: /data/users/yake_wei/KS_2023/ks_train_overlap.txt
-    visual_path_train: /data/users/yake_wei/KS_2023/train-frames-1fps/train
-    audio_path_train: /data/users/yake_wei/KS_2023/train_spec
-    csv_path_test: /data/users/yake_wei/KS_2023/ks_test_overlap.txt
-    visual_path_test: /data/users/yake_wei/KS_2023/val-frames-1fps/test
-    audio_path_test: /data/users/yake_wei/KS_2023/test_spec
-    validation: false
-    classes: 31  
-    audio:
-      input_dim: None
-    visual:
-      input_dim: None
-  ModelNet40:
-    csv_path_train: /data/users/yake_wei/KS_2023/ks_train_overlap.txt
-    visual_path_train: /data/users/yake_wei/KS_2023/train-frames-1fps/train
-    audio_path_train: /data/users/yake_wei/KS_2023/train_spec
-    csv_path_test: /data/users/yake_wei/KS_2023/ks_test_overlap.txt
-    visual_path_test: /data/users/yake_wei/KS_2023/val-frames-1fps/test
-    audio_path_test: /data/users/yake_wei/KS_2023/test_spec
-    validation: false
-    classes: 40  
-    front_view:
-      input_dim: 224
-    back_view:
-      input_dim: 224
-  VGG:
+  VGGSound:
     validation: false
     classes: 309
     use_video_frames: 3
+    csv_root: None
+    video_train_root: None
+    video_test_root: None
+    audio_train_root: None
+    audio_test_root: None
     audio:
       input_dim: None
     visual:
       input_dim: None
-# train:
-#     name: UMPC_Food
-#     mode: train
-#     fps: 3
-#     csv_file : '/data/users/yake_wei/KS_2023/ks_train_overlap.txt'
-#     audio_path : '/data/users/yake_wei/KS_2023/train_spec'
-#     visual_path : '/data/users/yake_wei/KS_2023/train-frames-1fps/train'
-
-#     if_align: false
-#     dataset_path: '/home/zequn_yang/MMT/data/'
-#     data: 'mosei_senti'
-#   test:
-#     name: UMPC_Food
-#     mode: test
-#     fps: 3
-#     csv_file : '/data/users/yake_wei/KS_2023/ks_test_overlap.txt'
-#     audio_path : '/data/users/yake_wei/KS_2023/test_spec'
-#     visual_path : '/data/users/yake_wei/KS_2023/val-frames-1fps/test'
-
-#     if_align: false
-#     dataset_path: '/home/zequn_yang/MMT/data/'
-#     data: 'mosei_senti'

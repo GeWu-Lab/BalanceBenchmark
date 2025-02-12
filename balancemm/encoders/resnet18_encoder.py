@@ -1,4 +1,3 @@
-# define ResNet ResNet18
 import torch.nn as nn
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -102,9 +101,6 @@ class ResNet(nn.Module):
                 nn.init.normal_(m.weight, mean=1, std=0.02)
                 nn.init.constant_(m.bias, 0)
 
-        # Zero-initialize the last BN in each residual branch,
-        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
-        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
         if zero_init_residual:
             for m in self.modules():
                 if isinstance(m, Bottleneck):

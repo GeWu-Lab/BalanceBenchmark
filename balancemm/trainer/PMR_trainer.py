@@ -20,8 +20,9 @@ def clip(a, b, c):
         return a
     if c<b:
         return c
-    return b
+    return b 
 
+# quicker
 # def EU_dist(x1, x2):
 #     return torch.cdist(x1, x2, p=2)
 def EU_dist(x1, x2):
@@ -36,15 +37,10 @@ class PMRTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(PMRTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
-        self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
-
-        self.embed_dim = method_dict['embed_dim']
         self.momentum_coef = method_dict['momentum_coef']
-        self.mu = method_dict['mu']
         self.eta = method_dict['eta']
-        self.norm_epoch = method_dict['norm_epoch']
         self.proto = {}
         
     def train_loop(
@@ -55,23 +51,11 @@ class PMRTrainer(BaseTrainer):
         limit_batches: Union[int, float] = float("inf"),
         scheduler_cfg: Optional[Mapping[str, Union[L.fabric.utilities.types.LRScheduler, bool, str, int]]] = None,
     ):
-        """The training loop running a single training epoch.
-
-        Args:
-            model: the LightningModule to train
-            optimizer: the optimizer, optimizing the LightningModule.
-            train_loader: The dataloader yielding the training batches.
-            limit_batches: Limits the batches during this training epoch.
-                If greater than the number of batches in the ``train_loader``, this has no effect.
-            scheduler_cfg: The learning rate scheduler configuration.
-                Have a look at :meth:`~lightning.pytorch.core.LightningModule.configure_optimizers`
-                for supported values.
-
-        """
+    
         modality_list = model.modalitys
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         
         self.fabric.call("on_train_epoch_start")
         if self.current_epoch == 0: 
@@ -105,7 +89,7 @@ class PMRTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -117,7 +101,7 @@ class PMRTrainer(BaseTrainer):
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
             
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model, batch, batch_idx, proto):
@@ -132,17 +116,17 @@ class PMRTrainer(BaseTrainer):
         m = {}
         model(batch)
         for modality in modality_list:
-            m[modality] = model.encoder_res[modality]
+            m[modality] = model.encoder_result[modality]
         # a, v = model(batch)['audio'], model(batch)['visual']
-        Uni_res = model.Unimodality_Calculate()
-        # out_v,out_a,out = Uni_res['visual'], Uni_res['audio'], Uni_res['output']
+        unimodal_result = model.Unimodality_Calculate()
+        # out_v,out_a,out = unimodal_result['visual'], unimodal_result['audio'], unimodal_result['output']
         label = batch['label']
         label = label.to(model.device)
         loss_modality = {}
         for modality in modality_list:
-            # print(Uni_res[modality])
+            # print(unimodal_result[modality])
             # print(label)
-            loss_modality[modality] = criterion(Uni_res[modality],label)
+            loss_modality[modality] = criterion(unimodal_result[modality],label)
 
         if  self.modulation_starts <= self.current_epoch <= self.modulation_ends:
             sim = {}
@@ -169,7 +153,7 @@ class PMRTrainer(BaseTrainer):
                     ratio[modality] = score_p[modality] / min_score
 
             # for modality in modality_list:
-            #     score[modality] = sum([softmax(Uni_res[modality])[i][label[i]] for i in range(Uni_res[modality].size(0))])
+            #     score[modality] = sum([softmax(unimodal_result[modality])[i][label[i]] for i in range(unimodal_result[modality].size(0))])
             # # score_v = sum([softmax(out_v)[i][label[i]] for i in range(out_v.size(0))])
             # # score_a = sum([softmax(out_a)[i][label[i]] for i in range(out_a.size(0))])
             # ratio_a = score[key[0]] / score[key[1]]
@@ -188,10 +172,10 @@ class PMRTrainer(BaseTrainer):
                 else:
                     beta = 0
                     lam = 0
-                loss = criterion(Uni_res['output'], label) + beta * loss_proto[key[0]] + lam * loss_proto[key[1]]
+                loss = criterion(unimodal_result['output'], label) + beta * loss_proto[key[0]] + lam * loss_proto[key[1]]
                 loss.backward()
             else:
-                loss = criterion(Uni_res['output'], label)
+                loss = criterion(unimodal_result['output'], label)
                 loss.backward()
                 k_t = {}
                 for modality in modality_list:
@@ -208,10 +192,10 @@ class PMRTrainer(BaseTrainer):
                                         torch.zeros_like(parms.grad).normal_(0, parms.grad.std().item() + 1e-8)
             # loss_a = criterion(out_a, label)
         else:
-            loss = criterion(Uni_res['output'], label)
+            loss = criterion(unimodal_result['output'], label)
             loss.backward()
         # # avoid gradients in stored/accumulated values -> prevents potential OOM
-        # self._current_train_return = apply_to_collection(model.encoder_res, dtype=torch.Tensor, function=lambda x: x.detach())
+        # self._current_train_return = apply_to_collection(model.encoder_result, dtype=torch.Tensor, function=lambda x: x.detach())
         return loss
     def calculate_prototype(self, model, dataloader, proto0):
     # todo customed output of prototype
@@ -232,19 +216,17 @@ class PMRTrainer(BaseTrainer):
             for batch_idx, batch in enumerate(dataloader):
                 model(batch)
                 for modality in modality_list:
-                    m[modality] = model.encoder_res[modality]
+                    m[modality] = model.encoder_result[modality]
                 label = batch['label']
-                # TODO: make it simpler and easier to extend
 
 
                 for c, l in enumerate(label):
                     l = l.long()
                     count_class[l] += 1
                     for modality in modality_list:
-                        # print(proto[modality].shape,m[modality].shape)
+                    
                         proto[modality][l,:] += m[modality][c,:]
-                    # if l == 22:
-                    #     print('fea_a', a[c, :], audio_prototypes[l, :])
+
 
                 sample_count += 1
 

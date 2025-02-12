@@ -11,7 +11,7 @@ def worker_init_fn(worker_id):
     random.seed(worker_seed)
 
 def create_train_val_dataloader(fabric: L.Fabric, config: dict):
-    # config = SimpleNamespace(**config)
+
     train_dataset = create_dataset(config.dataset, 'train')
     if config.dataset.get('validation', False):
         val_dataset = create_dataset(config.dataset, 'valid')
@@ -61,7 +61,7 @@ def create_train_val_dataloader(fabric: L.Fabric, config: dict):
                                                 pin_memory = config_dataloader.pin_memory,
                                                 prefetch_factor=6)
 
-    if config.Train['dataset'] == 'UMPC_Food':
+    if config.Train['dataset'] == 'FOOD101':
         g = torch.Generator()
         train_dataloader = torch.utils.data.DataLoader(train_dataset,
                                                batch_size=config_dataloader.batch_size, 

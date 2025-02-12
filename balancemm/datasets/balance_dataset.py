@@ -33,12 +33,8 @@ class BalanceDataset(Dataset):
 
         self.class_to_idx = {label : i for i,label in enumerate(class_labels)}
         print(len(class_labels))
-        # exit(0)
 
         for key in all_data.keys():
-        #     print(all_data[key])
-        #   exit(0)
-        
             if all_data[key]['subset'] == (self.mode + 'ing'):
                 if os.path.exists(self.visual_path + key + '.hdf5') and os.path.exists(self.audio_path + key + '.pkl'):
                     self.data.append(key)

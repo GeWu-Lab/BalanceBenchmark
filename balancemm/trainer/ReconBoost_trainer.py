@@ -25,7 +25,6 @@ class ReconBoostTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(ReconBoostTrainer,self).__init__(fabric,**para_dict)
         self.alpha = method_dict['alpha']
-        self.method = method_dict['method']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
         self.T_epochs = method_dict['T_epochs']
@@ -42,32 +41,16 @@ class ReconBoostTrainer(BaseTrainer):
         tb_logger: TensorBoardLogger,
         ckpt_path: Optional[str] = None,
     ):
-        """The main entrypoint of the trainer, triggering the actual training.
-
-        Args:
-            model: the LightningModule to train.
-                Can have the same hooks as :attr:`callbacks` (see :meth:`MyCustomTrainer.__init__`).
-            train_loader: the training dataloader. Has to be an iterable returning batches.
-            val_loader: the validation dataloader. Has to be an iterable returning batches.
-                If not specified, no validation will run.
-            ckpt_path: Path to previous checkpoints to resume training from.
-                If specified, will always look for the latest checkpoint within the given directory.
-
-        """
+        
         print(self.max_epochs)
         # self.fabric.launch()
         # setup calculator
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
         # setup dataloaders
         if self.should_train:
             train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
         if val_loader is not None:
             val_loader = self.fabric.setup_dataloaders(val_loader, use_distributed_sampler=self.use_distributed_sampler)
-        # optimizer, scheduler_cfg = self._parse_optimizers_schedulers(model.configure_optimizers())
-        # assert optimizer is not None
-        # model, optimizer = self.fabric.setup(model, optimizer)
-
-        # assemble state (current epoch and global step will be added in save)
         state = {"model": model, "optim": optimizer, "scheduler": scheduler_cfg}
 
         # load last checkpoint if available
@@ -144,7 +127,7 @@ class ReconBoostTrainer(BaseTrainer):
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
-                self.PrecisionCalculator.ClearAll()
+                self.precision_calculator.ClearAll()
             if self.should_validate:
                 model.eval()
                 
@@ -206,7 +189,7 @@ class ReconBoostTrainer(BaseTrainer):
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
-                self.PrecisionCalculator.ClearAll()
+                self.precision_calculator.ClearAll()
                 for handler in logger.handlers:
                     handler.flush()
             # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
@@ -236,19 +219,6 @@ class ReconBoostTrainer(BaseTrainer):
         modality = None,
         pre_modality = None
     ):
-        """The training loop running a single training epoch.
-
-        Args:
-            model: the LightningModule to train
-            optimizer: the optimizer, optimizing the LightningModule.
-            train_loader: The dataloader yielding the training batches.
-            limit_batches: Limits the batches during this training epoch.
-                If greater than the number of batches in the ``train_loader``, this has no effect.
-            scheduler_cfg: The learning rate scheduler configuration.
-                Have a look at :meth:`~lightning.pytorch.core.LightningModule.configure_optimizers`
-                for supported values.
-
-        """
         
         # phase 1
         for epoch in range(self.T_epochs):
@@ -280,7 +250,7 @@ class ReconBoostTrainer(BaseTrainer):
                 else:
                     # gradient accumulation -> no optimizer step
                     self.training_step2(model=model, batch=batch, batch_idx=batch_idx)
-                # self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+                # self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
                 self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
                 # this guard ensures, we only step the scheduler once per global step
@@ -298,7 +268,7 @@ class ReconBoostTrainer(BaseTrainer):
         for epoch in range(self.T_epochs):
             all_modalitys = list(model.modalitys)
             all_modalitys.append('output')
-            self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+            self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
             iterable = self.progbar_wrapper(
                 train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch} _ train"
             )
@@ -326,7 +296,7 @@ class ReconBoostTrainer(BaseTrainer):
                 else:
                     # gradient accumulation -> no optimizer step
                     self.training_step2(model=model, batch=batch, batch_idx=batch_idx)
-                self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+                self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
                 self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
                 # this guard ensures, we only step the scheduler once per global step
@@ -339,7 +309,7 @@ class ReconBoostTrainer(BaseTrainer):
                 
                 # only increase global step if optimizer stepped
                 self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step1(self, model, batch, batch_idx, modality,pre_modality,dependent_modality : str = 'none'):
@@ -360,7 +330,7 @@ class ReconBoostTrainer(BaseTrainer):
        
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
             model.forward(batch, mask_model=modality) ## mask_model = model_name global_ft: true or false
-            out_join = model.Uni_res['output']
+            out_join = model.unimodal_result['output']
             # out_obj = model.modality_model(modality_data,modality = modality,)
             out_obj = model.modality_model(batch,modality = modality,)
             target = torch.zeros(label.size(0),model.n_classes).to(model.device).scatter_(1,label.view(-1,1),1)
@@ -395,15 +365,15 @@ class ReconBoostTrainer(BaseTrainer):
         ## our modality-wise normalization on weight and feature
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends:
             model.forward_grad(batch) ## mask_model = model_name global_ft: true or false
-            out = model.Uni_res['output']
+            out = model.unimodal_result['output']
             loss = criterion(out,label)
             loss.backward()
                 
         else:
             # model(batch)
             # for modality in modality_list:
-            #     m[modality] = model.encoder_res[modality]
-            # m['out'] = model.encoder_res['output']
+            #     m[modality] = model.encoder_result[modality]
+            # m['out'] = model.encoder_result['output']
             # out_a, out_v = model.AVCalculate(a, v, out)
         
             total_loss = loss['out']

@@ -18,12 +18,12 @@ class BatchMetricsCalculator:
         self.total_samples += len(y_true)
 
     def compute_metrics(self):
-        # 计算准确率
+        # calculate accuracy
         Metrics_res = defaultdict(dict)
         for modality in self.confusion_matrix.keys():
             accuracy = np.sum(np.diag(self.confusion_matrix[modality])) / self.total_samples
 
-            # 计算每个类别的F1分数
+            # calculate f1 score of each class
             fps = self.confusion_matrix[modality].sum(axis=0) - np.diag(self.confusion_matrix[modality])
             fns = self.confusion_matrix[modality].sum(axis=1) - np.diag(self.confusion_matrix[modality])
             tps = np.diag(self.confusion_matrix[modality])

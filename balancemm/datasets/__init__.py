@@ -6,13 +6,13 @@ from torch.utils.data import Dataset
 import torch
 import numpy as np
 from math import factorial
-from .KS_dataset import KSDataset
-from .cremad_dataset import CremadDataset
-from .food_dataset import UMPC_FoodDataset
-from .Mosei_dataset import MoseiDataset
+from .KS_dataset import KineticsSoundsDataset
+from .cremad_dataset import CREMADDataset
+from .food_dataset import FOOD101Dataset
+from .Mosei_dataset import CMUMOSEIDataset
 from .balance_dataset import BalanceDataset
-from .ucf101_dataset import UCFDataset
-from .ModelNet40_dataset import ModelNet40Dataset
+from .ucf101_dataset import UCF101Dataset
+from .VGG_dataset import VGGSoundDataset
 import pandas as pd
 __all__ = ['find_dataset', 'create_dataset']
 
@@ -60,7 +60,7 @@ class SampleDataset(Dataset):
                 except AttributeError:
                     continue
     
-    def _handle_mosei_data(self, idx, data):
+    def _handle_CMUMOSEI_data(self, idx, data):
 
         if idx in self.zero_modality_samples:
             for modality in self.zero_modality_samples[idx]:
@@ -85,7 +85,7 @@ class SampleDataset(Dataset):
                     data['visual'] = torch.zeros_like(data['visual'])
         return data
     
-    def _handle_ucf_data(self, idx, data):
+    def _handle_UCF101_data(self, idx, data):
     
         if idx in self.zero_modality_samples:
             for modality in self.zero_modality_samples[idx]:
@@ -104,31 +104,19 @@ class SampleDataset(Dataset):
                 elif modality == 'visual':
                     data['visual'] = torch.zeros_like(data['visual'])
         return data
-    def _handle_modelnet_data(self, idx, data):
-    
-        if idx in self.zero_modality_samples:
-            for modality in self.zero_modality_samples[idx]:
-                if modality == 'front_view':
-                    data['front_view'] = torch.zeros_like(data['front_view'])
-                elif modality == 'back_view':
-                    data['back_view'] = torch.zeros_like(data['back_view'])
-        return data
-
 
     def __getitem__(self, idx):
 
         data = self.dataset.__getitem__(idx)
         
-        if isinstance(self.dataset, MoseiDataset):
-            return self._handle_mosei_data(idx, data)
-        elif isinstance(self.dataset, (KSDataset, BalanceDataset, CremadDataset)):
+        if isinstance(self.dataset, CMUMOSEIDataset):
+            return self._handle_CMUMOSEI_data(idx, data)
+        elif isinstance(self.dataset, (KineticsSoundsDataset, BalanceDataset, CREMADDataset, VGGSoundDataset)):
             return self._handle_av_data(idx, data)
-        elif isinstance(self.dataset, UMPC_FoodDataset):
+        elif isinstance(self.dataset, FOOD101Dataset):
             return self._handle_food_data(idx, data)
-        elif isinstance(self.dataset, UCFDataset):
+        elif isinstance(self.dataset, UCF101Dataset):
             return self._handle_food_data(idx, data)
-        elif isinstance(self.dataset, ModelNet40Dataset):
-            return self._handle_modelnet_data(idx,data)
         else:
             raise ValueError('Dataset name is required.')
             
@@ -145,18 +133,20 @@ def create_dataset_sample_level(dataset_opt: dict, mode: str, contribution: dict
     dataset = dataset_cls(dataset_opt)
 
     zero_modality_samples = {}
-    if isinstance(dataset,MoseiDataset):
+    if isinstance(dataset,CMUMOSEIDataset):
         new_vision = dataset.vision.clone()
         new_text = dataset.text.clone()
         new_audio = dataset.audio.clone()
         new_labels = dataset.labels.clone()
-    elif isinstance(dataset,UCFDataset):
+    elif isinstance(dataset,UCF101Dataset):
         new_data = dataset.data.copy()
         new_data2class = dataset.data2class.copy()
-    elif isinstance(dataset,UMPC_FoodDataset):
+    elif isinstance(dataset,FOOD101Dataset):
         new_data = dataset.data.copy()
-    elif isinstance(dataset, ModelNet40Dataset):  
-        new_filepaths = dataset.filepaths.copy()
+    elif isinstance(dataset, VGGSoundDataset): 
+        new_video = dataset.video.copy()
+        new_audio = dataset.audio.copy()
+        new_label = dataset.label.copy()
     else:
         new_data = dataset.data.copy()
         new_label = dataset.label.copy() if hasattr(dataset, 'label') else None
@@ -173,28 +163,30 @@ def create_dataset_sample_level(dataset_opt: dict, mode: str, contribution: dict
             else:
                 continue
             for _ in range(copies):
-                if isinstance(dataset,MoseiDataset):
+                if isinstance(dataset,CMUMOSEIDataset):
                     new_idx = len(new_vision)
                     new_vision = torch.cat([new_vision, dataset.vision[i:i+1]])
                     new_text = torch.cat([new_text, dataset.text[i:i+1]])
                     new_audio = torch.cat([new_audio, dataset.audio[i:i+1]])
                     new_labels = torch.cat([new_labels, dataset.labels[i:i+1]])
-                elif isinstance(dataset,(KSDataset, BalanceDataset, CremadDataset)):
+                elif isinstance(dataset,(KineticsSoundsDataset, BalanceDataset, CREMADDataset)):
                     new_idx = len(new_data)
                     new_data.append(dataset.data[i])
                     if new_label is not None:
                         new_label.append(dataset.label[i])
-                elif isinstance(dataset,UMPC_FoodDataset):
+                elif isinstance(dataset,FOOD101Dataset):
                     new_idx = len(new_data)
                     new_data = pd.concat([new_data, dataset.data.iloc[i:i+1]], ignore_index=True)
-                elif isinstance(dataset,UCFDataset):
+                elif isinstance(dataset,UCF101Dataset):
                     new_idx = len(new_data)
                     datum = dataset.data[i]
                     new_data.append(datum)
                     new_data2class[datum] = dataset.data2class[datum]
-                elif isinstance(dataset, ModelNet40Dataset):
-                    new_idx = len(new_filepaths)
-                    new_filepaths.append(dataset.filepaths[i])
+                elif isinstance(dataset, VGGSoundDataset):
+                    new_idx = len(new_video)
+                    new_video.append(dataset.video[i])
+                    new_audio.append(dataset.audio[i])
+                    new_label.append(dataset.label[i])
                     
                 if new_idx not in zero_modality_samples:
                     zero_modality_samples[new_idx] = []
@@ -203,22 +195,24 @@ def create_dataset_sample_level(dataset_opt: dict, mode: str, contribution: dict
                         continue
                     zero_modality_samples[new_idx].append(modality_another)
              
-    if isinstance(dataset,MoseiDataset):
+    if isinstance(dataset,CMUMOSEIDataset):
         dataset.vision = new_vision
         dataset.text = new_text
         dataset.audio = new_audio
         dataset.labels = new_labels
-    elif isinstance(dataset,(KSDataset, BalanceDataset, CremadDataset)):
+    elif isinstance(dataset,(KineticsSoundsDataset, BalanceDataset, CREMADDataset)):
         dataset.data = new_data
         if new_label is not None:
             dataset.label = new_label
-    elif isinstance(dataset, UMPC_FoodDataset):
+    elif isinstance(dataset, FOOD101Dataset):
         dataset.data = new_data
-    elif isinstance(dataset,UCFDataset):
+    elif isinstance(dataset,UCF101Dataset):
         dataset.data = new_data
         dataset.data2class = new_data2class 
-    elif isinstance(dataset, ModelNet40Dataset):
-        dataset.filepaths = new_filepaths
+    elif isinstance(dataset, VGGSoundDataset):
+        dataset.video = new_video
+        dataset.audio = new_audio
+        dataset.label = new_label
     
     sample_dataset = SampleDataset(dataset, zero_modality_samples)
     return sample_dataset
@@ -233,18 +227,20 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
     dataset = dataset_cls(dataset_opt)
 
     zero_modality_samples = {}
-    if isinstance(dataset,MoseiDataset):
+    if isinstance(dataset,CMUMOSEIDataset):
         new_vision = dataset.vision.clone()
         new_text = dataset.text.clone()
         new_audio = dataset.audio.clone()
         new_labels = dataset.labels.clone()
-    elif isinstance(dataset,UCFDataset):
+    elif isinstance(dataset,UCF101Dataset):
         new_data = dataset.data.copy()
         new_data2class = dataset.data2class.copy()
-    elif isinstance(dataset,UMPC_FoodDataset):
+    elif isinstance(dataset,FOOD101Dataset):
         new_data = dataset.data.copy()
-    elif isinstance(dataset, ModelNet40Dataset):  
-        new_filepaths = dataset.filepaths.copy()
+    elif isinstance(dataset, VGGSoundDataset): 
+        new_video = dataset.video.copy()
+        new_audio = dataset.audio.copy()
+        new_label = dataset.label.copy()
     else:
         new_data = dataset.data.copy()
         new_label = dataset.label.copy() if hasattr(dataset, 'label') else None
@@ -297,28 +293,30 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
 
     for i in sample_choice:
         for modality in modality_list:
-            if isinstance(dataset,MoseiDataset):
+            if isinstance(dataset,CMUMOSEIDataset):
                 new_idx = len(new_vision)
                 new_vision = torch.cat([new_vision, dataset.vision[i:i+1]])
                 new_text = torch.cat([new_text, dataset.text[i:i+1]])
                 new_audio = torch.cat([new_audio, dataset.audio[i:i+1]])
                 new_labels = torch.cat([new_labels, dataset.labels[i:i+1]])
-            elif isinstance(dataset,(KSDataset, BalanceDataset, CremadDataset)):
+            elif isinstance(dataset,(KineticsSoundsDataset, BalanceDataset, CREMADDataset)):
                 new_idx = len(new_data)
                 new_data.append(dataset.data[i])
                 if new_label is not None:
                     new_label.append(dataset.label[i])
-            elif isinstance(dataset,UMPC_FoodDataset):
+            elif isinstance(dataset,FOOD101Dataset):
                 new_idx = len(new_data)
                 new_data = pd.concat([new_data, dataset.data.iloc[i:i+1]], ignore_index=True)
-            elif isinstance(dataset,UCFDataset):
+            elif isinstance(dataset,UCF101Dataset):
                 new_idx = len(new_data)
                 datum = dataset.data[i]
                 new_data.append(datum)
                 new_data2class[datum] = dataset.data2class[datum]
-            elif isinstance(dataset, ModelNet40Dataset):
-                new_idx = len(new_filepaths)
-                new_filepaths.append(dataset.filepaths[i])
+            elif isinstance(dataset, VGGSoundDataset):
+                new_idx = len(new_video)
+                new_video.append(dataset.video[i])
+                new_audio.append(dataset.audio[i])
+                new_label.append(dataset.label[i])
             if new_idx not in zero_modality_samples:
                 zero_modality_samples[new_idx] = []
             for modality_another in modality_list:
@@ -326,19 +324,21 @@ def create_dataset_modality_level(dataset_opt: dict, mode: str, contribution: di
                     continue
                 if gap[modality] > gap[modality_another]:
                     zero_modality_samples[new_idx].append(modality_another)
-    if isinstance(dataset,MoseiDataset):
+    if isinstance(dataset,CMUMOSEIDataset):
         dataset.vision = new_vision
         dataset.text = new_text
         dataset.audio = new_audio
         dataset.labels = new_labels
-    elif isinstance(dataset, UMPC_FoodDataset):
+    elif isinstance(dataset, FOOD101Dataset):
         dataset.data = new_data
-    elif isinstance(dataset,UCFDataset):
+    elif isinstance(dataset,UCF101Dataset):
         dataset.data = new_data
         dataset.data2class = new_data2class 
-    elif isinstance(dataset, ModelNet40Dataset):
-        dataset.filepaths = new_filepaths
-    elif isinstance(dataset,(KSDataset, BalanceDataset, CremadDataset)):
+    elif isinstance(dataset, VGGSoundDataset):
+        dataset.video = new_video
+        dataset.audio = new_audio
+        dataset.label = new_label
+    elif isinstance(dataset,(KineticsSoundsDataset, BalanceDataset, CREMADDataset)):
         dataset.data = new_data
         if new_label is not None:
             dataset.label = new_label

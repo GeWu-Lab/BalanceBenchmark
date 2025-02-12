@@ -8,14 +8,9 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import os.path as osp
 
-class CremadDataset(Dataset):
+class CREMADDataset(Dataset):
     def __init__(self, args: dict):
         
-        #  mode: str, # 'train', 'val', 'test'
-        #  visual_path: str,
-        #  audio_path: str,
-        #  csv_file: str,
-        #  fps: int = 3
         self.image = []
         self.audio = []
         self.label = []
@@ -25,14 +20,8 @@ class CremadDataset(Dataset):
         self.fps = args['fps']
         self.visual_path = args['visual_path']
         self.audio_path = args['audio_path']
-        # self.csv_file = args['csv_file']
         self.train_txt = args['train_txt']
         self.test_txt = args['test_txt']
-        # self.visual_path = '/data/users/public/cremad/visual/'
-        # self.audio_path = '/data/users/public/cremad/audio/'
-        # self.stat_path = '/data/users/public/cremad/stat.csv'
-        # self.train_txt = '/data/users/public/cremad/train.csv'
-        # self.test_txt = '/data/users/public/cremad/test.csv'
         self.aid_transform = transforms.Compose([transforms.ToTensor()])
         if self.mode == 'train':
             self.csv_file = self.train_txt
@@ -94,5 +83,5 @@ class CremadDataset(Dataset):
 
 if __name__ == '__main__':   
     print('start')
-    a = CremadDataset({'mode':'train','fps':2})
+    a = CREMADDataset({'mode':'train','fps':2})
     a.__getitem__(0)

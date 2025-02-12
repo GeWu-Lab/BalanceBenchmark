@@ -5,9 +5,6 @@ from types import SimpleNamespace
 from ..utils.parser_utils import find_module
 __all__ = ['find_model', 'create_model']
 
-# ----------------------
-# Dynamic instantiation
-# ----------------------
 
 # import model modules from those with '_model' in file names
 _model_folder = osp.dirname(osp.abspath(__file__))

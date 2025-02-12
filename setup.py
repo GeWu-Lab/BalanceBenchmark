@@ -9,18 +9,18 @@ long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 setup(
     name='balancemm',
-    version='0.1', 
+    version='1.0', 
     description='A Benchmark for balanced multimodal learning.',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/HPLQAQ/BalanceMM/',
-    author='Siwei Li',
-    author_email='hplv@foxmail.com', 
+    url=' ',
+    author=' ',
+    author_email=' ', 
     classifiers=[
             "License :: OSI Approved :: MIT License",
             "Development Status :: 3 - Alpha",
             "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.11",
+            "Programming Language :: Python :: 3.10",
             "Operating System :: POSIX :: Linux",
             "Operating System :: Microsoft :: Windows",
     ],

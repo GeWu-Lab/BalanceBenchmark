@@ -7,9 +7,7 @@ import torch
 __all__ = ['find_encoder', 'create_encoder']
 from .pretrained_encoder import text_encoder
 from torchvision.models import vit_b_16, vit_h_14
-# ----------------------
-# Dynamic instantiation
-# ----------------------
+
 
 # import encoder modules from those with '_encoder' in file names
 _encoder_folder = osp.dirname(osp.abspath(__file__))
@@ -27,15 +25,6 @@ def find_encoder(encoder_name: str) -> object:
     encoder_cls = find_module(_encoder_modules, encoder_name, 'Encoder')
     return encoder_cls
 
-# create encoder from encoder_opt
-# def create_encoder(encoder_opt: dict):
-#     if 'name' not in encoder_opt:
-#         raise ValueError('encoder name is required.')
-#     encoder_cls = find_encoder(encoder_opt['name'])
-#     encoder = encoder_cls(encoder_opt)
-
-#     print (f'Encoder {encoder.__class__.__name__} - {encoder_opt["name"]} is created.')
-#     return encoder
 def create_encoders(encoder_opt: dict[str, dict])->dict[str, nn.Module]:
     modalitys = encoder_opt.keys()
     encoders = {}

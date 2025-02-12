@@ -274,7 +274,7 @@ class MMParetoTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -312,7 +312,7 @@ class MMParetoTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -325,7 +325,7 @@ class MMParetoTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
     
     def training_step(self, model : BaseClassifierModel, batch, batch_idx,record_names,optimizer):
 
@@ -346,8 +346,8 @@ class MMParetoTrainer(BaseTrainer):
 
         if self.modulation_starts <= self.current_epoch <= self.modulation_ends: # bug fixed
             loss = {}
-            for modality in model.Uni_res.keys():
-                loss[modality] = criterion(model.Uni_res[modality],label)
+            for modality in model.unimodal_result.keys():
+                loss[modality] = criterion(model.unimodal_result[modality],label)
                 loss[modality].backward(retain_graph = True)
             for modality in modality_list:
                 for loss_type in loss.keys():

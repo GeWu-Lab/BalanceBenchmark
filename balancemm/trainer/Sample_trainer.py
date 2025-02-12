@@ -41,22 +41,11 @@ class SampleTrainer(BaseTrainer):
         tb_logger: TensorBoardLogger,
         ckpt_path: Optional[str] = None,
     ):
-        """The main entrypoint of the trainer, triggering the actual training.
 
-        Args:
-            model: the LightningModule to train.
-                Can have the same hooks as :attr:`callbacks` (see :meth:`MyCustomTrainer.__init__`).
-            train_loader: the training dataloader. Has to be an iterable returning batches.
-            val_loader: the validation dataloader. Has to be an iterable returning batches.
-                If not specified, no validation will run.
-            ckpt_path: Path to previous checkpoints to resume training from.
-                If specified, will always look for the latest checkpoint within the given directory.
-
-        """
         print(self.max_epochs)
         # self.fabric.launch()
         # setup calculator
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
         # setup dataloaders
         if self.should_train:
             train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
@@ -153,7 +142,7 @@ class SampleTrainer(BaseTrainer):
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
-                self.PrecisionCalculator.ClearAll()
+                self.precision_calculator.ClearAll()
             if self.should_validate:
                 model.eval()
                 
@@ -215,7 +204,7 @@ class SampleTrainer(BaseTrainer):
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
-                self.PrecisionCalculator.ClearAll()
+                self.precision_calculator.ClearAll()
                 for handler in logger.handlers:
                     handler.flush()
             # self.step_scheduler(model, scheduler_cfg, level="epoch", current_value=self.current_epoch)
@@ -243,23 +232,11 @@ class SampleTrainer(BaseTrainer):
         limit_batches: Union[int, float] = float("inf"),
         scheduler_cfg: Optional[Mapping[str, Union[L.fabric.utilities.types.LRScheduler, bool, str, int]]] = None,
     ):
-        """The training loop running a single training epoch.
-
-        Args:
-            model: the LightningModule to train
-            optimizer: the optimizer, optimizing the LightningModule.
-            train_loader: The dataloader yielding the training batches.
-            limit_batches: Limits the batches during this training epoch.
-                If greater than the number of batches in the ``train_loader``, this has no effect.
-            scheduler_cfg: The learning rate scheduler configuration.
-                Have a look at :meth:`~lightning.pytorch.core.LightningModule.configure_optimizers`
-                for supported values.
-
-        """
+        
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -286,7 +263,7 @@ class SampleTrainer(BaseTrainer):
             else:
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -299,11 +276,10 @@ class SampleTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
     
     def training_step(self, model : BaseClassifierModel, batch, batch_idx):
 
-        # TODO: make it simpler and easier to extend
         softmax = nn.Softmax(dim=1)
         criterion = nn.CrossEntropyLoss()
         relu = nn.ReLU(inplace=True)
@@ -313,12 +289,12 @@ class SampleTrainer(BaseTrainer):
         model(batch)
         model.Unimodality_Calculate()
         modality_list = model.modalitys
-        loss = criterion(model.Uni_res['output'], label)
+        loss = criterion(model.unimodal_result['output'], label)
         loss.backward()
 
 
-        # model.Uni_res.clear()
-        # model.encoder_res.clear()
+        # model.unimodal_result.clear()
+        # model.encoder_result.clear()
         # scores.clear()
         # ratios.clear()
         # coeffs.clear()

@@ -50,8 +50,8 @@ def getAlpha_Learnable(epoch, valbatch, model, alpha, lr_alpha=1e-4):
     loss_alignment = 0
     modalitys = list(model.modalitys)
     for combination in combinations:
-        loss_alignment += Alignment(model.Uni_res[modalitys[combination[0]]],model.Uni_res[modalitys[combination[1]]])
-    out = model.Uni_res['output']        
+        loss_alignment += Alignment(model.unimodal_result[modalitys[combination[0]]],model.unimodal_result[modalitys[combination[1]]])
+    out = model.unimodal_result['output']        
     loss_cls = criterion(out, new_batch['label']).mean()
     L_total = (alpha[0]* loss_cls + alpha[1]* loss_alignment/len(combinations))
     theta_grads = torch.autograd.grad(L_total, model.parameters(), create_graph=True)
@@ -88,7 +88,6 @@ class LFMTrainer(BaseTrainer):
         self.modality = method_dict['modality']
         self.lr_alpha = method_dict['lr_alpha']
 
-        ##new
     def fit(
         self,
         model,
@@ -115,7 +114,7 @@ class LFMTrainer(BaseTrainer):
         print(self.max_epochs)
         # self.fabric.launch()
         # setup calculator
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, model.modalitys)
         # setup dataloaders
         if self.should_train:
             train_loader = self.fabric.setup_dataloaders(train_loader, use_distributed_sampler=self.use_distributed_sampler)
@@ -193,7 +192,7 @@ class LFMTrainer(BaseTrainer):
                 info = output_info+ ', ' + info
                     
                 logger.info(info)
-                self.PrecisionCalculator.ClearAll()
+                self.precision_calculator.ClearAll()
             if self.should_validate:
                 model.eval()
                 valid_loss, Metrics_res =self.val_loop(model, val_loader, limit_batches=self.limit_val_batches)
@@ -288,7 +287,7 @@ class LFMTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -315,7 +314,7 @@ class LFMTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -328,7 +327,7 @@ class LFMTrainer(BaseTrainer):
             
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     def training_step(self, model: BaseClassifierModel, batch, batch_idx):
 
@@ -336,18 +335,14 @@ class LFMTrainer(BaseTrainer):
         criterion = nn.CrossEntropyLoss()
         label = batch['label']
         label = label.to(model.device)
-        # if self.modality == 2:
-        #     a, v, out = model(batch)
-        # else:
-        #     a, v, t, out = model(batch)
         model(batch)
         modality_num = len(model.modalitys)
         combinations = manual_combinations(modality_num)
         loss_alignment = 0
         modalitys = list(model.modalitys)
         for combination in combinations:
-            loss_alignment += Alignment(model.Uni_res[modalitys[combination[0]]],model.Uni_res[modalitys[combination[1]]])
-        out = model.Uni_res['output']        
+            loss_alignment += Alignment(model.unimodal_result[modalitys[combination[0]]],model.unimodal_result[modalitys[combination[1]]])
+        out = model.unimodal_result['output']        
         loss = criterion(out, label)
         loss = 2 * (self.alpha[0]* loss + self.alpha[1]* loss_alignment/len(combinations))
         loss.backward()

@@ -17,9 +17,6 @@ import torch
 import random
 
 def conf_loss(conf, pred, conf_x, pred_x, label):
-    #print(conf.shape, pred.shape, conf_x.shape, pred_x.shape, label.shape)
-    # sign==1 => ( pred false || pred_x true)
-    # sign == 0 => pred true and prex , 此时loss取0
     sign = (~((pred == label) & (pred_x != label))).long()  # trick 1
     #print(sign)
     return (max(0, torch.sub(conf_x, conf).sum())), sign.sum()
@@ -27,15 +24,12 @@ def conf_loss(conf, pred, conf_x, pred_x, label):
 class CMLTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}):
         super(CMLTrainer,self).__init__(fabric,**para_dict)
-        self.alpha = method_dict['alpha']
-        self.method = method_dict['method']
+
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
 
         self.lam = method_dict['lam']
-        # self.modality = method_dict['modality']
 
-    # @profile_flops()
     def train_loop(
         self,
         model: L.LightningModule,
@@ -60,7 +54,7 @@ class CMLTrainer(BaseTrainer):
         self.fabric.call("on_train_epoch_start")
         all_modalitys = list(model.modalitys)
         all_modalitys.append('output')
-        self.PrecisionCalculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
+        self.precision_calculator = self.PrecisionCalculatorType(model.n_classes, all_modalitys)
         iterable = self.progbar_wrapper(
             train_loader, total=min(len(train_loader), limit_batches), desc=f"Epoch {self.current_epoch}"
         )
@@ -94,7 +88,7 @@ class CMLTrainer(BaseTrainer):
                 # gradient accumulation -> no optimizer step
                 self.training_step(model=model, batch=batch, batch_idx=batch_idx)
 
-            self.PrecisionCalculator.update(y_true = batch['label'].cpu(), y_pred = model.pridiction)
+            self.precision_calculator.update(y_true = batch['label'].cpu(), y_pred = model.prediction)
             self.fabric.call("on_train_batch_end", self._current_train_return, batch, batch_idx)
 
             # this guard ensures, we only step the scheduler once per global step
@@ -107,7 +101,7 @@ class CMLTrainer(BaseTrainer):
             # only increase global step if optimizer stepped
             self.global_step += int(should_optim_step)
 
-        self._current_metrics = self.PrecisionCalculator.compute_metrics()
+        self._current_metrics = self.precision_calculator.compute_metrics()
         self.fabric.call("on_train_epoch_end")
     
     def training_step(self, model, batch, batch_idx, random_dict_ ):
@@ -131,32 +125,19 @@ class CMLTrainer(BaseTrainer):
                 loss_mm = 0
                 model(batch)
                 for modality in modality_list:
-                    m[modality] = model.encoder_res[modality]
-                m['out'] = model.encoder_res['output']
+                    m[modality] = model.encoder_result[modality]
+                m['out'] = model.encoder_result['output']
                 # a, v, t, out = model(batch)
-                Uni_res = model.Unimodality_Calculate()
-                out_s = Uni_res['output']
+                unimodal_result = model.Unimodality_Calculate()
+                out_s = unimodal_result['output']
                 # out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
                 # out_s = out
                 random_dict = random_dict_.copy()
                 for i in range(modality_num - 1):
                     removed_mm = random_dict.pop()
-                    ### cuda out of memory
-                    # _, _, _, out_s = model(batch, pad_audio = pad_audio, pad_visual = pad_visual, pad_text =pad_text)
-                    # if removed_mm == 'audio':
-                    #     pad_audio = True
-                    # elif removed_mm == 'visual':
-                    #     pad_visual = True
-                    # else:
-                    #     pad_text = True
-                    # _, _, _, out_t = model(batch, pad_audio = pad_audio, pad_visual = pad_visual, pad_text =pad_text)
-                    out_p = out_s - Uni_res[removed_mm] +model.fusion_module.fc_out.bias/3
-                    # if removed_mm == 'audio':
-                    #     out_p = out_s - out_a + model.fusion_module.fc_out.bias/3
-                    # elif removed_mm == 'visual':
-                    #     out_p = out_s - out_v + model.fusion_module.fc_out.bias/3
-                    # else:
-                    #     out_p = out_s - out_t + model.fusion_module.fc_out.bias/3
+                   
+                    out_p = out_s - unimodal_result[removed_mm] +model.fusion_module.fc_out.bias/3
+             
                     prediction_s = softmax(out_s)
                     conf_s, pred_s = torch.max(prediction_s, dim=1)
 
@@ -171,37 +152,17 @@ class CMLTrainer(BaseTrainer):
                     _loss_c = _loss_c + loss_pc
 
                     out_s = out_p
-                    # if random_dict['audio']:
-                    #     conf_a, _pred_a = torch.max(pred_a, dim=1)
-                    #     loss_ac, count = conf_loss(conf, pred, conf_a, _pred_a, label)
-                    #     # conf_loss_hit_a += count
-                    #     loss += loss_a
-                    #     _loss_c += loss_ac
-                    # if random_dict["visual"]:
-                    #     conf_v, _pred_v = torch.max(pred_v, dim=1)
-                    #     loss_vc, count = conf_loss(conf, pred, conf_v, _pred_v, label)
-                    #     # conf_loss_hit_v += count
-                    #     loss += loss_v
-                    #     _loss_c += loss_vc
-                    # if random_dict['text']:
-                    #     conf_t, _pred_t = torch.max(pred_t, dim=1)
-                    #     loss_vc, count = conf_loss(conf, pred, conf_t, _pred_t, label)
-                    #     # conf_loss_hit_v += count
-                    #     loss += loss_v
-                    #     _loss_c += loss_vc
+                    
                 loss = (loss) / 3 +self.lam * _loss_c
             else:
                 model(batch)
                 for modality in modality_list:
-                    m[modality] = model.encoder_res[modality]
-                m['out'] = model.encoder_res['output']
+                    m[modality] = model.encoder_result[modality]
+                m['out'] = model.encoder_result['output']
                 # a, v, t, out = model(batch)
-                Uni_res = model.Unimodality_Calculate()
-                out_s = Uni_res['output']
-                # out_a, out_v, out_t = model.AVTCalculate(a, v, t, out)
-                # print(a.shape, v.shape, model.head.weight.shape)
-
-                ## our modality-wise normalization on weight and feature
+                unimodal_result = model.Unimodality_Calculate()
+                out_s = unimodal_result['output']
+                
             
                 loss = criterion(m['out'], label)
 
@@ -213,27 +174,15 @@ class CMLTrainer(BaseTrainer):
                 loss_mm = 0
                 model(batch)
                 for modality in modality_list:
-                    m[modality] = model.encoder_res[modality]
-                m['out'] = model.encoder_res['output']
-                Uni_res = model.Unimodality_Calculate()
-                out_s = Uni_res['output']
+                    m[modality] = model.encoder_result[modality]
+                m['out'] = model.encoder_result['output']
+                unimodal_result = model.Unimodality_Calculate()
+                out_s = unimodal_result['output']
                 random_dict = random_dict_.copy()
                 for i in range(modality_num - 1):
                     removed_mm = random_dict.pop()
-                    ### cuda out of memory
-                    # _, _, _, out_s = model(batch, pad_audio = pad_audio, pad_visual = pad_visual, pad_text =pad_text)
-                    # if removed_mm == 'audio':
-                    #     pad_audio = True
-                    # elif removed_mm == 'visual':
-                    #     pad_visual = True
-                    # else:
-                    #     pad_text = True
-                    # _, _, _, out_t = model(batch, pad_audio = pad_audio, pad_visual = pad_visual, pad_text =pad_text)
-                    out_p = out_s - Uni_res[removed_mm] +model.fusion_module.fc_out.bias/2
-                    # if removed_mm == 'audio':
-                    #     out_p = out_s - out_a + model.fusion_module.fc_out.bias/2
-                    # elif removed_mm == 'visual':
-                    #     out_p = out_s - out_v + model.fusion_module.fc_out.bias/2
+                    
+                    out_p = out_s - unimodal_result[removed_mm] +model.fusion_module.fc_out.bias/2
 
                     prediction_s = softmax(out_s)
                     conf_s, pred_s = torch.max(prediction_s, dim=1)
@@ -253,8 +202,8 @@ class CMLTrainer(BaseTrainer):
             else:
                 model(batch)
                 for modality in modality_list:
-                    m[modality] = model.encoder_res[modality]
-                m['out'] = model.encoder_res['output']
+                    m[modality] = model.encoder_result[modality]
+                m['out'] = model.encoder_result['output']
                 # out_a, out_v = model.AVCalculate(a, v, out)
             
                 loss = criterion(m['out'], label)

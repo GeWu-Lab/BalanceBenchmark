@@ -1,50 +1,19 @@
 mode: "train_and_test"
-check_point_path: '/home/shaoxuan_xu/BalanceMM/train_and_test/experiments/BaseClassifier_OGMTrainer_Mosei/train_20240921-063744/checkpoints/epoch_normal.ckpt'
+check_point_path: ''
 
 seed: 42
-### 简洁化 
 Main_config:
   model: "BaseClassifier" #
   model: "BaseClassifier" #
   tasks: "Classifier" #
   trainer: "LinearProbeTrainer"
   device: '1'
-  dataset: Cremad
+  dataset: CREMAD
 
 Train:
-  dataset: Cremad
+  dataset: CREMAD
 
 
 Test:
-  dataset: Cremad
+  dataset: CREMAD
 
-# dataset:
-#   dataloader:
-#     eff_batch_size: 64
-#     num_workers: 4 # number of workers for dataloader
-#     fast_run: false # if true, only use part of the dataset
-#     shuffle: true # if true, shuffle the dataset
-#     drop_last: true # if true, drop the last batch if the size is not equal to batch_size
-#     pin_memory: true # if true, use pin_memory for dataloader
-#   train:
-#     name: UMPC_Food
-#     mode: train
-#     fps: 3
-#     csv_file : '/data/users/yake_wei/KS_2023/ks_train_overlap.txt'
-#     audio_path : '/data/users/yake_wei/KS_2023/train_spec'
-#     visual_path : '/data/users/yake_wei/KS_2023/train-frames-1fps/train'
-
-#     if_align: false
-#     dataset_path: '/home/zequn_yang/MMT/data/'
-#     data: 'mosei_senti'
-#   test:
-#     name: UMPC_Food
-#     mode: test
-#     fps: 3
-#     csv_file : '/data/users/yake_wei/KS_2023/ks_test_overlap.txt'
-#     audio_path : '/data/users/yake_wei/KS_2023/test_spec'
-#     visual_path : '/data/users/yake_wei/KS_2023/val-frames-1fps/test'
-
-#     if_align: false
-#     dataset_path: '/home/zequn_yang/MMT/data/'
-#     data: 'mosei_senti'
