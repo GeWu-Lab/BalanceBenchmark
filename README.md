@@ -4,10 +4,18 @@
 ## Overview
 ![](images/frame6_00.png)
 
-Learning multimodal representations involves integrating information from multiple heterogeneous sources of data. However, it is often hindered by the multimodal imbalance problem, where certain modalities dominate while others remain underutilized. To facilitate addressing this challenge, we release **BalanceMM**, a standardized toolkit that implements various multimodal imbalance learning methods.
+Multimodal learning has gained attention for its capacity to integrate information from different modalities. However, it is often hindered by the multimodal imbalance problem, where certain modalities disproportionately dominate while others remain underutilized. Although recent studies have proposed various methods to alleviate this problem, they lack comprehensive and fair comparisons.
+To facilitate this field, we introduce BalanceBenchmark, a systematic and unified benchmark for evaluating multimodal imbalance learning methods. BalanceBenchmark spans 17 algorithms and 7 datasets, providing a comprehensive framework for method evaluation and comparison.
 
-BalanceMM provides an automated end-to-end pipeline that simplifies and standardizes data loading, experimental setup, and model evaluation. The toolkit is designed to support research across different multimodal imbalance learning strategies, including data processing, feed-forward adjustments, objective modifications, and optimization approaches.
+To accompany BalanceBenchmark, we release **BalanceMM**, a standardized toolkit that implements 17 state-of-the-art approaches spanning four research directions: data-level adjustments, feed-forward modifications, objective adaptations, and optimization-based methods. The toolkit provides a standardized pipeline that unifies innovations in fusion paradigms, optimization objectives, and training approaches.
+Our toolkit simplifies the research workflow through:
 
++ Standardized data loading for 7 multimodal datasets
++ Unified implementation of various imbalance learning methods
++ Automated experimental pipeline from training to evaluation
++ Comprehensive metrics for assessing performance, imbalance degree, and complexity
+
+BalanceMM is designed with modularity and extensibility in mind, enabling easy integration of new methods and datasets. It provides researchers with the necessary tools to reproduce experiments, conduct fair comparisons, and develop new approaches for addressing the multimodal imbalance problem.
 ## Datasets currently supported
 + Audio-Visual: KineticsSounds, CREMA-D, BalancedAV, VGGSound
 + RGB-Optical Flow: UCF-101
