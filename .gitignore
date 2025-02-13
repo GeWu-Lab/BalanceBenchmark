@@ -7,3 +7,4 @@ __pycache__/
 temps/
 training_*
 result*
+# ignore setup
