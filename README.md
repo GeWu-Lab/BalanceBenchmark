@@ -47,3 +47,24 @@ To add a new method:
   + If your method belongs to "Objective", you mostly don't have to do other modification except traienr.
   + If your method belongs to "Optimization", you may need to modify any combination of the parts mentioned above.
 6. Add configuration file in balancemm/configs/trainer_config.yaml
+## Experiment
+To run experiments, you'll need to download the datasets from their respective sources. After downloading, place the datasets in your preferred directory and update the dataset path in your configuration file.
+
+You can run any experiment using a single command line:
+```
+python -m balancemm \
+    --trainer [trainer_name] \
+    --dataset [dataset_name] \
+    --model [model_name] \
+    --hyper-params [param_file.yaml] \
+    --device [cuda:0/cpu]
+```
+For example, to run OGM on CREMA-D dataset:
+```
+python -m balancemm \
+    --trainer OGM \
+    --dataset cremad \
+    --model BaseClassifier \
+    --alpha 0.5 \
+    --device cuda:0
+```
