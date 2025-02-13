@@ -24,10 +24,10 @@ BalanceMM is designed with modularity and extensibility in mind, enabling easy i
 
 To add a new dataset:
 
-1. Go to balancemm/datasets/
+1. Go to 'balancemm/datasets/'
 2. Create a new Python file and a new dataset class
-3. Implement the required data loading and preprocessing methods in the corresponding .py file
-4. Add configuration file in balancemm/configs/dataset_config.yaml
+3. Implement the required data loading and preprocessing methods in the 'corresponding_dataset.py' file
+4. Add configuration file in 'balancemm/configs/dataset_config.yaml'
 
 ## Algorithms currently supported
 + Data-level methods: Modality-valuation
@@ -48,13 +48,14 @@ To add a new method:
   + "Optimization" : methods that adjust optimization process
 2. Go to balancemm/trainer/
 3. Create a new Python file implementing your method
-4. Implement the corresponding .py file based on /base_trainer.py, you should rewrite trainer.training_step usually.
+4. Implement the 'corresponding_trainer'.py file based on 'base_trainer.py', you should rewrite 'trainer.training_step' usually.
 5. Other implementation by your method's category:
-  + If your method belongs to "Data", go to balancemm/datasets/__init.py and modify properly.
-  + If your method belongs to "Feed-forward", go to balancemm/models/avclassify_model.py, create a new model class and rewrite specific functions.
+  + If your method belongs to "Data", go to 'balancemm/datasets/__init.py' and modify properly.
+  + If your method belongs to "Feed-forward", go to 'balancemm/models/avclassify_model.py', create a new model class and rewrite specific functions.
   + If your method belongs to "Objective", you mostly don't have to do other modification except traienr.
-  + If your method belongs to "Optimization", you may need to modify any combination of the parts mentioned above.
-6. Add configuration file in balancemm/configs/trainer_config.yaml
+  + If your method belongs to "Optimization", you may need to modify trainer or any parts mentioned above.
+  + You can also modify any combination of the parts metioned above according to your method.
+6. Add configuration file in 'balancemm/configs/trainer_config.yaml'
 ## Installation
 ```
 git clone https://github.com/GeWu-Lab/BalanceBenchmark.git
@@ -68,7 +69,7 @@ pip install lightning-cloud==0.5.68
 pip install lightning-utilities==0.11.2
 ```
 ## Experiment
-To run experiments, you'll need to download the datasets from their open-sourced links. After downloading, place the datasets in your preferred directory and update the dataset path in your configuration file.
+To run experiments, you'll need to download the datasets from their open-sourced links. After downloading, place the datasets in your preferred directory and update the dataset path in your configuration file. 
 
 You can run any experiment using a single command line:
 ```
