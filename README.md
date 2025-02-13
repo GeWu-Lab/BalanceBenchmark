@@ -68,7 +68,7 @@ pip install lightning-cloud==0.5.68
 pip install lightning-utilities==0.11.2
 ```
 ## Experiment
-To run experiments, you'll need to download the datasets from their respective sources. After downloading, place the datasets in your preferred directory and update the dataset path in your configuration file.
+To run experiments, you'll need to download the datasets from their open-sourced links. After downloading, place the datasets in your preferred directory and update the dataset path in your configuration file.
 
 You can run any experiment using a single command line:
 ```
