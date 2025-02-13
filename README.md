@@ -42,15 +42,15 @@ See Section 3 in our paper for detailed descriptions of each method.
 To add a new method:
 
 1. Determine which category your method belongs to:
-  + data_methods/ : methods that adjust data processing
-  + forward_methods/ : methods that modify network architecture
-  + objective_methods/ : methods that adapt learning objectives
-  + optimization_methods/ : methods that adjust optimization process
+  + "Data" : methods that adjust data processing
+  + "Feed-forward" : methods that modify network architecture
+  + "Objective" : methods that adapt learning objectives
+  + "Optimization" : methods that adjust optimization process
 2. Go to balancemm/trainer/
 3. Create a new Python file implementing your method
 4. Implement the corresponding .py file based on /base_trainer.py, you should rewrite trainer.training_step usually.
 5. Other implementation by your method's category:
-  + If your method belongs to "Data-level", go to balancemm/datasets/__init.py and modify properly.
+  + If your method belongs to "Data", go to balancemm/datasets/__init.py and modify properly.
   + If your method belongs to "Feed-forward", go to balancemm/models/avclassify_model.py, create a new model class and rewrite specific functions.
   + If your method belongs to "Objective", you mostly don't have to do other modification except traienr.
   + If your method belongs to "Optimization", you may need to modify any combination of the parts mentioned above.
