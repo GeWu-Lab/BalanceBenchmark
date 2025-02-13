@@ -77,14 +77,14 @@ python -m balancemm \
     --dataset [dataset_name] \
     --model [model_name] \
     --hyper-params [param_file.yaml] \
-    --device [cuda:0/cpu]
+    --device [0/cpu]
 ```
 For example, to run OGM on CREMA-D dataset:
 ```
 python -m balancemm \
     --trainer OGM \
-    --dataset cremad \
+    --dataset CREMAD \
     --model BaseClassifier \
     --alpha 0.5 \
-    --device cuda:0
+    --device 0
 ```
