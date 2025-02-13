@@ -48,7 +48,7 @@ To add a new method:
   + "Optimization" : methods that adjust optimization process
 2. Go to `balancemm/trainer/`
 3. Create a new Python file implementing your method
-4. Implement the `corresponding_trainer`.py file based on `base_trainer.py`, you should rewrite `trainer.training_step` usually.
+4. Implement the `corresponding_trainer.py` file based on `base_trainer.py`, you should rewrite `trainer.training_step` usually.
 5. Other implementation by your method's category:
   + If your method belongs to "Data", go to `balancemm/datasets/__init.py` and modify properly.
   + If your method belongs to "Feed-forward", go to `balancemm/models/avclassify_model.py`, create a new model class and rewrite specific functions.
