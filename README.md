@@ -1,8 +1,7 @@
-# BalanceMM
+# BalanceBenchmark: A Survey for Imbalanced Learning
 
 **Conduct balanced multimodal classification experiments in an easier way.**
 
-## Start
-```bash
+## Paper
+## Overview
 
-```
