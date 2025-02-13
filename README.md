@@ -89,3 +89,7 @@ python -m balancemm \
     --alpha 0.5 \
     --device 0
 ```
+## Results
+![](images/Results.jpeg)
+
+We have conducted comprehensive experiments using the proposed BanlenceBenchmark on 7 datasets. The results indicate that almost all related methods outperform the Baseline in terms of accuracy and F1 score, demonstrating that the multimodal imbalance problem is prevalent across various scenarios. 
