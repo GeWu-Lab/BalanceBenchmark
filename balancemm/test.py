@@ -17,71 +17,23 @@ import yaml
 import logging
 from .evaluation.modalitys import Calculate_Shapley
 from .analysis.t_sne import visualize_tsne_2d, visualize_tsne_3d
+from .utils.train_utils import get_newest_path
 import copy
-def only_test(args: dict):
-    args = SimpleNamespace(**args)
-    log_dir = osp.join(args.out_dir, "logs")
-    print("logg:{}".format(log_dir))
-    # loggers = [choose_logger(logger_name, log_dir = log_dir, project = args.name, comment = args.log['comment']) for logger_name in args.log['logger_name']]
-    logger = logging.getLogger(__name__)
-    args.checkpoint_dir = osp.join(args.out_dir, 'checkpoints')
-    os.makedirs(args.out_dir, exist_ok=True)
-    os.makedirs(args.checkpoint_dir, exist_ok=True)
-    file_handler = logging.FileHandler(args.out_dir + '/test.log') 
-    file_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    loggers = [logger]
-    logger.setLevel(logging.DEBUG)
-    for logger in loggers:
-        if isinstance(logger, L.fabric.loggers.CSVLogger):
-            os.makedirs(os.path.join(log_dir, 'csv'), exist_ok=True)
-        elif isinstance(logger, L.fabric.loggers.TensorBoardLogger):
-            os.makedirs(os.path.join(log_dir, 'tensorboard'), exist_ok=True)
-        elif isinstance(logger, L.pytorch.loggers.wandb.WandbLogger):
-            os.makedirs(os.path.join(log_dir, 'wandb'), exist_ok=True)
 
-    fabric = Fabric(**(args.fabric),
-                    loggers = loggers,
-                    )
-
-    if isinstance(fabric.accelerator, L.fabric.accelerators.CUDAAccelerator):
-        fabric.print('set float32 matmul precision to high')
-        torch.set_float32_matmul_precision('high')
-
-    train_dataloader, val_dataloader, test_dataloader = create_train_val_dataloader(fabric, args)
-    args.trainer['checkpoint_dir'] = args.checkpoint_dir ##
-    model = create_model(args.model)
-    if hasattr(args.trainer, 'name') and args.trainer['name'] == 'GBlending':
-        args.model['type'] = args.model['type'] + '_gb'
-        model = create_model(args.model)
-        temp_model = create_model(args.model)
-    # optimizer = create_optimizer(model, args.train['optimizer'], args.train['parameter'])
-    # scheduler = create_scheduler(optimizer, args.train['scheduler'])
-    trainer = create_trainer(fabric, args.Main_config, args.trainer, args, logger)
-    device = args.Main_config['device']
-    if device == '':
-        device = torch.device('cpu')
-    else:
-        device = torch.device('cuda:' + args.Main_config['device'])
-    model.to(device)
-    model.device = device
-    check_point = torch.load(args.check_point_path)
-    model.load_state_dict(check_point['model'])
-    trainer.max_epochs = 1
-    trainer.fit(model, None, test_dataloader, None, None, logger)
-    Calculate_Shapley(trainer = trainer, model = model, CalcuLoader = test_dataloader, logger= logger)
-
-def all_test(args: dict):
+def test(args: dict):
     dict_args = args
     args = SimpleNamespace(**args)
     model = args.Main_config['model']
     trainer = args.Main_config['trainer']
     dataset = args.Main_config['dataset']
     checkpoint_rootdir = f"./experiments/{model}_{trainer}_{dataset}/train_and_test"
+    if args.trainer['name'] == 'unimodal':
+        checkpoint_rootdir = checkpoint_rootdir.replace('unimodalTrainer','unimodalTrainer_' + list(args.model['encoders'].keys())[0])
+    test_path = args.test_path
+    if test_path is None:
+        test_path = get_newest_path(checkpoint_rootdir)
     for root, dirs, files in os.walk(checkpoint_rootdir):
-        if os.path.basename(root).startswith('train_20241104') or os.path.basename(root).startswith('train_20241105') or os.path.basename(root).startswith('train_20241106'):
+        if os.path.basename(root) in test_path:
             checkpoint_path = os.path.join(root, 'checkpoints', 'epoch_normal.ckpt')
             if os.path.isfile(checkpoint_path):
                 print(f"find checkpoint: {checkpoint_path}")
@@ -177,7 +129,8 @@ def all_test(args: dict):
             for handler in logger.handlers[:]:
                 handler.close()
                 logger.removeHandler(handler)
-
+        else:
+            raise ValueError("not a valid path, please check your model checkpoints")
 def t_sne(args: dict):
     dict_args = args
     targs = SimpleNamespace(**args)
@@ -185,8 +138,13 @@ def t_sne(args: dict):
     trainer = targs.Main_config['trainer']
     dataset = targs.Main_config['dataset']
     checkpoint_rootdir = f"./experiments/{model}_{trainer}_{dataset}/train_and_test"
+    if args.trainer['name'] == 'unimodal':
+        checkpoint_rootdir = checkpoint_rootdir.replace('unimodalTrainer','unimodalTrainer_' + list(args.model['encoders'].keys())[0])
+    test_path = args.test_path
+    if test_path is None:
+        test_path = get_newest_path(checkpoint_rootdir)
     for root, dirs, files in os.walk(checkpoint_rootdir):
-        if os.path.basename(root).startswith('train_20241107'):
+        if os.path.basename(root) in test_path:
             args = copy.deepcopy(targs)
             checkpoint_path = os.path.join(root, 'checkpoints', 'epoch_normal.ckpt')
             if os.path.isfile(checkpoint_path):

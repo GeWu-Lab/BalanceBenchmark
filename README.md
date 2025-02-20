@@ -1,6 +1,21 @@
 # BalanceBenchmark: A Survey for Imbalanced Learning
 
 ## Paper
+[BalanceBenchmark: A Survey for Imbalanced Learning](http://arxiv.org/abs/2502.10816)
+Shaoxuan Xu, Menglu Cui, Chengxiang Huang, Hongfa Wang and Di Hu
+If you find this repository useful, please cite our paper and corresponding toolkit:
+```bibtex
+@misc{xu2025balancebenchmarksurveyimbalancedlearning,
+      title={BalanceBenchmark: A Survey for Imbalanced Learning}, 
+      author={Shaoxuan Xu and Menglu Cui and Chengxiang Huang and Hongfa Wang and DiHu},
+      year={2025},
+      eprint={2502.10816},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2502.10816}, 
+}
+```
+
 ## Overview
 ![](images/frame6_00.png)
 

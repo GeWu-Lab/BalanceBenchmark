@@ -20,7 +20,7 @@ def add_to_pythonpath(path):
 add_to_pythonpath(os.getcwd())
 from balancemm.utils.parser_utils import parse_cli_args_to_dict, load_config_dict, ensure_and_get_config_path
 from balancemm.train import train_and_test, linear_probe_eval
-from balancemm.test import only_test, all_test, t_sne
+from balancemm.test import test, t_sne
 
 from lightning import fabric
 import datetime
@@ -178,12 +178,12 @@ def create_config(config_dict: dict, args):
             config_dict['name'] = config_dict['Main_config']['model'] + '_' +config_dict['Main_config']['trainer'] \
                 + '_' +config_dict['Train']['dataset']
             config_dict["out_dir"] = osp.join(root_path, 'experiments', config_dict["name"], mode, exp_name)
-    elif mode == "test" or mode == 'all_test' or mode == 'tsne':
-        # config_dict.pop('train', None)
-        # config_dict.pop('trainer', None)
-        # config_dict.pop('Train', None)
-        # config_dict.pop('Val', None)
+    elif mode == "test" or mode == 'tsne':
         config_dict['Val'] = config_dict['Test'].copy()
+        if args.test_path:
+            config_dict['test_path'] = args.test_path
+        else:
+            config_dict['test_path'] = None
         exp_name = f"test_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
         config_dict['name'] = config_dict['Main_config']['model'] + '_' +config_dict['Main_config']['trainer'] \
                 + '_' +config_dict['Train']['dataset']
@@ -231,6 +231,7 @@ if __name__ == "__main__":
     parser.add_argument('--move_lambda', type= str, default= None)
     parser.add_argument('--reinit_epoch', type= str, default= None)
     parser.add_argument('--lr_alpha', type= str, default= None)
+    parser.add_argument('--test_path', type= str, default= None)
     args = sys.argv[1:]
     print(args)
     os.environ['http_proxy'] = ''
@@ -261,9 +262,7 @@ if __name__ == "__main__":
     if args['mode'] == "train_and_test":
         train_and_test(args)
     elif args['mode'] == "test":
-        only_test(args)
-    elif args['mode'] == "all_test":
-        all_test(args)
+        test(args)
     elif args['mode'] == "tsne":
         t_sne(args)
     elif args['mode'] == "linear_probe":

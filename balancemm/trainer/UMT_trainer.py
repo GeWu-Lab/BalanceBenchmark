@@ -25,7 +25,7 @@ from models.avclassify_model import MultiModalParallel
 class UMTTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}, args = {}):
         super(UMTTrainer,self).__init__(fabric,**para_dict)
-        self.alpha = method_dict['alpha']
+        self.scaling = method_dict['scaling']
         self.modulation_starts = method_dict['modulation_starts']
         self.modulation_ends = method_dict['modulation_ends']
 
@@ -141,7 +141,7 @@ class UMTTrainer(BaseTrainer):
                 with torch.no_grad():
                     self.loaded_model[modality](batch)
                 out_unimodal = self.loaded_model[modality].encoder_result[modality]
-                loss += self.alpha * MSE(out_unimodal, model.encoder_result[modality])
+                loss += self.scaling * MSE(out_unimodal, model.encoder_result[modality])
 
         loss.backward()
         return loss
