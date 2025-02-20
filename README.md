@@ -1,8 +1,7 @@
 # BalanceBenchmark: A Survey for Imbalanced Learning
 
 ## Paper
-[BalanceBenchmark: A Survey for Imbalanced Learning](http://arxiv.org/abs/2502.10816)
-
+[**BalanceBenchmark: A Survey for Imbalanced Learning**](http://arxiv.org/abs/2502.10816)<br>
 Shaoxuan Xu, Menglu Cui, Chengxiang Huang, Hongfa Wang and Di Hu
 If you find this repository useful, please cite our paper and corresponding toolkit:
 ```bibtex
