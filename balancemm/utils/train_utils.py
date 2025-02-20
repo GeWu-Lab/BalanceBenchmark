@@ -39,7 +39,8 @@ def get_checkpoint_files(checkpoint_dir):
 
 def get_newest_path(out_dir):
     folders = [f for f in os.listdir(out_dir) if os.path.isdir(os.path.join(out_dir, f)) and len(os.listdir(os.path.join(out_dir, f + '/checkpoints')))>0 ]
-    folder = max(folders, key=lambda f: os.path.getmtime(os.path.join(out_dir, f)))
+    # folder = max(folders, key=lambda f: os.path.getmtime(os.path.join(out_dir, f)))
+    folder = max(folders)
     folder = os.path.join(out_dir, folder + '/checkpoints')
     if folder:
         return folder

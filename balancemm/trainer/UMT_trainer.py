@@ -21,6 +21,7 @@ import copy
 from ..utils.train_utils import get_checkpoint_files, get_newest_path
 import os.path as osp
 import yaml
+from models.avclassify_model import MultiModalParallel
 class UMTTrainer(BaseTrainer):
     def __init__(self,fabric, method_dict: dict = {}, para_dict : dict = {}, args = {}):
         super(UMTTrainer,self).__init__(fabric,**para_dict)
@@ -40,12 +41,16 @@ class UMTTrainer(BaseTrainer):
                 temp_args.model['encoders'] = {modality: args.model['encoders'][modality]}
                 temp_args.model['modality_size'] = {modality: args.model['modality_size'][modality]}
                 loaded_model[modality] = create_model(temp_args.model)
-                loaded_model[modality].to(temp_args.model['device'])
                 out_dir = temp_args.out_dir.replace('UMTTrainer', 'unimodalTrainer_' + modality)
                 out_dir = '/'.join(out_dir.split('/')[:-1])
                 path = get_newest_path(out_dir)
+                # loaded_model[modality].load_state_dict(torch.load(get_checkpoint_files(path)[0])['model'])
                 loaded_model[modality].load_state_dict(torch.load(get_checkpoint_files(path)[0])['model'])
-            self.loaded_model = nn.ModuleDict(loaded_model)
+                loaded_model[modality] = MultiModalParallel(loaded_model[modality],device_ids=[0,1])
+                loaded_model[modality] =loaded_model[modality].cuda()
+                # loaded_model[modality] = torch.load(get_checkpoint_files(path)[0])['model']
+                # print(type(loaded_model))
+            self.loaded_model = loaded_model
 
     def train_loop(
         self,
@@ -128,10 +133,6 @@ class UMTTrainer(BaseTrainer):
         MSE = nn.MSELoss()
         label = batch['label']
         label = label.to(model.device)
-        # if self.modality == 2:
-        #     a, v, out = model(batch)
-        # else:
-        #     a, v, t, out = model(batch)
         _ = model(batch= batch)
         out = model.encoder_result['output']        
         loss = criterion(out, label)

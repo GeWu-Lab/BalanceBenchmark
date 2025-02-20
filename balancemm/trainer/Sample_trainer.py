@@ -287,18 +287,9 @@ class SampleTrainer(BaseTrainer):
         label = batch['label']
         label = label.to(model.device)
         model(batch)
-        model.Unimodality_Calculate()
         modality_list = model.modalitys
         loss = criterion(model.unimodal_result['output'], label)
         loss.backward()
-
-
-        # model.unimodal_result.clear()
-        # model.encoder_result.clear()
-        # scores.clear()
-        # ratios.clear()
-        # coeffs.clear()
-        # batch.clear()
 
         return loss
     

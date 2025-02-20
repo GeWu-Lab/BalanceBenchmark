@@ -335,6 +335,8 @@ class BaseClassifierAMCoModel(BaseClassifierModel):
                 pt = 0,
                 types= 0) -> dict[str, torch.Tensor]:
         self.encoder_result = {}
+        self.unimodal_result = {}
+        self.prediction = {}
         for modality in self.modalitys:
             modality_data = batch[modality]
             # modality_data = modality_data.to(self.device)
@@ -347,8 +349,7 @@ class BaseClassifierAMCoModel(BaseClassifierModel):
                 modality_res = self.encoder_process(modality_data = modality_data, modality_name= modality)
             self.encoder_result[modality] = modality_res 
         self.encoder_result['output'] = self.fusion_module(self.encoder_result)
-        if True not in dependent_modality.values():
-            self.unimodality_calculate(mask,dependent_modality)
+        self.unimodality_calculate(mask,dependent_modality)
         self.encoder_result['output'] = self.linear_star(self.encoder_result['output'])
         self.unimodal_result['output'] = self.encoder_result['output'] 
         return self.encoder_result, self.unimodal_result, self.prediction
@@ -510,6 +511,7 @@ class BaseClassifierGreedyModel(BaseClassifierModel):
         modality_nums = 0
         all_nums = len(self.encoder_result.keys())-1
         self.unimodal_result = {}
+        self.prediction = {}
         now_size = 0
         for modality in self.encoder_result.keys():
             if modality == 'output':
@@ -563,6 +565,7 @@ class MMTM(nn.Module):
                 ,curation_mode = False
                 ,caring_modality = 0):
         squeeze_array = []
+        self.running_avg_weight = {}
         modality_list = model.modalitys
         for modality in modality_list:
             if modality == 'visual' or modality == 'flow':

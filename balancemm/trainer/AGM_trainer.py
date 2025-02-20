@@ -574,7 +574,8 @@ class AGMTrainer(BaseTrainer):
             train_scores[modality] = train_scores[modality] * (iteration - 1) / iteration + scores[modality].item() / iteration
             info += f'{modality} coeffs = {coeffs[modality]},'
         for name, parms in model.named_parameters():
-                layer = str(name).split('.')[1]
+                # layer = str(name).split('.')[1]
+                layer = str(name)
                 for modality in model.modalitys:
                     if modality in layer and len(parms.grad.size()) != 1: ##Don't change the grad of bias for layer
                             parms.grad *= coeffs[modality] 
