@@ -1,14 +1,14 @@
-# BalanceBenchmark: A Survey for Imbalanced Learning
+# BalanceBenchmark: A Survey for Multimodal Imbalance Learning
 
 ## Paper
-[**BalanceBenchmark: A Survey for Imbalanced Learning**](http://arxiv.org/abs/2502.10816)<br>
+[**BalanceBenchmark: A Survey for Multimodal Imbalance Learning**](http://arxiv.org/abs/2502.10816)<br>
 Shaoxuan Xu, Menglu Cui, Chengxiang Huang, Hongfa Wang and Di Hu
 
 If you find this repository useful, please cite our paper and corresponding toolkit:
 ```bibtex
-@misc{xu2025balancebenchmarksurveyimbalancedlearning,
-      title={BalanceBenchmark: A Survey for Imbalanced Learning}, 
-      author={Shaoxuan Xu and Menglu Cui and Chengxiang Huang and Hongfa Wang and DiHu},
+@misc{xu2025balancebenchmarksurveymultimodalimbalancelearning,
+      title={BalanceBenchmark: A Survey for Multimodal Imbalance Learning}, 
+      author={Shaoxuan Xu and Menglu Cui and Chengxiang Huang and Hongfa Wang and Di Hu},
       year={2025},
       eprint={2502.10816},
       archivePrefix={arXiv},
